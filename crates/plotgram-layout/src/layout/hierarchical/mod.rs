@@ -24,10 +24,10 @@ mod strong_macro;
 
 pub use debug::{build_debug_trace, LayoutDebugTrace};
 pub use group_frame::{GROUP_FRAME_GAP, GROUP_LABEL_TOP_PAD, GROUP_PAD};
-pub use metric::partition_bands::PARTITION_EMPTY_BAND_MIN;
 pub use ink::verify::{
     group_penetration_violations, verify_no_group_penetration, GroupPenetrationViolation,
 };
+pub use metric::partition_bands::PARTITION_EMPTY_BAND_MIN;
 
 use plotgram_algo::orientation::{self as algo_orient, Orientation as AlgoOrientation};
 use plotgram_engine_api::{
@@ -40,12 +40,11 @@ use plotgram_model::result::{EdgePath, EdgePlacement, GroupPlacement, NodePlacem
 use std::collections::{BTreeMap, BTreeSet};
 
 pub use params::{
-    BindResult, GroupPolicy, HierarchicalParams, HierarchicalPreset,
-    Orientation, RoutingStyle,
+    BindResult, GroupPolicy, HierarchicalParams, HierarchicalPreset, Orientation, RoutingStyle,
 };
 
-use model::ElemKey;
 use compose::ports::{EdgePorts, ResolvedPort};
+use model::ElemKey;
 use orient::{from_algo_point, to_algo_point, to_algo_size};
 use std::cell::Cell;
 
@@ -99,9 +98,10 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
 
     // PG-0: partition facts must be consistent before any layout decision
     // (partition-grid.md) — hard failure, never silent.
-    input.graph.validate_partition().map_err(|e| {
-        LayoutError::message(format!("hierarchical: invalid partition grid: {e}"))
-    })?;
+    input
+        .graph
+        .validate_partition()
+        .map_err(|e| LayoutError::message(format!("hierarchical: invalid partition grid: {e}")))?;
 
     let orientation = orient::to_algo_orientation(params.orientation);
 
@@ -129,7 +129,12 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
                     .to_string(),
             });
         }
-        if input.graph.partition.as_ref().map_or(false, |g| !g.rows.is_empty()) {
+        if input
+            .graph
+            .partition
+            .as_ref()
+            .map_or(false, |g| !g.rows.is_empty())
+        {
             diagnostics.warnings.push(LayoutWarning {
                 message: "hierarchical: partition rows are not consumed yet \
                           (cell_row ignored, PG-3)"
@@ -145,9 +150,8 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     let canonical_size = canonical_sizes(&real_graph, input.node_sizes, orientation)?;
 
     if params.group_policy == GroupPolicy::StrongMacro {
-        let (real_graph, plan, ports, end_bundles, frames, groups, labeled) = strong_macro::layout(
-            input, params, orientation, real_graph, &canonical_size,
-        )?;
+        let (real_graph, plan, ports, end_bundles, frames, groups, labeled) =
+            strong_macro::layout(input, params, orientation, real_graph, &canonical_size)?;
         // D1.2: Channel search + rip-up; BundlePlan (end-bus + optional corridor).
         let route_plan =
             channel::route_edges_channel(&plan, &real_graph, &ports, &end_bundles, params)?;
@@ -226,12 +230,8 @@ fn compute_weak<'g>(
     // Group ids carrying a label (frame top pad reserves the label band).
     let labeled = collect_labeled_groups(&input.graph.groups);
 
-    let port_assignment = compose::ports::assign_ports(
-        &real_graph,
-        &plan,
-        orientation,
-        params.auto_edge_grouping,
-    )?;
+    let port_assignment =
+        compose::ports::assign_ports(&real_graph, &plan, orientation, params.auto_edge_grouping)?;
     let compose::ports::PortAssignment {
         ports,
         bundles: end_bundles,
@@ -253,10 +253,9 @@ fn compute_weak<'g>(
     } else {
         Vec::new()
     };
-    let size_of =
-        |elem_idx: usize| -> algo_orient::Size {
-            elem_size(&plan, &real_graph, &canonical_size, elem_idx)
-        };
+    let size_of = |elem_idx: usize| -> algo_orient::Size {
+        elem_size(&plan, &real_graph, &canonical_size, elem_idx)
+    };
     let main_prelim =
         metric::main_axis::assign_main_axis(&plan, &size_of, &prelim_gaps, params.layer_alignment);
     // Infeasibility here can only come from crossing BK blocks — a bug, not
@@ -276,12 +275,7 @@ fn compute_weak<'g>(
     let prelim_frames: Vec<Rect> = (0..plan.elems.len())
         .map(|i| {
             let s = elem_size(&plan, &real_graph, &canonical_size, i);
-            Rect::new(
-                cross[i] - s.width / 2.0,
-                main_prelim[i],
-                s.width,
-                s.height,
-            )
+            Rect::new(cross[i] - s.width / 2.0, main_prelim[i], s.width, s.height)
         })
         .collect();
 
@@ -341,11 +335,12 @@ fn compute_channel_ink_tail<'g>(
     route_plan: channel::ChannelRoutePlan,
     frames: TailFrames,
 ) -> Result<(LayoutOutput, debug::Captures<'g>), LayoutError> {
-    let size_of =
-        |elem_idx: usize| -> algo_orient::Size {
-            elem_size(&plan, &real_graph, &canonical_size, elem_idx)
-        };
-    diagnostics.relaxations.extend(route_plan.relaxations.iter().cloned());
+    let size_of = |elem_idx: usize| -> algo_orient::Size {
+        elem_size(&plan, &real_graph, &canonical_size, elem_idx)
+    };
+    diagnostics
+        .relaxations
+        .extend(route_plan.relaxations.iter().cloned());
     let mut bus_edge_ids: Vec<String> = compose::bundle::end_bus_edge_ids(&route_plan.bundles)
         .into_iter()
         .collect();
@@ -504,8 +499,13 @@ fn compute_channel_ink_tail<'g>(
             )
         })
         .collect();
-    let lane_facts =
-        main_lane_facts(&plan, &real_graph, &ports, &canonical_frames, params.edge_gap);
+    let lane_facts = main_lane_facts(
+        &plan,
+        &real_graph,
+        &ports,
+        &canonical_frames,
+        params.edge_gap,
+    );
     let (track_coords, track_relaxations) = metric::track::assign_track_coords(
         &plan,
         &main,
@@ -561,16 +561,14 @@ fn compute_channel_ink_tail<'g>(
         &canonical_frames,
         params.edge_gap,
     ));
-    ink::verify::verify_no_illegal_overlap(
-        &canonical_edges,
-        &route_plan.bundles,
-        params.edge_gap,
-    )?;
-    diagnostics.relaxations.extend(ink::verify::segment_overlap_relaxations(
-        &canonical_edges,
-        &route_plan.bundles,
-        params.edge_gap,
-    ));
+    ink::verify::verify_no_illegal_overlap(&canonical_edges, &route_plan.bundles, params.edge_gap)?;
+    diagnostics
+        .relaxations
+        .extend(ink::verify::segment_overlap_relaxations(
+            &canonical_edges,
+            &route_plan.bundles,
+            params.edge_gap,
+        ));
     let real_frames: Vec<(String, Rect)> = real_graph
         .ids
         .iter()
@@ -587,13 +585,15 @@ fn compute_channel_ink_tail<'g>(
     for ce in &canonical_edges {
         if let Some(bends) = ink::verify::polyline_bend_count(&ce.path) {
             if bends > params.max_bends_budget as usize {
-                diagnostics.relaxations.push(plotgram_model::diagnostics::Relaxation {
-                    rule: "ink-max-bends-budget".into(),
-                    detail: format!(
-                        "edge `{}` has {bends} bends > max_bends_budget={}",
-                        ce.id, params.max_bends_budget
-                    ),
-                });
+                diagnostics
+                    .relaxations
+                    .push(plotgram_model::diagnostics::Relaxation {
+                        rule: "ink-max-bends-budget".into(),
+                        detail: format!(
+                            "edge `{}` has {bends} bends > max_bends_budget={}",
+                            ce.id, params.max_bends_budget
+                        ),
+                    });
             }
         }
     }
@@ -603,9 +603,7 @@ fn compute_channel_ink_tail<'g>(
         matches!(params.routing_style, RoutingStyle::Orthogonal),
     ) {
         Ok(()) => {}
-        Err(err)
-            if route_plan.used_gates && !CHANNEL_FORCE_ROOT.get() =>
-        {
+        Err(err) if route_plan.used_gates && !CHANNEL_FORCE_ROOT.get() => {
             // Gate corridors + order pads can still produce a legal Channel
             // path that pens a real node; retry once with root-scope Channel.
             let _ = err;
@@ -712,10 +710,7 @@ fn compute_channel_ink_tail<'g>(
         .iter()
         .map(|(id, topo)| {
             let channel::RouteTopology::Orthogonal(path) = topo;
-            (
-                id.clone(),
-                path.tracks.iter().map(|t| t.0).collect(),
-            )
+            (id.clone(), path.tracks.iter().map(|t| t.0).collect())
         })
         .collect();
 
@@ -814,10 +809,7 @@ fn main_lane_facts(
                 metric::anchor::port_anchor(frames[tgt], rp.target).x,
             ),
         );
-        let (sr, tr) = (
-            plan.elems[src].rank as usize,
-            plan.elems[tgt].rank as usize,
-        );
+        let (sr, tr) = (plan.elems[src].rank as usize, plan.elems[tgt].rank as usize);
         let (lo, hi) = (sr.min(tr), sr.max(tr));
         facts.rank_span.insert(e.edge_id.clone(), (lo, hi));
         facts.endpoint_elems.insert(e.edge_id.clone(), (src, tgt));
@@ -828,9 +820,7 @@ fn main_lane_facts(
         let mut bounds = (f64::NEG_INFINITY, f64::INFINITY);
         for (elem, port) in [(src, rp.source), (tgt, rp.target)] {
             match port.side {
-                algo_orient::Side::East => {
-                    bounds.0 = bounds.0.max(frames[elem].right() + margin)
-                }
+                algo_orient::Side::East => bounds.0 = bounds.0.max(frames[elem].right() + margin),
                 algo_orient::Side::West => bounds.1 = bounds.1.min(frames[elem].x - margin),
                 _ => {}
             }
@@ -856,7 +846,11 @@ fn main_lane_facts(
             (rp.target.side, rp.source.side)
         };
         let cross_lo = if ns(lo_side) { lo + 1 } else { lo };
-        let cross_hi = if ns(hi_side) { hi.saturating_sub(1) } else { hi };
+        let cross_hi = if ns(hi_side) {
+            hi.saturating_sub(1)
+        } else {
+            hi
+        };
         facts.corridor_ranks.insert(
             e.edge_id.clone(),
             (cross_lo <= cross_hi).then_some((cross_lo, cross_hi)),
@@ -867,7 +861,9 @@ fn main_lane_facts(
 
 /// Group ids carrying a label (recursive — nested groups included); their
 /// frame top pad reserves the label band.
-fn collect_labeled_groups(groups: &[plotgram_model::graph::Group]) -> std::collections::BTreeSet<String> {
+fn collect_labeled_groups(
+    groups: &[plotgram_model::graph::Group],
+) -> std::collections::BTreeSet<String> {
     let mut out = std::collections::BTreeSet::new();
     fn walk(groups: &[plotgram_model::graph::Group], out: &mut std::collections::BTreeSet<String>) {
         for g in groups {
@@ -888,9 +884,9 @@ fn collect_labeled_groups(groups: &[plotgram_model::graph::Group]) -> std::colle
 fn port_ref_out(orientation: AlgoOrientation, rp: ResolvedPort) -> PortRef {
     let along = match rp.along {
         AlongSpec::Ordered { .. } => rp.along,
-        AlongSpec::LocalOffset(p) => AlongSpec::LocalOffset(from_algo_point(
-            orientation.from_tb_point(to_algo_point(p)),
-        )),
+        AlongSpec::LocalOffset(p) => {
+            AlongSpec::LocalOffset(from_algo_point(orientation.from_tb_point(to_algo_point(p))))
+        }
     };
     PortRef {
         side: orient::from_algo_side(orientation.from_tb_side(rp.side)),
@@ -1060,17 +1056,13 @@ mod tests {
                 .map(|k| ((*k).to_string(), AttrValue::Num(1.0)))
                 .collect();
             let out = layout_with_options(options);
-            assert_eq!(
-                out.diagnostics.warnings.len(),
-                *expected,
-                "keys={keys:?}"
-            );
+            assert_eq!(out.diagnostics.warnings.len(), *expected, "keys={keys:?}");
             for (w, key) in out.diagnostics.warnings.iter().zip(*keys) {
                 assert!(w.message.contains(key), "{}", w.message);
             }
-        // Soft relaxations only appear for Channel rip-up / group fallback;
-        // this two-node (ungrouped) fixture stays empty.
-        assert!(out.diagnostics.relaxations.is_empty());
+            // Soft relaxations only appear for Channel rip-up / group fallback;
+            // this two-node (ungrouped) fixture stays empty.
+            assert!(out.diagnostics.relaxations.is_empty());
             assert_eq!(out.diagnostics.params_hash.len(), 16);
         }
     }
@@ -1108,11 +1100,7 @@ mod tests {
 
         // (grid, node cell, expected message fragment)
         let cases: &[(Option<PartitionGrid>, Option<PartitionCell>, &str)] = &[
-            (
-                None,
-                Some(PartitionCell::col("x")),
-                "no `partition` grid",
-            ),
+            (None, Some(PartitionCell::col("x")), "no `partition` grid"),
             (
                 Some(PartitionGrid {
                     columns: vec![PartitionAxis::new("sales")],
@@ -1223,16 +1211,22 @@ mod tests {
         };
 
         // StrongMacro + grid → hard failure, never silent.
-        let err = run(&graph_with_grid(false), opts(&[("group_policy", "strong-macro")]))
-            .expect_err("strong-macro + partition must fail hard");
+        let err = run(
+            &graph_with_grid(false),
+            opts(&[("group_policy", "strong-macro")]),
+        )
+        .expect_err("strong-macro + partition must fail hard");
         assert!(
             err.to_string().contains("strong-macro"),
             "unexpected error: {err}"
         );
 
         // LR + grid → not consumed (columns are the main axis there), warning.
-        let out = run(&graph_with_grid(false), opts(&[("orientation", "left-to-right")]))
-            .expect("LR + partition must still lay out");
+        let out = run(
+            &graph_with_grid(false),
+            opts(&[("orientation", "left-to-right")]),
+        )
+        .expect("LR + partition must still lay out");
         assert!(
             out.diagnostics
                 .warnings
@@ -1322,11 +1316,8 @@ mod tests {
             })
             .expect("swimlane layout");
 
-        let mut frames: Vec<(&str, Rect)> = out
-            .nodes
-            .iter()
-            .map(|n| (n.id.as_str(), n.frame))
-            .collect();
+        let mut frames: Vec<(&str, Rect)> =
+            out.nodes.iter().map(|n| (n.id.as_str(), n.frame)).collect();
         frames.sort_by(|a, b| a.0.cmp(b.0));
         insta::assert_json_snapshot!(serde_json::json!(frames
             .iter()
@@ -1412,7 +1403,12 @@ mod tests {
         let ids: Vec<&str> = bands.iter().map(|b| b.column.as_str()).collect();
         assert_eq!(ids, vec!["customer", "sales", "warehouse"]);
         assert!(bands.iter().all(|b| !b.empty), "no empty column here");
-        for (id, ci) in [("place_order", 0usize), ("confirm", 1), ("pick", 2), ("ship", 2)] {
+        for (id, ci) in [
+            ("place_order", 0usize),
+            ("confirm", 1),
+            ("pick", 2),
+            ("ship", 2),
+        ] {
             let f = out.nodes.iter().find(|n| n.id == id).unwrap().frame;
             let b = &bands[ci];
             assert!(
@@ -1488,10 +1484,21 @@ mod tests {
             o.nodes.iter().map(|n| (n.id.clone(), n.frame)).collect()
         };
         let paths = |o: &LayoutOutput| -> Vec<(String, plotgram_model::result::EdgePath)> {
-            o.edges.iter().map(|e| (e.id.clone(), e.path.clone())).collect()
+            o.edges
+                .iter()
+                .map(|e| (e.id.clone(), e.path.clone()))
+                .collect()
         };
-        assert_eq!(frames(&none), frames(&empty_grid), "node frames must be bit-identical");
-        assert_eq!(paths(&none), paths(&empty_grid), "edge geometry must be bit-identical");
+        assert_eq!(
+            frames(&none),
+            frames(&empty_grid),
+            "node frames must be bit-identical"
+        );
+        assert_eq!(
+            paths(&none),
+            paths(&empty_grid),
+            "edge geometry must be bit-identical"
+        );
         // PG-2: unconsumed grids publish no bands (the obs key stays absent)
         // and diagnostics are bit-identical as well.
         for o in [&none, &empty_grid] {

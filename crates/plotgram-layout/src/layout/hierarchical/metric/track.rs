@@ -98,12 +98,7 @@ pub fn assign_track_coords(
             let s = size_of(e);
             let cx = cross_centers[e];
             let y = main[e];
-            obstacles.push((
-                cx - s.width / 2.0,
-                y,
-                cx + s.width / 2.0,
-                y + s.height,
-            ));
+            obstacles.push((cx - s.width / 2.0, y, cx + s.width / 2.0, y + s.height));
         }
     }
 
@@ -178,9 +173,8 @@ pub fn assign_track_coords(
             let gap_top = main[plan.layers[r][0]] + thickness;
             let gap_bot = main[plan.layers[r + 1][0]];
             let (below_band, above_band) = shell.gap.get(r).copied().unwrap_or((0.0, 0.0));
-            let (start, fallback) = cross_lane_start(
-                gap_top, gap_bot, below_band, above_band, count, edge_gap,
-            );
+            let (start, fallback) =
+                cross_lane_start(gap_top, gap_bot, below_band, above_band, count, edge_gap);
             if fallback {
                 relaxations.push(Relaxation {
                     rule: "channel-shell-band-fallback".into(),
@@ -190,9 +184,7 @@ pub fn assign_track_coords(
                     ),
                 });
             }
-            (0..count)
-                .map(|i| start + i as f64 * edge_gap)
-                .collect()
+            (0..count).map(|i| start + i as f64 * edge_gap).collect()
         };
         cross_grids.insert(line, ys);
     }
@@ -232,20 +224,26 @@ pub fn assign_track_coords(
                         .map(|v| v.as_slice())
                         .unwrap_or(&[]);
                     let band = lane_rank_band(facts, members);
-                    let lane_obstacles = band_obstacles(
-                        plan, main, cross_centers, size_of, facts, members,
-                    );
+                    let lane_obstacles =
+                        band_obstacles(plan, main, cross_centers, size_of, facts, members);
                     let _ = outer;
                     let foreign = foreign_group_frames(groups, facts, members);
-                    let settle = |x: f64| -> f64 {
-                        clear_outside(x, &lane_obstacles, &foreign, edge_gap)
-                    };
+                    let settle =
+                        |x: f64| -> f64 { clear_outside(x, &lane_obstacles, &foreign, edge_gap) };
                     let (blo, bhi) = lane_x_bounds(facts, members);
                     let settle = |x: f64| settle_within(x, blo, bhi, edge_gap, &settle);
                     let x = if members.is_empty() {
                         settle(backbone - (lane as f64) * if og == 0 { edge_gap } else { 0.0 })
                     } else {
-                        best_lane_x(plan, cross_centers, facts, members, backbone, edge_gap, &settle)
+                        best_lane_x(
+                            plan,
+                            cross_centers,
+                            facts,
+                            members,
+                            backbone,
+                            edge_gap,
+                            &settle,
+                        )
                     };
                     xs.push(x);
                     bands.push(band);
@@ -389,13 +387,7 @@ fn lane_x_bounds(facts: &MainLaneFacts, members: &[String]) -> (f64, f64) {
 
 /// Clear `x` of node bodies **without** leaving `[lo, hi]`: clearance may push
 /// a rail across the bound, so step back inward until both hold.
-fn settle_within(
-    x: f64,
-    lo: f64,
-    hi: f64,
-    edge_gap: f64,
-    settle: &dyn Fn(f64) -> f64,
-) -> f64 {
+fn settle_within(x: f64, lo: f64, hi: f64, edge_gap: f64, settle: &dyn Fn(f64) -> f64) -> f64 {
     let clamp = |v: f64| v.clamp(lo, hi);
     let first = settle(clamp(x));
     if first >= lo - 1e-9 && first <= hi + 1e-9 {
@@ -497,11 +489,7 @@ fn chain_columns(plan: &PlanGraph, cross_centers: &[f64], edge_id: &str) -> Vec<
 
 /// Push lanes of one corridor apart when their rank bands overlap — lanes
 /// with disjoint bands are free to share an X.
-fn separate_overlapping_lanes(
-    xs: &mut [f64],
-    bands: &[Option<(usize, usize)>],
-    edge_gap: f64,
-) {
+fn separate_overlapping_lanes(xs: &mut [f64], bands: &[Option<(usize, usize)>], edge_gap: f64) {
     let overlaps = |a: usize, b: usize| match (bands.get(a), bands.get(b)) {
         (Some(Some((a0, a1))), Some(Some((b0, b1)))) => a0 <= b1 && b0 <= a1,
         _ => true,
@@ -589,7 +577,11 @@ fn clear_main_x(x: f64, obstacles: &[(f64, f64, f64, f64)], edge_gap: f64) -> f6
     const EPS: f64 = 1e-6;
     let margin = edge_gap.max(1.0) * 0.5;
     let mut intervals: Vec<(f64, f64)> = obstacles.iter().map(|&(l, _, r, _)| (l, r)).collect();
-    intervals.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap().then(a.1.partial_cmp(&b.1).unwrap()));
+    intervals.sort_by(|a, b| {
+        a.0.partial_cmp(&b.0)
+            .unwrap()
+            .then(a.1.partial_cmp(&b.1).unwrap())
+    });
     let mut merged: Vec<(f64, f64)> = Vec::new();
     for (l, r) in intervals {
         if let Some(last) = merged.last_mut() {
@@ -625,7 +617,11 @@ fn clear_outside(
     edge_gap: f64,
 ) -> f64 {
     for _ in 0..16 {
-        let next = clear_main_x(clear_main_x(x, obstacles, edge_gap), group_obstacles, edge_gap);
+        let next = clear_main_x(
+            clear_main_x(x, obstacles, edge_gap),
+            group_obstacles,
+            edge_gap,
+        );
         if next == x {
             return x;
         }
@@ -705,7 +701,7 @@ mod tests {
                 decl_index: (0..2).collect(),
                 segments: vec![],
                 layers: vec![vec![0], vec![1]],
-                            ..Default::default()
+                ..Default::default()
             };
             // One corridor line cut into a wide + narrow scope-cut track.
             let mut sub = Substrate::new();
@@ -749,8 +745,7 @@ mod tests {
                 &MainLaneFacts::default(),
             );
             assert_eq!(
-                &coords.coords[&t_wide],
-                expected,
+                &coords.coords[&t_wide], expected,
                 "below={below} above={above} count={count}"
             );
             // The single-lane track takes lane 0 of the same grid — never an
@@ -868,7 +863,7 @@ mod tests {
             decl_index: (0..2).collect(),
             segments: vec![],
             layers: vec![vec![0], vec![1]],
-                    ..Default::default()
+            ..Default::default()
         };
         // East-outer Main track (order gap 1 >= max_cols 1).
         let mut sub = Substrate::new();

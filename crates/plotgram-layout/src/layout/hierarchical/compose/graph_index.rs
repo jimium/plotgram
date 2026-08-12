@@ -186,7 +186,10 @@ mod tests {
         assert_eq!(rg.ids, vec!["place_order", "archive", "verify_order"]);
         let grid = rg.partition.as_ref().expect("grid carried through");
         assert_eq!(
-            grid.columns.iter().map(|a| a.id.as_str()).collect::<Vec<_>>(),
+            grid.columns
+                .iter()
+                .map(|a| a.id.as_str())
+                .collect::<Vec<_>>(),
             vec!["customer", "sales"]
         );
         assert_eq!(

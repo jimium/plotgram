@@ -106,9 +106,7 @@ pub fn group_shell_bands(plan: &PlanGraph, labeled: &BTreeSet<String>) -> GroupS
             .filter(|(_, &(lo, _))| lo == ru + 1)
             .map(|(g, _)| group_top_pad(labeled.contains(*g)))
             .fold(0.0_f64, f64::max);
-        bands
-            .gap
-            .push((if below { GROUP_PAD } else { 0.0 }, above));
+        bands.gap.push((if below { GROUP_PAD } else { 0.0 }, above));
     }
     bands.outer_top = span
         .iter()

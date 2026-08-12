@@ -9,7 +9,6 @@ use std::fmt;
 #[cfg(test)]
 use crate::layout::hierarchical::model::PlanGraph;
 
-
 /// Discrete track (segment) identity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TrackId(pub u32);
@@ -118,19 +117,41 @@ pub enum SubstrateError {
     DuplicateTrack(TrackId),
     DuplicateGroup(GroupId),
     DuplicateGate(GateId),
-    InvalidExtent { track: TrackId },
-    InvalidLink { a: TrackId, b: TrackId },
-    ParallelLink { a: TrackId, b: TrackId },
-    NonIntersectingLink { a: TrackId, b: TrackId },
-    CrossScopeConnection { a: TrackId, b: TrackId },
-    InvalidGateScope { gate: GateId, group: GroupId },
+    InvalidExtent {
+        track: TrackId,
+    },
+    InvalidLink {
+        a: TrackId,
+        b: TrackId,
+    },
+    ParallelLink {
+        a: TrackId,
+        b: TrackId,
+    },
+    NonIntersectingLink {
+        a: TrackId,
+        b: TrackId,
+    },
+    CrossScopeConnection {
+        a: TrackId,
+        b: TrackId,
+    },
+    InvalidGateScope {
+        gate: GateId,
+        group: GroupId,
+    },
     GatePairMismatch {
         gate: GateId,
         inner: TrackId,
         outer: TrackId,
     },
-    DuplicateGateSide { group: GroupId, side: GateSide },
-    EmptyGate { gate: GateId },
+    DuplicateGateSide {
+        group: GroupId,
+        side: GateSide,
+    },
+    EmptyGate {
+        gate: GateId,
+    },
 }
 
 impl fmt::Display for SubstrateError {
@@ -262,14 +283,8 @@ impl Substrate {
 
     /// Same-scope intersecting Main×Cross link.
     pub fn link(&mut self, a: TrackId, b: TrackId) -> Result<(), SubstrateError> {
-        let ta = self
-            .tracks
-            .get(&a)
-            .ok_or(SubstrateError::UnknownTrack(a))?;
-        let tb = self
-            .tracks
-            .get(&b)
-            .ok_or(SubstrateError::UnknownTrack(b))?;
+        let ta = self.tracks.get(&a).ok_or(SubstrateError::UnknownTrack(a))?;
+        let tb = self.tracks.get(&b).ok_or(SubstrateError::UnknownTrack(b))?;
         if a == b {
             return Err(SubstrateError::InvalidLink { a, b });
         }
@@ -419,12 +434,7 @@ impl BlueprintIndex {
             .map(|sg| sg.id)
     }
 
-    pub fn resolve_host_track(
-        &self,
-        rank: usize,
-        order: usize,
-        side: PortSide,
-    ) -> Option<TrackId> {
+    pub fn resolve_host_track(&self, rank: usize, order: usize, side: PortSide) -> Option<TrackId> {
         match side {
             PortSide::MainLow => self.cross_at(rank, order),
             PortSide::MainHigh => self.cross_at(rank + 1, order),

@@ -130,9 +130,8 @@ pub(super) fn expand(
         top_scope.iter().enumerate().map(|(k, &b)| (b, k)).collect();
 
     let mut cache: BTreeMap<usize, Vec<Vec<String>>> = BTreeMap::new();
-    let layers_of = |bi: usize, cache: &mut BTreeMap<usize, Vec<Vec<String>>>| {
-        block_layers(blocks, bi, cache)
-    };
+    let layers_of =
+        |bi: usize, cache: &mut BTreeMap<usize, Vec<Vec<String>>>| block_layers(blocks, bi, cache);
 
     // Top bands: band width = deepest top block of that super rank.
     let max_top_rank = top_scope
@@ -188,7 +187,10 @@ pub(super) fn expand(
         .iter()
         .map(|&bi| {
             let r = blocks[bi].super_rank as usize;
-            (offsets[r], offsets[r] + layers_of(bi, &mut cache).len() as u32)
+            (
+                offsets[r],
+                offsets[r] + layers_of(bi, &mut cache).len() as u32,
+            )
         })
         .collect();
     let edge_source_top: BTreeMap<String, usize> = real_graph
@@ -233,11 +235,7 @@ pub(super) fn expand(
             let section = edge_source_top[&edge_id];
             let (start, end) = top_block_band[section];
             let covered = (start..end).contains(&(g as u32));
-            (
-                if covered { section } else { usize::MAX },
-                edge_id,
-                ordinal,
-            )
+            (if covered { section } else { usize::MAX }, edge_id, ordinal)
         });
         ordered.extend(virtuals);
         plan.layers[g] = ordered;

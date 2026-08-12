@@ -9,9 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use plotgram_engine_api::LayoutError;
 use plotgram_model::diagnostics::Relaxation;
 
-use super::substrate::{
-    BlueprintIndex, GateSide, GroupId, SegmentRef, Substrate, TrackOrient,
-};
+use super::substrate::{BlueprintIndex, GateSide, GroupId, SegmentRef, Substrate, TrackOrient};
 use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealGraph};
 
 #[derive(Debug, Clone, Copy)]
@@ -197,9 +195,11 @@ fn derive_group_substrate(
         .flatten()
         {
             let (bo0, bo1) = span;
-            let covers = descendants
-                .iter()
-                .all(|m| nodes.get(m).is_some_and(|s| s.order >= bo0 && s.order <= bo1));
+            let covers = descendants.iter().all(|m| {
+                nodes
+                    .get(m)
+                    .is_some_and(|s| s.order >= bo0 && s.order <= bo1)
+            });
             if covers && boundary_ranks_pure(plan, gname, nodes, &desc_set) {
                 o0 = bo0;
                 o1 = bo1;
@@ -277,12 +277,7 @@ fn derive_group_substrate(
     }
 
     let rank_count = plan.layers.len();
-    let order_count = plan
-        .layers
-        .iter()
-        .map(|l| l.len())
-        .max()
-        .unwrap_or(0);
+    let order_count = plan.layers.iter().map(|l| l.len()).max().unwrap_or(0);
 
     let mut cross_lines: BTreeMap<usize, Vec<SegmentRef>> = BTreeMap::new();
     for k in 0..=rank_count {
@@ -474,7 +469,10 @@ fn boundary_ranks_pure(
             continue;
         };
         for (nname, slot) in nodes {
-            if slot.rank == rank && l <= slot.order && slot.order <= r && !descendants.contains(nname)
+            if slot.rank == rank
+                && l <= slot.order
+                && slot.order <= r
+                && !descendants.contains(nname)
             {
                 return false;
             }
@@ -523,12 +521,7 @@ fn boundary_ranks_overlap(plan: &PlanGraph, a: &str, b: &str) -> bool {
 /// Derive a root-scope Substrate with node-body Main cuts (P5-1).
 pub fn derive_root_substrate(plan: &PlanGraph) -> (Substrate, BlueprintIndex) {
     let rank_count = plan.layers.len();
-    let order_count = plan
-        .layers
-        .iter()
-        .map(|l| l.len())
-        .max()
-        .unwrap_or(0);
+    let order_count = plan.layers.iter().map(|l| l.len()).max().unwrap_or(0);
 
     let mut s = Substrate::new();
     let mut cross_lines: BTreeMap<usize, Vec<SegmentRef>> = BTreeMap::new();
@@ -778,7 +771,7 @@ mod tests {
             decl_index: (0..4).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3]],
-                    ..Default::default()
+            ..Default::default()
         };
         let mut index_of_ids = BTreeMap::new();
         index_of_ids.insert("a".into(), 0);

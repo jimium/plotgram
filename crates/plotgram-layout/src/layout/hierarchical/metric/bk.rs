@@ -242,7 +242,11 @@ fn vertical_alignment(plan: &PlanGraph, ctx: &Ctx, use_upper: bool, left: bool) 
 /// The one or two median neighbors of `v` on the swept side (already sorted
 /// by position; left-of-center first).
 fn medians(ctx: &Ctx, v: usize, use_upper: bool) -> Vec<usize> {
-    let nbs = if use_upper { &ctx.upper[v] } else { &ctx.lower[v] };
+    let nbs = if use_upper {
+        &ctx.upper[v]
+    } else {
+        &ctx.lower[v]
+    };
     let k = nbs.len();
     if k == 0 {
         Vec::new()
@@ -358,9 +362,7 @@ mod tests {
 
         let bk = bk_ideal(&plan, &|_| Size::new(20.0, 10.0), 10.0);
         assert!(
-            bk.primary_blocks
-                .iter()
-                .any(|b| b == &vec![0usize, 1, 2]),
+            bk.primary_blocks.iter().any(|b| b == &vec![0usize, 1, 2]),
             "primary alignment must keep the 1:1 chain in one block: {:?}",
             bk.primary_blocks
         );

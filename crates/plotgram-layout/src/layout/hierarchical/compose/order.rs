@@ -18,8 +18,8 @@
 //! [`super::boundary::insert_group_boundaries`] (Left/Right clamps + high-weight
 //! cross-rank segments). Crossing minimization is fully group-agnostic.
 
-use std::collections::{BTreeMap, BTreeSet};
 use std::cmp::Ordering;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::layout::hierarchical::model::{Elem, PlanGraph};
 
@@ -291,11 +291,7 @@ fn is_forward_branch_source(
     is_branch_source(plan, xidx, e) && !heads_reversed_edge(plan, e, reversed_edges)
 }
 
-fn source_moment(
-    plan: &PlanGraph,
-    xidx: &CrossingIndex,
-    reversed_edges: &BTreeSet<String>,
-) -> u64 {
+fn source_moment(plan: &PlanGraph, xidx: &CrossingIndex, reversed_edges: &BTreeSet<String>) -> u64 {
     let mut sum = 0u64;
     for layer in &plan.layers {
         for (i, &e) in layer.iter().enumerate() {
@@ -764,9 +760,7 @@ fn restore_group_clamps(plan: &mut PlanGraph, r: usize) {
         }
 
         let is_member = |e: usize| {
-            e != left_ei
-                && e != right_ei
-                && plan.elems[e].group_path.iter().any(|g| g == &group)
+            e != left_ei && e != right_ei && plan.elems[e].group_path.iter().any(|g| g == &group)
         };
 
         let mut before = Vec::new();
@@ -897,11 +891,7 @@ fn transpose_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, use_span: bool) {
 
 /// Sifting: slide each non-zero-width elem through its layer, keep best `J_order`.
 /// Crosses zero-width dummies that block adjacent transpose.
-fn sift_pass(
-    plan: &mut PlanGraph,
-    xidx: &CrossingIndex,
-    reversed_edges: &BTreeSet<String>,
-) {
+fn sift_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, reversed_edges: &BTreeSet<String>) {
     let layer_count = plan.layers.len();
     for r in 0..layer_count {
         if plan.layers[r].len() < 2 {
@@ -1422,7 +1412,6 @@ mod tests {
             plan.layers[1]
         );
     }
-
 
     #[test]
     fn span_tiebreak_prefers_straighter_order() {

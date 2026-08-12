@@ -291,10 +291,7 @@ fn project(layout_name: &str, cap: Captures<'_>) -> LayoutDebugTrace {
         .map(|(i, elem)| {
             let frame = phys_rect(cap.canonical_frames[i]);
             let (key, kind_tags) = match &elem.key {
-                ElemKey::Real(id) => (
-                    ElemKeyDebug::Real { id: id.clone() },
-                    vec!["real"],
-                ),
+                ElemKey::Real(id) => (ElemKeyDebug::Real { id: id.clone() }, vec!["real"]),
                 ElemKey::Virtual { edge_id, ordinal } => (
                     ElemKeyDebug::Virtual {
                         owner_edge: edge_id.clone(),
@@ -482,8 +479,7 @@ fn project(layout_name: &str, cap: Captures<'_>) -> LayoutDebugTrace {
                 .collect(),
         },
         notes: vec![
-            "hierarchical: D1.3 Channel (RouteOrder + Gate/ScopeMask + bounded rip-up)"
-                .to_string(),
+            "hierarchical: D1.3 Channel (RouteOrder + Gate/ScopeMask + bounded rip-up)".to_string(),
         ],
     }
 }
@@ -537,7 +533,8 @@ fn collect_groups(
 }
 
 fn project_edge_plans(cap: &Captures<'_>) -> Vec<HierEdgeDebug> {
-    let mut plans = Vec::with_capacity(cap.real_graph.edges.len() + cap.real_graph.self_loops.len());
+    let mut plans =
+        Vec::with_capacity(cap.real_graph.edges.len() + cap.real_graph.self_loops.len());
 
     for e in &cap.real_graph.edges {
         let mut segs: Vec<&Segment> = cap
@@ -622,11 +619,20 @@ fn project_ports(
             None => continue,
         };
         for (end, node_idx, resolved, constraint) in [
-            ("source", e.original_source, edge_ports.source, e.from_port.clone()),
-            ("target", e.original_target, edge_ports.target, e.to_port.clone()),
+            (
+                "source",
+                e.original_source,
+                edge_ports.source,
+                e.from_port.clone(),
+            ),
+            (
+                "target",
+                e.original_target,
+                edge_ports.target,
+                e.to_port.clone(),
+            ),
         ] {
-            let elem = cap.plan.index_of
-                [&ElemKey::Real(cap.real_graph.ids[node_idx].clone())];
+            let elem = cap.plan.index_of[&ElemKey::Real(cap.real_graph.ids[node_idx].clone())];
             let canonical_anchor = port_anchor(cap.canonical_frames[elem], resolved);
             let side = from_algo_side(algo_orient.from_tb_side(resolved.side));
             out.push(PortDebug {

@@ -31,9 +31,9 @@ pub fn insert_group_boundaries(plan: &mut PlanGraph) {
         }
         let rank = elem.rank as usize;
         for (depth, gname) in elem.group_path.iter().enumerate() {
-            group_path_of.entry(gname.clone()).or_insert_with(|| {
-                elem.group_path[..=depth].to_vec()
-            });
+            group_path_of
+                .entry(gname.clone())
+                .or_insert_with(|| elem.group_path[..=depth].to_vec());
             group_rank_span
                 .entry(gname.clone())
                 .and_modify(|(lo, hi)| {
@@ -141,9 +141,9 @@ pub fn insert_group_boundaries(plan: &mut PlanGraph) {
             let mut children: Vec<&String> = groups_here
                 .iter()
                 .filter(|g| {
-                    group_path_of.get(*g).is_some_and(|p| {
-                        p.len() == depth + 1 && p[..depth] == *prefix
-                    })
+                    group_path_of
+                        .get(*g)
+                        .is_some_and(|p| p.len() == depth + 1 && p[..depth] == *prefix)
                 })
                 .collect();
             children.sort();
@@ -308,7 +308,7 @@ mod tests {
             decl_index: vec![0, 1, 2],
             segments: vec![],
             layers: vec![vec![0], vec![1, 2]],
-                    ..Default::default()
+            ..Default::default()
         };
         insert_group_boundaries(&mut plan);
 
@@ -328,7 +328,13 @@ mod tests {
             }
         ));
         // g1 spans both ranks → cross-rank boundary segments; g2 only on rank1.
-        assert!(plan.segments.iter().any(|s| s.edge_id.starts_with("gb:g1:")));
-        assert!(!plan.segments.iter().any(|s| s.edge_id.starts_with("gb:g2:")));
+        assert!(plan
+            .segments
+            .iter()
+            .any(|s| s.edge_id.starts_with("gb:g1:")));
+        assert!(!plan
+            .segments
+            .iter()
+            .any(|s| s.edge_id.starts_with("gb:g2:")));
     }
 }

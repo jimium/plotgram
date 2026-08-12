@@ -7,8 +7,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use plotgram_engine_api::LayoutError;
 use plotgram_algo::orientation::Size;
+use plotgram_engine_api::LayoutError;
 use plotgram_model::geometry::Rect;
 
 use crate::layout::hierarchical::compose;
@@ -143,12 +143,8 @@ pub(super) fn layout_intra(
         .map(|e| e.edge_id.clone())
         .collect();
     compose::order::order_layers(&mut plan, &edge_weights, 0.0, &reversed_edges);
-    let assignment = compose::ports::assign_ports(
-        &local_graph,
-        &plan,
-        orientation,
-        params.auto_edge_grouping,
-    )?;
+    let assignment =
+        compose::ports::assign_ports(&local_graph, &plan, orientation, params.auto_edge_grouping)?;
 
     let size_of = |elem_idx: usize| -> Size {
         match &plan.elems[elem_idx].key {
@@ -157,12 +153,8 @@ pub(super) fn layout_intra(
         }
     };
     let prelim_gaps: Vec<f64> = vec![params.layer_gap; plan.layers.len().saturating_sub(1)];
-    let main = metric::main_axis::assign_main_axis(
-        &plan,
-        &size_of,
-        &prelim_gaps,
-        params.layer_alignment,
-    );
+    let main =
+        metric::main_axis::assign_main_axis(&plan, &size_of, &prelim_gaps, params.layer_alignment);
     // `params.group_policy == StrongMacro` disables the Weak-only drawn-frame
     // compact inside the objective (symmetry_objective guard).
     let cross = metric::cross_axis::assign_cross_axis(
@@ -173,7 +165,11 @@ pub(super) fn layout_intra(
         &main,
         params,
     )
-    .map_err(|e| LayoutError::message(format!("hierarchical strong-macro: intra VPSC solve failed: {e}")))?;
+    .map_err(|e| {
+        LayoutError::message(format!(
+            "hierarchical strong-macro: intra VPSC solve failed: {e}"
+        ))
+    })?;
 
     let frame_of = |i: usize| {
         let s = size_of(i);

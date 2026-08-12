@@ -227,11 +227,21 @@ mod tests {
         assert_eq!(bands.len(), 2);
         assert_eq!(
             bands[0],
-            PartitionBandCoords { column: "a".into(), start: 10.0, end: 90.0, empty: false }
+            PartitionBandCoords {
+                column: "a".into(),
+                start: 10.0,
+                end: 90.0,
+                empty: false
+            }
         );
         assert_eq!(
             bands[1],
-            PartitionBandCoords { column: "b".into(), start: 130.0, end: 226.0, empty: false }
+            PartitionBandCoords {
+                column: "b".into(),
+                start: 130.0,
+                end: 226.0,
+                empty: false
+            }
         );
     }
 
@@ -286,11 +296,21 @@ mod tests {
         assert_eq!(bands.len(), 2);
         assert_eq!(
             bands[0],
-            PartitionBandCoords { column: "a".into(), start: 20.0, end: 100.0, empty: false }
+            PartitionBandCoords {
+                column: "a".into(),
+                start: 20.0,
+                end: 100.0,
+                empty: false
+            }
         );
         assert_eq!(
             bands[1],
-            PartitionBandCoords { column: "b".into(), start: 160.0, end: 258.0, empty: true }
+            PartitionBandCoords {
+                column: "b".into(),
+                start: 160.0,
+                end: 258.0,
+                empty: true
+            }
         );
         assert!(bands[1].end - bands[1].start >= PARTITION_EMPTY_BAND_MIN);
     }

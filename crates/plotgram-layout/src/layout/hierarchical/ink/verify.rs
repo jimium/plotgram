@@ -544,28 +544,16 @@ mod tests {
 
     #[test]
     fn identical_paths_without_bundle_fail() {
-        let pts = vec![
-            Point { x: 0.0, y: 0.0 },
-            Point { x: 0.0, y: 10.0 },
-        ];
-        let edges = vec![
-            edge("e0", "a", "b", pts.clone()),
-            edge("e1", "a", "c", pts),
-        ];
+        let pts = vec![Point { x: 0.0, y: 0.0 }, Point { x: 0.0, y: 10.0 }];
+        let edges = vec![edge("e0", "a", "b", pts.clone()), edge("e1", "a", "c", pts)];
         let err = verify_no_illegal_overlap(&edges, &[], 16.0).unwrap_err();
         assert!(err.to_string().contains("BundlePlan"));
     }
 
     #[test]
     fn identical_paths_with_bundle_ok() {
-        let pts = vec![
-            Point { x: 0.0, y: 0.0 },
-            Point { x: 0.0, y: 10.0 },
-        ];
-        let edges = vec![
-            edge("e0", "a", "b", pts.clone()),
-            edge("e1", "a", "c", pts),
-        ];
+        let pts = vec![Point { x: 0.0, y: 0.0 }, Point { x: 0.0, y: 10.0 }];
+        let edges = vec![edge("e0", "a", "b", pts.clone()), edge("e1", "a", "c", pts)];
         let bundles = vec![BundlePlan {
             id: "b".into(),
             kind: BundleKind::SourcePrefix,
@@ -601,10 +589,7 @@ mod tests {
             "e0",
             "a",
             "c",
-            vec![
-                Point { x: 5.0, y: 0.0 },
-                Point { x: 5.0, y: 50.0 },
-            ],
+            vec![Point { x: 5.0, y: 0.0 }, Point { x: 5.0, y: 50.0 }],
         )];
         let frames = vec![(
             "b".into(),
@@ -625,10 +610,7 @@ mod tests {
             "e0",
             "a",
             "b",
-            vec![
-                Point { x: 10.0, y: 0.0 },
-                Point { x: 10.0, y: 40.0 },
-            ],
+            vec![Point { x: 10.0, y: 0.0 }, Point { x: 10.0, y: 40.0 }],
         )];
         let frames = vec![
             (
@@ -659,10 +641,7 @@ mod tests {
             "e0",
             "a",
             "b",
-            vec![
-                Point { x: 0.0, y: 0.0 },
-                Point { x: 10.0, y: 10.0 },
-            ],
+            vec![Point { x: 0.0, y: 0.0 }, Point { x: 10.0, y: 10.0 }],
         )];
         let err = verify_no_node_penetration(&edges, &[], true).unwrap_err();
         assert!(err.to_string().contains("non-orthogonal"));
@@ -678,26 +657,10 @@ mod tests {
             height: 10.0,
         };
         let cases = [
-            (
-                Point { x: 5.0, y: -5.0 },
-                Point { x: 5.0, y: 15.0 },
-                true,
-            ),
-            (
-                Point { x: -5.0, y: 5.0 },
-                Point { x: 15.0, y: 5.0 },
-                true,
-            ),
-            (
-                Point { x: 0.0, y: -5.0 },
-                Point { x: 0.0, y: 15.0 },
-                false,
-            ),
-            (
-                Point { x: 20.0, y: 0.0 },
-                Point { x: 20.0, y: 10.0 },
-                false,
-            ),
+            (Point { x: 5.0, y: -5.0 }, Point { x: 5.0, y: 15.0 }, true),
+            (Point { x: -5.0, y: 5.0 }, Point { x: 15.0, y: 5.0 }, true),
+            (Point { x: 0.0, y: -5.0 }, Point { x: 0.0, y: 15.0 }, false),
+            (Point { x: 20.0, y: 0.0 }, Point { x: 20.0, y: 10.0 }, false),
         ];
         for (a, b, want) in cases {
             assert_eq!(
@@ -824,10 +787,7 @@ mod tests {
         // Straight through g1's interior.
         let cross = vec![placed_edge(
             "e0",
-            vec![
-                Point { x: 50.0, y: -20.0 },
-                Point { x: 50.0, y: 120.0 },
-            ],
+            vec![Point { x: 50.0, y: -20.0 }, Point { x: 50.0, y: 120.0 }],
         )];
         let v = group_penetration_violations(&cross, &groups, &BTreeMap::new());
         assert_eq!(
@@ -847,20 +807,14 @@ mod tests {
         // Grazing along the frame boundary is not penetration.
         let graze = vec![placed_edge(
             "e1",
-            vec![
-                Point { x: 0.0, y: -20.0 },
-                Point { x: 0.0, y: 120.0 },
-            ],
+            vec![Point { x: 0.0, y: -20.0 }, Point { x: 0.0, y: 120.0 }],
         )];
         assert!(group_penetration_violations(&graze, &groups, &BTreeMap::new()).is_empty());
 
         // Segment ending exactly on the boundary (port entry) is fine.
         let into = vec![placed_edge(
             "e2",
-            vec![
-                Point { x: 50.0, y: -20.0 },
-                Point { x: 50.0, y: 0.0 },
-            ],
+            vec![Point { x: 50.0, y: -20.0 }, Point { x: 50.0, y: 0.0 }],
         )];
         assert!(group_penetration_violations(&into, &groups, &BTreeMap::new()).is_empty());
     }

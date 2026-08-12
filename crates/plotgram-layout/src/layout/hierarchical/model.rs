@@ -75,7 +75,10 @@ impl ElemKey {
     /// Either clamp family (group / partition) — same ordering & metric
     /// treatment (zero-width, boundary-weight segments, nesting blocks).
     pub fn is_boundary(&self) -> bool {
-        matches!(self, Self::GroupBoundary { .. } | Self::PartitionBoundary { .. })
+        matches!(
+            self,
+            Self::GroupBoundary { .. } | Self::PartitionBoundary { .. }
+        )
     }
 
     pub fn is_zero_width(&self) -> bool {

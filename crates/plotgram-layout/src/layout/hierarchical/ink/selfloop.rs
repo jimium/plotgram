@@ -104,8 +104,18 @@ mod tests {
         let frames = vec![Rect::new(0.0, 0.0, 20.0, 10.0)];
         let loops = vec![("e0".to_string(), 0usize), ("e1".to_string(), 0usize)];
         let edges = self_loop_edges(&loops, &ids, &frames, 24.0);
-        let max_x0 = edges[0].path.samples().iter().map(|p| p.x).fold(0.0_f64, f64::max);
-        let max_x1 = edges[1].path.samples().iter().map(|p| p.x).fold(0.0_f64, f64::max);
+        let max_x0 = edges[0]
+            .path
+            .samples()
+            .iter()
+            .map(|p| p.x)
+            .fold(0.0_f64, f64::max);
+        let max_x1 = edges[1]
+            .path
+            .samples()
+            .iter()
+            .map(|p| p.x)
+            .fold(0.0_f64, f64::max);
         assert!(max_x1 > max_x0, "second loop should extend further out");
     }
 }

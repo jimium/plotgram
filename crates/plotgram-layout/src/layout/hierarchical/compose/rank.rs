@@ -110,9 +110,7 @@ fn component_edges(graph: &RealGraph, comp: &BTreeSet<usize>) -> Vec<usize> {
         .iter()
         .enumerate()
         .filter(|(_, e)| {
-            !e.undirected
-                && comp.contains(&e.working_source)
-                && comp.contains(&e.working_target)
+            !e.undirected && comp.contains(&e.working_source) && comp.contains(&e.working_target)
         })
         .map(|(i, _)| i)
         .collect()

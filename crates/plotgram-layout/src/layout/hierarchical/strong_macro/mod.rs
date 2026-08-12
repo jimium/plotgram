@@ -82,11 +82,7 @@ impl Block {
         }
     }
 
-    fn container(
-        gid: String,
-        child_idx: Vec<usize>,
-        labeled: &BTreeSet<String>,
-    ) -> Self {
+    fn container(gid: String, child_idx: Vec<usize>, labeled: &BTreeSet<String>) -> Self {
         Self {
             group_id: Some(gid),
             child_idx,
@@ -303,10 +299,7 @@ fn group_placements_from_blocks(blocks: &[Block]) -> Vec<plotgram_model::result:
 /// that participated in a local VPSC solve. Cross-block edges keep the
 /// global decision; `along` / end-bus clusters stay global (they depend on
 /// the expanded plan's neighbors and layer order).
-fn reconcile_intra_port_sides(
-    blocks: &[Block],
-    ports: &mut BTreeMap<String, EdgePorts>,
-) {
+fn reconcile_intra_port_sides(blocks: &[Block], ports: &mut BTreeMap<String, EdgePorts>) {
     for b in blocks {
         if b.is_container() {
             continue;
@@ -359,7 +352,11 @@ fn build_group_block(
 
     let bi = blocks.len();
     if child_group_idxs.is_empty() {
-        blocks.push(Block::leaf_group(group.id.clone(), members.clone(), labeled));
+        blocks.push(Block::leaf_group(
+            group.id.clone(),
+            members.clone(),
+            labeled,
+        ));
         for &gi in &members {
             covered[gi] = true;
             block_of_node[gi] = bi;
@@ -546,7 +543,10 @@ mod tests {
                 edge("e3", "scheduler", "meta_db"),
                 edge("e4", "executor", "meta_db"),
             ],
-            groups: vec![platform, group("workload", "工作负载", vec![node("job_a"), node("job_b")])],
+            groups: vec![
+                platform,
+                group("workload", "工作负载", vec![node("job_a"), node("job_b")]),
+            ],
             partition: None,
         };
         let mut sizes = NodeSizes::new();
@@ -586,7 +586,10 @@ mod tests {
 
     fn frame_center(out: &plotgram_engine_api::LayoutOutput, id: &str) -> (f64, f64) {
         let n = out.nodes.iter().find(|n| n.id == id).expect("node present");
-        (n.frame.x + n.frame.width / 2.0, n.frame.y + n.frame.height / 2.0)
+        (
+            n.frame.x + n.frame.width / 2.0,
+            n.frame.y + n.frame.height / 2.0,
+        )
     }
 
     #[test]
@@ -603,7 +606,10 @@ mod tests {
                 .collect(),
             )
             .expect("group_policy strong-macro must bind");
-            assert_eq!(bound.params.group_policy, crate::layout::hierarchical::GroupPolicy::StrongMacro);
+            assert_eq!(
+                bound.params.group_policy,
+                crate::layout::hierarchical::GroupPolicy::StrongMacro
+            );
             assert_ne!(bound.params.hash(), base_hash, "spelling {spelling}");
         }
     }
@@ -634,11 +640,8 @@ mod tests {
         let (graph, sizes) = three_group_chain();
         let out = layout_strong(&graph, &sizes);
 
-        let frame_of: BTreeMap<&str, plotgram_model::geometry::Rect> = out
-            .nodes
-            .iter()
-            .map(|n| (n.id.as_str(), n.frame))
-            .collect();
+        let frame_of: BTreeMap<&str, plotgram_model::geometry::Rect> =
+            out.nodes.iter().map(|n| (n.id.as_str(), n.frame)).collect();
 
         // Vertical stacking: 接入层 above 业务层 above 数据层.
         let group_top = |ids: &[&str]| {
@@ -655,7 +658,10 @@ mod tests {
         // Rows center-align: group centers deviate < 1px from the canvas
         // center for this symmetric fixture.
         let center_of = |ids: &[&str]| {
-            let min_x = ids.iter().map(|id| frame_of[*id].x).fold(f64::INFINITY, f64::min);
+            let min_x = ids
+                .iter()
+                .map(|id| frame_of[*id].x)
+                .fold(f64::INFINITY, f64::min);
             let max_x = ids
                 .iter()
                 .map(|id| frame_of[*id].right())
@@ -676,11 +682,13 @@ mod tests {
         for i in 0..frames.len() {
             for j in (i + 1)..frames.len() {
                 let (a, b) = (&frames[i], &frames[j]);
-                let overlap = a.x < b.right()
-                    && b.x < a.right()
-                    && a.y < b.bottom()
-                    && b.y < a.bottom();
-                assert!(!overlap, "nodes {} and {} overlap", out.nodes[i].id, out.nodes[j].id);
+                let overlap =
+                    a.x < b.right() && b.x < a.right() && a.y < b.bottom() && b.y < a.bottom();
+                assert!(
+                    !overlap,
+                    "nodes {} and {} overlap",
+                    out.nodes[i].id, out.nodes[j].id
+                );
             }
         }
 
@@ -738,11 +746,8 @@ mod tests {
 
         let (graph, sizes) = nested_platform();
         let out = layout_strong(&graph, &sizes);
-        let frame_of: BTreeMap<&str, Rect> = out
-            .nodes
-            .iter()
-            .map(|n| (n.id.as_str(), n.frame))
-            .collect();
+        let frame_of: BTreeMap<&str, Rect> =
+            out.nodes.iter().map(|n| (n.id.as_str(), n.frame)).collect();
 
         // Top scope: workload stacks above platform (job → scheduler edges).
         let top_of = |ids: &[&str]| {
@@ -752,7 +757,10 @@ mod tests {
         };
         let workload_top = top_of(&["job_a", "job_b"]);
         let platform_top = top_of(&["scheduler", "executor", "meta_db"]);
-        assert!(workload_top < platform_top, "workload must sit above platform");
+        assert!(
+            workload_top < platform_top,
+            "workload must sit above platform"
+        );
 
         // Container scope: runtime rows above storage rows (local super
         // order), with sibling frames vertically disjoint.
@@ -768,10 +776,22 @@ mod tests {
         // Nesting containment: the child group frame (member bbox + pads) as
         // finalize derives it must fit inside the parent group frame.
         let bbox_of = |ids: &[&str]| {
-            let min_x = ids.iter().map(|id| frame_of[*id].x).fold(f64::INFINITY, f64::min);
-            let min_y = ids.iter().map(|id| frame_of[*id].y).fold(f64::INFINITY, f64::min);
-            let max_x = ids.iter().map(|id| frame_of[*id].right()).fold(f64::NEG_INFINITY, f64::max);
-            let max_y = ids.iter().map(|id| frame_of[*id].bottom()).fold(f64::NEG_INFINITY, f64::max);
+            let min_x = ids
+                .iter()
+                .map(|id| frame_of[*id].x)
+                .fold(f64::INFINITY, f64::min);
+            let min_y = ids
+                .iter()
+                .map(|id| frame_of[*id].y)
+                .fold(f64::INFINITY, f64::min);
+            let max_x = ids
+                .iter()
+                .map(|id| frame_of[*id].right())
+                .fold(f64::NEG_INFINITY, f64::max);
+            let max_y = ids
+                .iter()
+                .map(|id| frame_of[*id].bottom())
+                .fold(f64::NEG_INFINITY, f64::max);
             Rect::new(min_x, min_y, max_x - min_x, max_y - min_y)
         };
         let runtime_bbox = bbox_of(&["scheduler", "executor"]);
@@ -804,11 +824,13 @@ mod tests {
         for i in 0..frames.len() {
             for j in (i + 1)..frames.len() {
                 let (a, b) = (&frames[i], &frames[j]);
-                let overlap = a.x < b.right()
-                    && b.x < a.right()
-                    && a.y < b.bottom()
-                    && b.y < a.bottom();
-                assert!(!overlap, "nodes {} and {} overlap", out.nodes[i].id, out.nodes[j].id);
+                let overlap =
+                    a.x < b.right() && b.x < a.right() && a.y < b.bottom() && b.y < a.bottom();
+                assert!(
+                    !overlap,
+                    "nodes {} and {} overlap",
+                    out.nodes[i].id, out.nodes[j].id
+                );
             }
         }
 
@@ -923,16 +945,14 @@ mod tests {
         // Two groups g1{a} / g2{c}, k parallel edges a→c. The vertical node
         // clearance = GROUP_PAD (below a) + seam + label top pad (above c).
         let cases: &[(usize, f64)] = &[
-            (1, 16.0 + 40.0 + 24.0),          // base seam
-            (2, 16.0 + 56.0 + 24.0),          // +1 lane
-            (3, 16.0 + 72.0 + 24.0),          // +2 lanes
-            (5, 16.0 + 104.0 + 24.0),         // cap = 4 lanes
-            (10, 16.0 + 104.0 + 24.0),        // cap holds
+            (1, 16.0 + 40.0 + 24.0),   // base seam
+            (2, 16.0 + 56.0 + 24.0),   // +1 lane
+            (3, 16.0 + 72.0 + 24.0),   // +2 lanes
+            (5, 16.0 + 104.0 + 24.0),  // cap = 4 lanes
+            (10, 16.0 + 104.0 + 24.0), // cap holds
         ];
         for &(k, want) in cases {
-            let edges: Vec<Edge> = (0..k)
-                .map(|i| edge(&format!("e{i}"), "a", "c"))
-                .collect();
+            let edges: Vec<Edge> = (0..k).map(|i| edge(&format!("e{i}"), "a", "c")).collect();
             let graph = Graph {
                 nodes: vec![],
                 edges,
@@ -992,10 +1012,10 @@ mod tests {
             ("a3", "b2"),
         ];
         let cases: &[(usize, f64)] = &[
-            (1, 24.0),                 // GROUP_FRAME_GAP base
-            (2, 40.0),                 // +1 lane
-            (5, 88.0),                 // cap = 4 lanes
-            (9, 88.0),                 // cap holds
+            (1, 24.0), // GROUP_FRAME_GAP base
+            (2, 40.0), // +1 lane
+            (5, 88.0), // cap = 4 lanes
+            (9, 88.0), // cap holds
         ];
         for &(k, want) in cases {
             let edges: Vec<Edge> = all_pairs[..k]
@@ -1023,7 +1043,14 @@ mod tests {
             let out = layout_strong(&graph, &sizes);
             let g1_right = ["a1", "a2", "a3"]
                 .iter()
-                .map(|id| out.nodes.iter().find(|n| &n.id == id).unwrap().frame.right())
+                .map(|id| {
+                    out.nodes
+                        .iter()
+                        .find(|n| &n.id == id)
+                        .unwrap()
+                        .frame
+                        .right()
+                })
                 .fold(f64::NEG_INFINITY, f64::max)
                 + 16.0;
             let g2_left = ["b1", "b2", "b3"]

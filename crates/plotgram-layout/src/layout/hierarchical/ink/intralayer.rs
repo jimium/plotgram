@@ -204,7 +204,7 @@ mod tests {
             decl_index,
             segments: Vec::new(),
             layers: vec![layer],
-                    ..Default::default()
+            ..Default::default()
         };
         let edges = vec![RealEdge {
             edge_id: "e0".into(),
@@ -247,9 +247,7 @@ mod tests {
         assert!((seam - 24.0).abs() < 1e-9);
         // No sample may sit inside the blocker's frame.
         let b = frames[2];
-        let inside = |p: &Point| {
-            p.x > b.x && p.x < b.right() && p.y > b.y && p.y < b.bottom()
-        };
+        let inside = |p: &Point| p.x > b.x && p.x < b.right() && p.y > b.y && p.y < b.bottom();
         assert!(!pts.iter().any(inside));
         // Stubs leave the ports along their outward normal (horizontal).
         assert!((pts[1].y - pts[0].y).abs() < 1e-9);

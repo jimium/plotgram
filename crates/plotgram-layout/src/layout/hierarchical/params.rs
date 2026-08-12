@@ -294,10 +294,7 @@ impl HierarchicalParams {
         {
             params.layer_gap = v;
         }
-        if let Some(v) = binder
-            .get_f64_any(&["layer_alignment"])
-            .map_err(bind_err)?
-        {
+        if let Some(v) = binder.get_f64_any(&["layer_alignment"]).map_err(bind_err)? {
             params.layer_alignment = v.clamp(0.0, 1.0);
         }
         if let Some(v) = binder

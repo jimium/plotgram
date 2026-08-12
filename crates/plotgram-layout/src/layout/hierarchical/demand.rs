@@ -8,7 +8,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::layout::hierarchical::compose::track_order::TrackOrderPlan;
 use crate::layout::hierarchical::group_frame::{group_shell_bands, GROUP_FRAME_GAP};
-use crate::layout::hierarchical::metric::partition_bands::{PartitionBandPlan, PARTITION_EMPTY_BAND_MIN};
+use crate::layout::hierarchical::metric::partition_bands::{
+    PartitionBandPlan, PARTITION_EMPTY_BAND_MIN,
+};
 use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealGraph};
 
 /// Typed MetricBudget demand keys (coordinate-and-demand.md §1.1 subset).
@@ -142,11 +144,7 @@ pub fn publish_group_layer_gap_demand(
 ///
 /// Requires a frozen board. Each gap is at least `base_layer_gap`, raised by
 /// any published [`DemandKey::LayerGap`] lower bound.
-pub fn resolved_layer_gaps(
-    n_layers: usize,
-    base_layer_gap: f64,
-    board: &DemandBoard,
-) -> Vec<f64> {
+pub fn resolved_layer_gaps(n_layers: usize, base_layer_gap: f64, board: &DemandBoard) -> Vec<f64> {
     assert!(
         board.is_frozen(),
         "DemandBoard: resolved_layer_gaps requires freeze"
@@ -283,8 +281,8 @@ pub fn publish_gate_capacity_demand(
         if count <= 1 {
             continue;
         }
-        let extra = ((count - 1) as f64 * edge_gap)
-            .min(MACRO_DEMAND_MAX_EXTRA_LANES as f64 * edge_gap);
+        let extra =
+            ((count - 1) as f64 * edge_gap).min(MACRO_DEMAND_MAX_EXTRA_LANES as f64 * edge_gap);
         board.publish(DemandKey::LayerGap(seam), base_layer_gap + extra);
         published += 1;
     }
@@ -395,11 +393,17 @@ mod tests {
             decl_index: vec![0, 1, 2],
             segments: Vec::new(),
             layers,
-                    ..Default::default()
+            ..Default::default()
         };
         let labeled: BTreeSet<String> = ["g2".to_string()].into_iter().collect();
         let mut board = DemandBoard::new();
-        publish_group_layer_gap_demand(&mut board, &plan, &labeled, &TrackOrderPlan::default(), 16.0);
+        publish_group_layer_gap_demand(
+            &mut board,
+            &plan,
+            &labeled,
+            &TrackOrderPlan::default(),
+            16.0,
+        );
         board.freeze();
         // bottom band 16 + top band 24 + frame-gap core 24 = 64.
         assert_eq!(board.get(DemandKey::LayerGap(0)), Some(64.0));
@@ -428,7 +432,7 @@ mod tests {
             decl_index: vec![0, 1],
             segments: Vec::new(),
             layers: vec![vec![0], vec![1]],
-                    ..Default::default()
+            ..Default::default()
         };
         let labeled = BTreeSet::new();
         let mut tracks = TrackOrderPlan::default();
@@ -479,7 +483,7 @@ mod tests {
         let col_base = 24.0;
         let edge_gap = 16.0;
         let cases: &[(usize, f64, f64)] = &[
-            (1, row_base, col_base),          // single edge → no demand raise
+            (1, row_base, col_base), // single edge → no demand raise
             (2, row_base + 16.0, col_base + 16.0),
             (5, row_base + 64.0, col_base + 64.0), // cap = 4 lanes
             (99, row_base + 64.0, col_base + 64.0), // cap holds
@@ -501,7 +505,10 @@ mod tests {
     fn gate_fixture(
         nodes: &[(&str, u32, &[&str])],
         edges: &[(usize, usize)],
-    ) -> (crate::layout::hierarchical::model::PlanGraph, crate::layout::hierarchical::model::RealGraph) {
+    ) -> (
+        crate::layout::hierarchical::model::PlanGraph,
+        crate::layout::hierarchical::model::RealGraph,
+    ) {
         use crate::layout::hierarchical::model::{Elem, ElemKey, RealEdge};
 
         let elems: Vec<Elem> = nodes
@@ -528,7 +535,7 @@ mod tests {
             decl_index: (0..nodes.len()).collect(),
             segments: Vec::new(),
             layers,
-                    ..Default::default()
+            ..Default::default()
         };
         let mut id_index = BTreeMap::new();
         for (i, (id, _, _)) in nodes.iter().enumerate() {
@@ -562,7 +569,13 @@ mod tests {
 
     /// `count` outside nodes at rank 0, `count` group-g members at rank 1,
     /// one edge o_k → i_k per k — all crossing g's top gate at seam 0.
-    fn gate_crossing_fixture(count: usize, tag: &str) -> (crate::layout::hierarchical::model::PlanGraph, crate::layout::hierarchical::model::RealGraph) {
+    fn gate_crossing_fixture(
+        count: usize,
+        tag: &str,
+    ) -> (
+        crate::layout::hierarchical::model::PlanGraph,
+        crate::layout::hierarchical::model::RealGraph,
+    ) {
         let g_slice: &[&str] = &["g"];
         let empty: &[&str] = &[];
         let mut nodes: Vec<(&str, u32, &[&str])> = Vec::new();
@@ -584,7 +597,7 @@ mod tests {
         // Table: crossings per gate → LayerGap demand. base = 40, edge_gap =
         // 16, cap = 4 lanes (Macro-aligned; §8.11).
         let cases: &[(usize, Option<f64>)] = &[
-            (1, None),               // single crossing → no demand raise
+            (1, None), // single crossing → no demand raise
             (2, Some(40.0 + 16.0)),
             (5, Some(40.0 + 64.0)),  // cap = 4 lanes
             (99, Some(40.0 + 64.0)), // cap holds
@@ -593,7 +606,11 @@ mod tests {
             let (plan, graph) = gate_crossing_fixture(count, "tab");
             let mut board = DemandBoard::new();
             publish_gate_capacity_demand(&mut board, &plan, &graph, 40.0, 16.0);
-            assert_eq!(board.get(DemandKey::LayerGap(0)), want, "crossing count {count}");
+            assert_eq!(
+                board.get(DemandKey::LayerGap(0)),
+                want,
+                "crossing count {count}"
+            );
         }
     }
 
@@ -615,8 +632,16 @@ mod tests {
         let mut board = DemandBoard::new();
         publish_gate_capacity_demand(&mut board, &plan, &graph, 40.0, 16.0);
         assert_eq!(board.get(DemandKey::LayerGap(0)), Some(56.0), "g top gate");
-        assert_eq!(board.get(DemandKey::LayerGap(2)), Some(56.0), "g bottom gate");
-        assert_eq!(board.get(DemandKey::LayerGap(1)), None, "no interior crossing");
+        assert_eq!(
+            board.get(DemandKey::LayerGap(2)),
+            Some(56.0),
+            "g bottom gate"
+        );
+        assert_eq!(
+            board.get(DemandKey::LayerGap(1)),
+            None,
+            "no interior crossing"
+        );
     }
 
     #[test]

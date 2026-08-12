@@ -320,10 +320,30 @@ mod tests {
         let (mut plan, real) = fixture(
             &["warehouse", "customer"],
             &[
-                Spec { id: "pick", rank: 0, path: &[], col: Some("warehouse") },
-                Spec { id: "audit", rank: 0, path: &[], col: None },
-                Spec { id: "order", rank: 0, path: &[], col: Some("customer") },
-                Spec { id: "ship", rank: 1, path: &[], col: Some("warehouse") },
+                Spec {
+                    id: "pick",
+                    rank: 0,
+                    path: &[],
+                    col: Some("warehouse"),
+                },
+                Spec {
+                    id: "audit",
+                    rank: 0,
+                    path: &[],
+                    col: None,
+                },
+                Spec {
+                    id: "order",
+                    rank: 0,
+                    path: &[],
+                    col: Some("customer"),
+                },
+                Spec {
+                    id: "ship",
+                    rank: 1,
+                    path: &[],
+                    col: Some("warehouse"),
+                },
             ],
         );
         insert_partition_boundaries(&mut plan, &real).unwrap();
@@ -334,8 +354,12 @@ mod tests {
             // `audit` sat AFTER the first assigned elem → trail free zone;
             // blocks follow DECLARATION order, not member order.
             vec![
-                "pb:warehouse:L", "pick", "pb:warehouse:R",
-                "pb:customer:L", "order", "pb:customer:R",
+                "pb:warehouse:L",
+                "pick",
+                "pb:warehouse:R",
+                "pb:customer:L",
+                "order",
+                "pb:customer:R",
                 "audit",
             ]
         );
@@ -343,8 +367,11 @@ mod tests {
         assert_eq!(
             key_names(&plan, &plan.layers[1]),
             vec![
-                "pb:warehouse:L", "ship", "pb:warehouse:R",
-                "pb:customer:L", "pb:customer:R",
+                "pb:warehouse:L",
+                "ship",
+                "pb:warehouse:R",
+                "pb:customer:L",
+                "pb:customer:R",
             ]
         );
     }
@@ -354,9 +381,24 @@ mod tests {
         let (mut plan, real) = fixture(
             &["a", "b"],
             &[
-                Spec { id: "n1", rank: 0, path: &[], col: Some("a") },
-                Spec { id: "n2", rank: 1, path: &[], col: Some("b") },
-                Spec { id: "n3", rank: 2, path: &[], col: Some("a") },
+                Spec {
+                    id: "n1",
+                    rank: 0,
+                    path: &[],
+                    col: Some("a"),
+                },
+                Spec {
+                    id: "n2",
+                    rank: 1,
+                    path: &[],
+                    col: Some("b"),
+                },
+                Spec {
+                    id: "n3",
+                    rank: 2,
+                    path: &[],
+                    col: Some("a"),
+                },
             ],
         );
         insert_partition_boundaries(&mut plan, &real).unwrap();
@@ -364,11 +406,8 @@ mod tests {
         for col in ["a", "b"] {
             for side in ["L", "R"] {
                 let id = format!("pb:{col}:{side}");
-                let segs: Vec<&Segment> = plan
-                    .segments
-                    .iter()
-                    .filter(|s| s.edge_id == id)
-                    .collect();
+                let segs: Vec<&Segment> =
+                    plan.segments.iter().filter(|s| s.edge_id == id).collect();
                 assert_eq!(segs.len(), 2, "{id} must span both rank gaps");
                 for s in segs {
                     assert_eq!(
@@ -386,9 +425,24 @@ mod tests {
         let (mut plan, real) = fixture(
             &["sales", "ops"],
             &[
-                Spec { id: "m1", rank: 0, path: &["team"], col: Some("sales") },
-                Spec { id: "m2", rank: 0, path: &["team"], col: Some("sales") },
-                Spec { id: "other", rank: 0, path: &[], col: Some("ops") },
+                Spec {
+                    id: "m1",
+                    rank: 0,
+                    path: &["team"],
+                    col: Some("sales"),
+                },
+                Spec {
+                    id: "m2",
+                    rank: 0,
+                    path: &["team"],
+                    col: Some("sales"),
+                },
+                Spec {
+                    id: "other",
+                    rank: 0,
+                    path: &[],
+                    col: Some("ops"),
+                },
             ],
         );
         super::super::boundary::insert_group_boundaries(&mut plan);
@@ -420,26 +474,41 @@ mod tests {
         let (mut plan, real) = fixture(
             &["a", "b"],
             &[
-                Spec { id: "m1", rank: 0, path: &["span"], col: Some("a") },
-                Spec { id: "m2", rank: 1, path: &["span"], col: Some("b") },
+                Spec {
+                    id: "m1",
+                    rank: 0,
+                    path: &["span"],
+                    col: Some("a"),
+                },
+                Spec {
+                    id: "m2",
+                    rank: 1,
+                    path: &["span"],
+                    col: Some("b"),
+                },
             ],
         );
         let err = insert_partition_boundaries(&mut plan, &real).unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("`span`") && msg.contains("partition columns"), "{msg}");
+        assert!(
+            msg.contains("`span`") && msg.contains("partition columns"),
+            "{msg}"
+        );
         // Nothing was allocated before the check failed.
         assert!(plan.partition_columns.is_empty());
-        assert!(plan
-            .elems
-            .iter()
-            .all(|e| !e.key.is_partition_boundary()));
+        assert!(plan.elems.iter().all(|e| !e.key.is_partition_boundary()));
     }
 
     #[test]
     fn no_grid_or_no_columns_is_a_noop() {
         let (mut plan, mut real) = fixture(
             &["a"],
-            &[Spec { id: "n1", rank: 0, path: &[], col: Some("a") }],
+            &[Spec {
+                id: "n1",
+                rank: 0,
+                path: &[],
+                col: Some("a"),
+            }],
         );
         real.partition = None;
         insert_partition_boundaries(&mut plan, &real).unwrap();
@@ -447,7 +516,12 @@ mod tests {
 
         let (mut plan2, mut real2) = fixture(
             &[],
-            &[Spec { id: "n1", rank: 0, path: &[], col: None }],
+            &[Spec {
+                id: "n1",
+                rank: 0,
+                path: &[],
+                col: None,
+            }],
         );
         real2.partition = Some(PartitionGrid::default());
         insert_partition_boundaries(&mut plan2, &real2).unwrap();

@@ -360,7 +360,12 @@ mod tests {
         // empty group → also no frame.
         let groups = vec![
             group("empty", None, &["ghost"], Vec::new()),
-            group("holder", None, &[], vec![group("empty2", None, &[], Vec::new())]),
+            group(
+                "holder",
+                None,
+                &[],
+                vec![group("empty2", None, &[], Vec::new())],
+            ),
             group("real", None, &["a"], Vec::new()),
         ];
         let out = solve_group_frames(&groups, &plan, &frames, &labeled).unwrap();

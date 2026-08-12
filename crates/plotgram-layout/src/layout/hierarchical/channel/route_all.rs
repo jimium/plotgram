@@ -59,9 +59,9 @@ fn endpoint_side_rank_order(
     edge_id: &str,
     at_source: bool,
 ) -> Result<(PortSide, usize, usize), LayoutError> {
-    let &ei = edge_of.get(edge_id).ok_or_else(|| {
-        LayoutError::message(format!("channel: unknown edge `{edge_id}`"))
-    })?;
+    let &ei = edge_of
+        .get(edge_id)
+        .ok_or_else(|| LayoutError::message(format!("channel: unknown edge `{edge_id}`")))?;
     let edge = &graph.edges[ei];
     let node_idx = if at_source {
         edge.original_source
@@ -83,11 +83,7 @@ fn endpoint_side_rank_order(
 
 /// Real-sibling orders of `elem`'s rank that block a straight E/W escape
 /// (dummies never block — the edge may pass its own chain column).
-fn rank_real_sibling_orders(
-    plan: &PlanGraph,
-    layer_pos: &[usize],
-    elem: usize,
-) -> Vec<usize> {
+fn rank_real_sibling_orders(plan: &PlanGraph, layer_pos: &[usize], elem: usize) -> Vec<usize> {
     let rank = plan.elems[elem].rank as usize;
     plan.layers[rank]
         .iter()
@@ -123,22 +119,24 @@ fn edge_end_candidates(
     let (tgt_side, tgt_rank, tgt_order) =
         endpoint_side_rank_order(plan, graph, edge_of, layer_pos, ports, edge_id, false)?;
 
-    let &edge_idx = edge_of.get(edge_id).ok_or_else(|| {
-        LayoutError::message(format!("channel: unknown edge `{edge_id}`"))
-    })?;
-    let blocked =
-        |elem: usize| -> (std::collections::BTreeSet<usize>, std::collections::BTreeSet<usize>) {
-            let mut east = std::collections::BTreeSet::new();
-            let mut west = std::collections::BTreeSet::new();
-            for s in rank_real_sibling_orders(plan, layer_pos, elem) {
-                if s > layer_pos[elem] {
-                    east.insert(s);
-                } else {
-                    west.insert(s);
-                }
+    let &edge_idx = edge_of
+        .get(edge_id)
+        .ok_or_else(|| LayoutError::message(format!("channel: unknown edge `{edge_id}`")))?;
+    let blocked = |elem: usize| -> (
+        std::collections::BTreeSet<usize>,
+        std::collections::BTreeSet<usize>,
+    ) {
+        let mut east = std::collections::BTreeSet::new();
+        let mut west = std::collections::BTreeSet::new();
+        for s in rank_real_sibling_orders(plan, layer_pos, elem) {
+            if s > layer_pos[elem] {
+                east.insert(s);
+            } else {
+                west.insert(s);
             }
-            (east, west)
-        };
+        }
+        (east, west)
+    };
     let (src_be, src_bw) = blocked(graph.edges[edge_idx].original_source);
     let (tgt_be, tgt_bw) = blocked(graph.edges[edge_idx].original_target);
 
@@ -245,11 +243,7 @@ fn edge_rank_span(
 }
 
 /// Median layer order of `edge_id`'s dummy chain (`None` when span 1).
-fn chain_median_order(
-    plan: &PlanGraph,
-    layer_pos: &[usize],
-    edge_id: &str,
-) -> Option<usize> {
+fn chain_median_order(plan: &PlanGraph, layer_pos: &[usize], edge_id: &str) -> Option<usize> {
     let mut orders: Vec<usize> = plan
         .elems
         .iter()
@@ -475,9 +469,8 @@ fn route_on_substrate(
         if bus_edges.contains(&e.edge_id) {
             continue;
         }
-        let (starts, goals, couple_main_corridor) = edge_end_candidates(
-            &index, plan, graph, &edge_of, &layer_pos, ports, &e.edge_id,
-        )?;
+        let (starts, goals, couple_main_corridor) =
+            edge_end_candidates(&index, plan, graph, &edge_of, &layer_pos, ports, &e.edge_id)?;
         let mask = scope_mask_for_edge(&substrate, &index, graph, e);
         let mut hints = hints_for_edge(plan, graph, &layer_pos, params, e, index.order_count);
         hints.couple_main_corridor = couple_main_corridor;
@@ -506,9 +499,7 @@ fn route_on_substrate(
 
     let mut states: BTreeMap<String, EdgeRouteState> = BTreeMap::new();
     for entry in &ordered {
-        let prep = by_id
-            .remove(&entry.edge_id)
-            .expect("prepared edge present");
+        let prep = by_id.remove(&entry.edge_id).expect("prepared edge present");
         let outcome = route_edge(
             &channel_graph,
             &prep.starts,
@@ -542,12 +533,8 @@ fn route_on_substrate(
         );
     }
 
-    let (ripup_relaxations, ripup_rounds) = bounded_ripup(
-        &channel_graph,
-        &substrate,
-        &mut occupancy,
-        &mut states,
-    );
+    let (ripup_relaxations, ripup_rounds) =
+        bounded_ripup(&channel_graph, &substrate, &mut occupancy, &mut states);
     relaxations.extend(ripup_relaxations);
 
     // Outer-overflow: record when the final path sits on outer Main while an
@@ -698,9 +685,7 @@ fn bounded_ripup(
     if peak_final > 1 {
         relaxations.push(Relaxation {
             rule: "channel-rip-up-budget".into(),
-            detail: format!(
-                "peak occupancy {peak_final} remains after {MAX_RIPUP_ROUNDS} rounds"
-            ),
+            detail: format!("peak occupancy {peak_final} remains after {MAX_RIPUP_ROUNDS} rounds"),
         });
     }
 
@@ -709,8 +694,8 @@ fn bounded_ripup(
 
 #[cfg(test)]
 mod tests {
-    use super::{compute_route_order, edge_end_candidates, RouteOrderEntry, MAX_RIPUP_ROUNDS};
     use super::super::substrate::{derive_root_substrate, TrackOrient};
+    use super::{compute_route_order, edge_end_candidates, RouteOrderEntry, MAX_RIPUP_ROUNDS};
     use crate::layout::hierarchical::compose::ports::{EdgePorts, ResolvedPort};
     use crate::layout::hierarchical::model::{Elem, ElemKey, PlanGraph, RealEdge, RealGraph};
     use plotgram_algo::orientation::Side;
@@ -782,7 +767,7 @@ mod tests {
             decl_index: (0..4).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3]],
-                    ..Default::default()
+            ..Default::default()
         };
         let mut index_of_ids = BTreeMap::new();
         for (i, id) in ["a0", "a1", "b0", "b1"].iter().enumerate() {
@@ -832,7 +817,8 @@ mod tests {
             &plan.layer_positions(),
             &ports,
             "ew",
-        ).unwrap();
+        )
+        .unwrap();
         assert!(couple, "E–E must couple Main corridors");
         assert!(!starts.is_empty() && !goals.is_empty());
         // max(0,1)+1 = 2 is the only shared normal-side corridor (order_count=2).
@@ -857,7 +843,8 @@ mod tests {
             &plan.layer_positions(),
             &ports,
             "ew",
-        ).unwrap();
+        )
+        .unwrap();
         assert!(couple, "W–W must couple Main corridors");
         assert!(!starts.is_empty() && !goals.is_empty());
         // min(0,1) = 0 is the only shared normal-side corridor.
@@ -890,7 +877,7 @@ mod tests {
             decl_index: (0..6).collect(),
             segments: vec![],
             layers: vec![vec![0, 1, 2], vec![3, 4, 5]],
-                    ..Default::default()
+            ..Default::default()
         };
         let mut ids = BTreeMap::new();
         for i in 0..6 {

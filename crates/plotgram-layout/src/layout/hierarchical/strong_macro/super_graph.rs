@@ -57,7 +57,12 @@ pub(super) fn break_scope_cycles(
     if pairs.is_empty() {
         return BTreeSet::new();
     }
-    let slot_count = slots.iter().filter_map(|s| *s).max().map(|m| m + 1).unwrap_or(0);
+    let slot_count = slots
+        .iter()
+        .filter_map(|s| *s)
+        .max()
+        .map(|m| m + 1)
+        .unwrap_or(0);
     let cut = plotgram_algo::fas::greedy_fas(slot_count, &pairs);
     if cut.is_empty() {
         return BTreeSet::new();

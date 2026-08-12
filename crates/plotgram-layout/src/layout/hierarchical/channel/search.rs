@@ -599,7 +599,15 @@ pub fn route_edge(
             hints,
         );
     }
-    route_edge_ungated(graph, starts, goals, occupancy, congestion_bias, allowed, hints)
+    route_edge_ungated(
+        graph,
+        starts,
+        goals,
+        occupancy,
+        congestion_bias,
+        allowed,
+        hints,
+    )
 }
 
 fn route_edge_coupled_main(
@@ -612,9 +620,7 @@ fn route_edge_coupled_main(
     hints: RouteHints,
 ) -> RouteOutcome {
     let substrate = graph.substrate();
-    let line_of = |tid: TrackId| -> Option<usize> {
-        substrate.track(tid).map(|t| t.line)
-    };
+    let line_of = |tid: TrackId| -> Option<usize> { substrate.track(tid).map(|t| t.line) };
     let mut lines = BTreeSet::new();
     for c in starts.iter().chain(goals.iter()) {
         if let Some(line) = line_of(c.track) {
@@ -888,9 +894,9 @@ fn route_edge_ungated(
                     next.bends += 1;
                     if leaving_start
                         && hints.min_first_span > 0.0
-                        && substrate.track(track).is_some_and(|t| {
-                            t.span_weight + 1e-9 < hints.min_first_span
-                        })
+                        && substrate
+                            .track(track)
+                            .is_some_and(|t| t.span_weight + 1e-9 < hints.min_first_span)
                     {
                         next.congestion += 1e6;
                     }
@@ -901,8 +907,9 @@ fn route_edge_ungated(
                 _ => {}
             }
             next.length += to_t.span_weight;
-            next.span_affinity =
-                next.span_affinity.saturating_add(track_span_affinity(substrate, tr.to, &hints));
+            next.span_affinity = next
+                .span_affinity
+                .saturating_add(track_span_affinity(substrate, tr.to, &hints));
             next.crossings = next
                 .crossings
                 .saturating_add(occupancy.crossing_count(tr.to, to_t.ext));
@@ -1012,9 +1019,9 @@ fn reconstruct(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::graph::{ChannelGraph, Occupancy};
     use super::super::substrate::{derive_root_substrate, PortSide};
+    use super::*;
     use crate::layout::hierarchical::model::{Elem, ElemKey, PlanGraph};
 
     fn plan_chain() -> PlanGraph {
@@ -1116,7 +1123,11 @@ mod tests {
         for &tid in &out.path.tracks {
             let t = sub.track(tid).unwrap();
             if t.orient == TrackOrient::Cross {
-                assert_ne!(t.line, 0, "must not rush to Cross line 0: {:?}", out.path.tracks);
+                assert_ne!(
+                    t.line, 0,
+                    "must not rush to Cross line 0: {:?}",
+                    out.path.tracks
+                );
             }
         }
     }
@@ -1182,7 +1193,7 @@ mod tests {
             decl_index: (0..6).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
-                    ..Default::default()
+            ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         let g = ChannelGraph::from_substrate(&sub);
@@ -1255,7 +1266,7 @@ mod tests {
             decl_index: (0..6).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
-                    ..Default::default()
+            ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         let g = ChannelGraph::from_substrate(&sub);
@@ -1331,7 +1342,7 @@ mod tests {
             decl_index: (0..6).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
-                    ..Default::default()
+            ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         let g = ChannelGraph::from_substrate(&sub);
@@ -1397,7 +1408,7 @@ mod tests {
             decl_index: (0..6).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
-                    ..Default::default()
+            ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         let g = ChannelGraph::from_substrate(&sub);
@@ -1452,7 +1463,7 @@ mod tests {
             decl_index: (0..6).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
-                    ..Default::default()
+            ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         use plotgram_algo::orientation::Side;
@@ -1477,8 +1488,7 @@ mod tests {
             assert!(!cands.is_empty(), "East port must have candidates");
             let straight = |line: usize| {
                 cands.iter().any(|c| {
-                    c.escape == EscapeEnd::AtPortNormal
-                        && sub.track(c.track).unwrap().line == line
+                    c.escape == EscapeEnd::AtPortNormal && sub.track(c.track).unwrap().line == line
                 })
             };
             assert!(!straight(1), "inner lane is not normal-safe: {cands:?}");
@@ -1492,9 +1502,7 @@ mod tests {
             for line in [1usize, 2] {
                 let gaps: Vec<usize> = cands
                     .iter()
-                    .filter(|c| {
-                        sub.track(c.track).unwrap().line == line
-                    })
+                    .filter(|c| sub.track(c.track).unwrap().line == line)
                     .filter_map(|c| match c.escape {
                         EscapeEnd::ViaGap(g) => Some(g),
                         _ => None,
@@ -1524,11 +1532,13 @@ mod tests {
             assert!(!cands.is_empty(), "West port must have candidates");
             let straight = |line: usize| {
                 cands.iter().any(|c| {
-                    c.escape == EscapeEnd::AtPortNormal
-                        && sub.track(c.track).unwrap().line == line
+                    c.escape == EscapeEnd::AtPortNormal && sub.track(c.track).unwrap().line == line
                 })
             };
-            assert!(!straight(1), "inner West lane is not normal-safe: {cands:?}");
+            assert!(
+                !straight(1),
+                "inner West lane is not normal-safe: {cands:?}"
+            );
             assert_eq!(
                 straight(0),
                 want_straight_rim,
@@ -1621,7 +1631,7 @@ mod tests {
             decl_index: (0..6).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
-                    ..Default::default()
+            ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         let g = ChannelGraph::from_substrate(&sub);

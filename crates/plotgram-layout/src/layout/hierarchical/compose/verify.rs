@@ -9,9 +9,7 @@ use std::collections::BTreeMap;
 use plotgram_algo::orientation::Side;
 use plotgram_engine_api::LayoutError;
 
-use crate::layout::hierarchical::channel::{
-    ChannelRoutePlan, EscapeEnd, RouteTopology,
-};
+use crate::layout::hierarchical::channel::{ChannelRoutePlan, EscapeEnd, RouteTopology};
 use crate::layout::hierarchical::compose::ports::EdgePorts;
 use crate::layout::hierarchical::model::{PlanGraph, RealGraph};
 
@@ -155,7 +153,7 @@ mod tests {
                 to: 1,
             }],
             layers: vec![vec![0], vec![1]],
-                    ..Default::default()
+            ..Default::default()
         };
         let mut ids = BTreeMap::new();
         ids.insert("a".into(), 0);

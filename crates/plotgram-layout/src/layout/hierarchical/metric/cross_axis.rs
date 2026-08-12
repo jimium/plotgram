@@ -162,17 +162,19 @@ mod tests {
         let segments = vec![seg("e0", 0, 0, 2), seg("e1", 0, 1, 3)];
         let plan = build_plan(elems, layers, segments);
         let graph = real_graph(&["a", "b", "c", "d"], &[("e0", 0, 2), ("e1", 1, 3)]);
-        let ports = assign_ports(
-            &graph,
-            &plan,
-            AlgoOrientation::Tb,
-            false,
-        )
-        .unwrap()
-        .ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
 
-        let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
-            .expect("feasible");
+        let coords = assign_cross_axis(
+            &plan,
+            &graph,
+            &ports,
+            &|_| Size::new(20.0, 10.0),
+            &main_of(&plan),
+            &gap_params(10.0),
+        )
+        .expect("feasible");
         assert!(
             coords[1] - coords[0] >= 30.0 - 1e-6,
             "b must keep gap+width away from a"
@@ -205,17 +207,19 @@ mod tests {
         let segments = vec![seg("e0", 0, 0, 1), seg("e0", 1, 1, 2), seg("e0", 2, 2, 3)];
         let plan = build_plan(elems, layers, segments);
         let graph = real_graph(&["a", "b"], &[("e0", 0, 1)]);
-        let ports = assign_ports(
-            &graph,
-            &plan,
-            AlgoOrientation::Tb,
-            false,
-        )
-        .unwrap()
-        .ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
 
-        let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
-            .expect("feasible");
+        let coords = assign_cross_axis(
+            &plan,
+            &graph,
+            &ports,
+            &|_| Size::new(20.0, 10.0),
+            &main_of(&plan),
+            &gap_params(10.0),
+        )
+        .expect("feasible");
         assert!(
             (coords[1] - coords[2]).abs() < 1e-9,
             "dummies must be hard-collinear: {} vs {}",
@@ -238,24 +242,15 @@ mod tests {
     fn real_chain_and_leaf_share_one_column() {
         let elems = vec![real("a", 0), real("b", 1), real("c", 2), real("done", 3)];
         let layers = vec![vec![0], vec![1], vec![2], vec![3]];
-        let segments = vec![
-            seg("e0", 0, 0, 1),
-            seg("e1", 0, 1, 2),
-            seg("e2", 0, 2, 3),
-        ];
+        let segments = vec![seg("e0", 0, 0, 1), seg("e1", 0, 1, 2), seg("e2", 0, 2, 3)];
         let plan = build_plan(elems, layers, segments);
         let graph = real_graph(
             &["a", "b", "c", "done"],
             &[("e0", 0, 1), ("e1", 1, 2), ("e2", 2, 3)],
         );
-        let ports = assign_ports(
-            &graph,
-            &plan,
-            AlgoOrientation::Tb,
-            false,
-        )
-        .unwrap()
-        .ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
 
         // Unequal widths make the packed-center ideals differ per elem, so
         // only the hard equality (not the soft ideal) can keep them aligned.
@@ -302,18 +297,19 @@ mod tests {
             &["gw", "api", "worker", "m", "db"],
             &[("e0", 0, 1), ("e1", 1, 2), ("e2", 2, 3), ("e3", 2, 4)],
         );
-        let ports = assign_ports(
-            &graph,
-            &plan,
-            AlgoOrientation::Tb,
-            false,
-        )
-        .unwrap()
-        .ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
 
-        let coords =
-            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
-                .expect("feasible");
+        let coords = assign_cross_axis(
+            &plan,
+            &graph,
+            &ports,
+            &|_| Size::new(20.0, 10.0),
+            &main_of(&plan),
+            &gap_params(10.0),
+        )
+        .expect("feasible");
         let axis = (coords[3] + coords[4]) / 2.0;
         for (i, name) in [(0, "gw"), (1, "api"), (2, "worker")] {
             assert!(
@@ -331,12 +327,7 @@ mod tests {
     #[test]
     fn binary_fan_diamond_centers_hub_and_sink() {
         // gw=0, a=1, b=2, db=3
-        let elems = vec![
-            real("gw", 0),
-            real("a", 1),
-            real("b", 1),
-            real("db", 2),
-        ];
+        let elems = vec![real("gw", 0), real("a", 1), real("b", 1), real("db", 2)];
         let layers = vec![vec![0], vec![1, 2], vec![3]];
         let segments = vec![
             seg("e0", 0, 0, 1),
@@ -349,18 +340,19 @@ mod tests {
             &["gw", "a", "b", "db"],
             &[("e0", 0, 1), ("e1", 0, 2), ("e2", 1, 3), ("e3", 2, 3)],
         );
-        let ports = assign_ports(
-            &graph,
-            &plan,
-            AlgoOrientation::Tb,
-            false,
-        )
-        .unwrap()
-        .ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
 
-        let coords =
-            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
-                .expect("feasible");
+        let coords = assign_cross_axis(
+            &plan,
+            &graph,
+            &ports,
+            &|_| Size::new(20.0, 10.0),
+            &main_of(&plan),
+            &gap_params(10.0),
+        )
+        .expect("feasible");
         let mid = (coords[1] + coords[2]) / 2.0;
         assert!(
             (coords[0] - mid).abs() < 1e-6,
@@ -408,18 +400,19 @@ mod tests {
                 ("e5", 3, 4),
             ],
         );
-        let ports = assign_ports(
-            &graph,
-            &plan,
-            AlgoOrientation::Tb,
-            false,
-        )
-        .unwrap()
-        .ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
 
-        let coords =
-            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
-                .expect("feasible");
+        let coords = assign_cross_axis(
+            &plan,
+            &graph,
+            &ports,
+            &|_| Size::new(20.0, 10.0),
+            &main_of(&plan),
+            &gap_params(10.0),
+        )
+        .expect("feasible");
         let mid = coords[2]; // median child `b`
         assert!(
             (coords[0] - mid).abs() < 1e-6,
@@ -477,18 +470,19 @@ mod tests {
                 ("e6", 4, 5),
             ],
         );
-        let ports = assign_ports(
-            &graph,
-            &plan,
-            AlgoOrientation::Tb,
-            false,
-        )
-        .unwrap()
-        .ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
 
-        let coords =
-            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
-                .expect("feasible");
+        let coords = assign_cross_axis(
+            &plan,
+            &graph,
+            &ports,
+            &|_| Size::new(20.0, 10.0),
+            &main_of(&plan),
+            &gap_params(10.0),
+        )
+        .expect("feasible");
         let mid = coords[3]; // median child M
         for (i, name) in [(0, "submit"), (1, "review"), (5, "notify")] {
             assert!(
@@ -524,19 +518,27 @@ mod tests {
         let plan = build_plan(elems, layers, segments);
         let graph = real_graph(
             &["hub", "a", "b", "c", "d", "b2"],
-            &[("e0", 0, 1), ("e1", 0, 2), ("e2", 0, 3), ("e3", 0, 4), ("e4", 2, 5)],
+            &[
+                ("e0", 0, 1),
+                ("e1", 0, 2),
+                ("e2", 0, 3),
+                ("e3", 0, 4),
+                ("e4", 2, 5),
+            ],
         );
-        let ports = assign_ports(
-            &graph,
-            &plan,
-            AlgoOrientation::Tb,
-            false,
-        )
-        .unwrap()
-        .ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
 
-        let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
-            .expect("feasible");
+        let coords = assign_cross_axis(
+            &plan,
+            &graph,
+            &ports,
+            &|_| Size::new(20.0, 10.0),
+            &main_of(&plan),
+            &gap_params(10.0),
+        )
+        .expect("feasible");
         // Even fan of four equal-width children: hub sits at the midpoint
         // of the two middle children (= midpoint of the outer two).
         let expected = (coords[2] + coords[3]) / 2.0;
@@ -587,17 +589,19 @@ mod tests {
         ];
         let plan = build_plan(elems, layers, segments);
         let graph = real_graph(&["a", "b", "ca", "cb"], &[("ea", 0, 2), ("eb", 1, 3)]);
-        let ports = assign_ports(
-            &graph,
-            &plan,
-            AlgoOrientation::Tb,
-            false,
-        )
-        .unwrap()
-        .ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
 
-        let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
-            .expect("crossing chains must not make the equality system infeasible");
+        let coords = assign_cross_axis(
+            &plan,
+            &graph,
+            &ports,
+            &|_| Size::new(20.0, 10.0),
+            &main_of(&plan),
+            &gap_params(10.0),
+        )
+        .expect("crossing chains must not make the equality system infeasible");
         // L1 order [db1, da1]; L2 order [da2, db2] — dummies are width 0.
         assert!(coords[3] - coords[2] >= 10.0 - 1e-6, "L1 separation");
         assert!(coords[5] - coords[4] >= 10.0 - 1e-6, "L2 separation");
@@ -633,14 +637,9 @@ mod tests {
             &["A", "B0", "B1", "B2"],
             &[("e0", 0, 1), ("e1", 0, 2), ("e2", 0, 3)],
         );
-        let ports = assign_ports(
-            &graph,
-            &plan,
-            AlgoOrientation::Tb,
-            false,
-        )
-        .unwrap()
-        .ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
 
         let width = |e: usize| {
             if plan.elems[e].key.is_virtual() {
@@ -693,14 +692,9 @@ mod tests {
         let segments = vec![seg("e0", 0, 0, 1), seg("e0", 1, 1, 2), seg("e0", 2, 2, 3)];
         let plan = build_plan(elems, layers, segments);
         let graph = real_graph(&["A", "B"], &[("e0", 0, 1)]);
-        let ports = assign_ports(
-            &graph,
-            &plan,
-            AlgoOrientation::Tb,
-            false,
-        )
-        .unwrap()
-        .ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
 
         let run = || {
             assign_cross_axis(
@@ -719,5 +713,4 @@ mod tests {
         let b2: Vec<u64> = c2.iter().map(|f| f.to_bits()).collect();
         assert_eq!(b1, b2, "cross-axis output must be bit-identical");
     }
-
 }

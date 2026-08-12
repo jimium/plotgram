@@ -28,14 +28,14 @@ impl<'s> ChannelGraph<'s> {
             adjacency.entry(t.id).or_default();
         }
         for &(a, b) in substrate.links() {
-            adjacency
-                .entry(a)
-                .or_default()
-                .push(Transition { to: b, via: Via::Link });
-            adjacency
-                .entry(b)
-                .or_default()
-                .push(Transition { to: a, via: Via::Link });
+            adjacency.entry(a).or_default().push(Transition {
+                to: b,
+                via: Via::Link,
+            });
+            adjacency.entry(b).or_default().push(Transition {
+                to: a,
+                via: Via::Link,
+            });
         }
         for g in substrate.gates() {
             for &(inner, outer) in &g.crossings {

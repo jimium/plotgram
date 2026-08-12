@@ -142,9 +142,9 @@ fn place_rows(
                 // adjacency (or gaps belonging to other rows whose slot
                 // indices happen to lie between `sa` and `sb`).
                 let (lo_s, hi_s) = if sa < sb { (sa, sb) } else { (sb, sa) };
-                let intervening = scope[lo_s + 1..hi_s].iter().any(|&bi| {
-                    blocks[bi].super_rank == ra
-                });
+                let intervening = scope[lo_s + 1..hi_s]
+                    .iter()
+                    .any(|&bi| blocks[bi].super_rank == ra);
                 if !intervening {
                     *col_counts.entry(lo_s as u32).or_insert(0) += count;
                 }

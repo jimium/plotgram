@@ -171,12 +171,7 @@ fn free_side(
 /// not comparable across layers of different widths (mech e29: tip n14
 /// order 1/2 vs n11 order 4/5 both sit on the right, but raw `1 < 4`
 /// wrongly picked West and forced a full-width U).
-fn side_corridor_polarity(
-    plan: &PlanGraph,
-    pos: &[usize],
-    a: usize,
-    b: usize,
-) -> Side {
+fn side_corridor_polarity(plan: &PlanGraph, pos: &[usize], a: usize, b: usize) -> Side {
     let (tip, other) = match plan.elems[a].rank.cmp(&plan.elems[b].rank) {
         std::cmp::Ordering::Greater => (a, b),
         std::cmp::Ordering::Less => (b, a),
@@ -293,9 +288,10 @@ fn far_real_endpoint(plan: &PlanGraph, edge_id: &str, known_real: usize) -> Opti
                 // On this edge's chain if any segment mentions edge_id and
                 // connects toward this elem — cheaper: scan segments for
                 // endpoints that are real and share edge_id.
-                let on_edge = plan.segments.iter().any(|s| {
-                    s.edge_id == edge_id && (s.from == i || s.to == i)
-                });
+                let on_edge = plan
+                    .segments
+                    .iter()
+                    .any(|s| s.edge_id == edge_id && (s.from == i || s.to == i));
                 if on_edge {
                     Some(i)
                 } else {
@@ -375,7 +371,10 @@ fn pick_side_with_policy(
         Some(r) => attempts.into_iter().filter(|s| r.contains(s)).collect(),
         None => attempts,
     };
-    debug_assert!(!attempts.is_empty(), "caller must ensure non-empty attempt set");
+    debug_assert!(
+        !attempts.is_empty(),
+        "caller must ensure non-empty attempt set"
+    );
 
     for s in &attempts {
         let used = usage.get(&(node_real, *s)).copied().unwrap_or(0);
@@ -464,16 +463,10 @@ pub fn assign_ports(
                         | ElemKey::PartitionBoundary { .. }
                         | ElemKey::OrderPad { .. } => neighbor,
                     };
-                    let ns_load = spine_ns_load(&free_usage, node_real)
-                        + spine_ns_load(&free_usage, peer);
+                    let ns_load =
+                        spine_ns_load(&free_usage, node_real) + spine_ns_load(&free_usage, peer);
                     let primary = free_side(
-                        plan,
-                        &pos,
-                        node_real,
-                        neighbor,
-                        e.reversed,
-                        has_twin,
-                        ns_load,
+                        plan, &pos, node_real, neighbor, e.reversed, has_twin, ns_load,
                     );
                     pick_side_with_policy(primary, policy, node_real, &mut free_usage, None)
                 }
@@ -500,10 +493,10 @@ pub fn assign_ports(
         groups.entry((ep.node_real, ep.side)).or_default().push(i);
     }
 
-    let mut along_of: Vec<AlongSpec> = vec![AlongSpec::Ordered { order: 0, count: 1 }; endpoints.len()];
+    let mut along_of: Vec<AlongSpec> =
+        vec![AlongSpec::Ordered { order: 0, count: 1 }; endpoints.len()];
     let mut cluster_of: Vec<Option<EndCluster>> = vec![None; endpoints.len()];
-    let mut bundles: Vec<crate::layout::hierarchical::compose::bundle::BundlePlan> =
-        Vec::new();
+    let mut bundles: Vec<crate::layout::hierarchical::compose::bundle::BundlePlan> = Vec::new();
     for members in groups.into_values() {
         // Automatic edge grouping (yFiles AutomaticEdgeGrouping / edge-
         // parameters §2.3): ends already share (node, side) via the outer
@@ -528,9 +521,7 @@ pub fn assign_ports(
         let mut slot_members: Vec<SlotMember> = Vec::with_capacity(members.len());
         let mut singles: Vec<usize> = Vec::new();
         for &i in &members {
-            let in_cluster = cluster_map
-                .values()
-                .any(|c| c.len() >= 2 && c.contains(&i));
+            let in_cluster = cluster_map.values().any(|c| c.len() >= 2 && c.contains(&i));
             if !in_cluster {
                 singles.push(i);
             }
@@ -539,16 +530,12 @@ pub fn assign_ports(
         for i in singles {
             slot_members.push(SlotMember::Single(i));
         }
-        let mut clusters: Vec<Vec<usize>> = cluster_map
-            .into_values()
-            .filter(|c| c.len() >= 2)
-            .collect();
+        let mut clusters: Vec<Vec<usize>> =
+            cluster_map.into_values().filter(|c| c.len() >= 2).collect();
         for c in &mut clusters {
             c.sort_by(|&a, &b| endpoints[a].sort_key.cmp(&endpoints[b].sort_key));
         }
-        clusters.sort_by(|a, b| {
-            endpoints[a[0]].sort_key.cmp(&endpoints[b[0]].sort_key)
-        });
+        clusters.sort_by(|a, b| endpoints[a[0]].sort_key.cmp(&endpoints[b[0]].sort_key));
         for c in clusters {
             slot_members.push(SlotMember::Cluster(c));
         }
@@ -591,13 +578,11 @@ pub fn assign_ports(
                         if at_source { "src" } else { "tgt" },
                         members.join("+")
                     );
-                    bundles.push(
-                        crate::layout::hierarchical::compose::bundle::BundlePlan {
-                            id,
-                            kind,
-                            member_edges: members,
-                        },
-                    );
+                    bundles.push(crate::layout::hierarchical::compose::bundle::BundlePlan {
+                        id,
+                        kind,
+                        member_edges: members,
+                    });
                     slot_of_member.push((s, c.clone()));
                 }
             }
@@ -743,7 +728,7 @@ mod tests {
             decl_index: vec![0, 1, 2],
             segments,
             layers,
-                    ..Default::default()
+            ..Default::default()
         };
         (graph, plan)
     }
@@ -758,7 +743,9 @@ mod tests {
     #[test]
     fn free_ports_infer_south_for_downstream_north_for_upstream() {
         let (graph, plan) = small_plan_and_graph();
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false).unwrap().ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
         assert_eq!(ports["e0"].source.side, Side::South);
         assert_eq!(ports["e0"].target.side, Side::North);
         assert_eq!(ports["e1"].source.side, Side::South);
@@ -767,7 +754,6 @@ mod tests {
         assert_eq!(ordered(ports["e0"].source), (0, 2));
         assert_eq!(ordered(ports["e1"].source), (1, 2));
     }
-
 
     #[test]
     fn fixed_side_is_converted_into_canonical_space() {
@@ -783,10 +769,11 @@ mod tests {
         for (orientation, authored, expected_canonical) in cases {
             let (mut graph, plan) = small_plan_and_graph();
             graph.edges[0].from_port = Some(PortConstraint::FixedSide { side: authored });
-            let ports = assign_ports(&graph, &plan, orientation, false).unwrap().ports;
+            let ports = assign_ports(&graph, &plan, orientation, false)
+                .unwrap()
+                .ports;
             assert_eq!(
-                ports["e0"].source.side,
-                expected_canonical,
+                ports["e0"].source.side, expected_canonical,
                 "orientation {orientation:?}: authored {authored:?}"
             );
             // Round-trip through mod.rs's output transform must recover the
@@ -798,7 +785,6 @@ mod tests {
             );
         }
     }
-
 
     #[test]
     fn reversed_edge_free_ports_prefer_cross_axis_side() {
@@ -863,9 +849,11 @@ mod tests {
                 to: 2,
             }],
             layers: vec![vec![0], vec![1, 2]],
-                    ..Default::default()
+            ..Default::default()
         };
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false).unwrap().ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
         assert_eq!(ports["back"].source.side, Side::East);
         assert_eq!(ports["back"].target.side, Side::East);
     }
@@ -933,7 +921,7 @@ mod tests {
                 to: 2,
             }],
             layers: vec![vec![0, 1], vec![2]],
-                    ..Default::default()
+            ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
@@ -1022,7 +1010,7 @@ mod tests {
                 },
             ],
             layers: vec![vec![0, 1], vec![2], vec![3]],
-                    ..Default::default()
+            ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
@@ -1031,7 +1019,10 @@ mod tests {
         // Put a under c (order 1): rebuild with a alone still order 0.
         // b order 0, a order 0 → Equal → North/South.
         assert!(
-            matches!(ports["back"].source.side, Side::North | Side::West | Side::East),
+            matches!(
+                ports["back"].source.side,
+                Side::North | Side::West | Side::East
+            ),
             "got {:?}",
             ports["back"].source.side
         );
@@ -1110,9 +1101,11 @@ mod tests {
                 },
             ],
             layers: vec![vec![0], vec![1], vec![2]],
-                    ..Default::default()
+            ..Default::default()
         };
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false).unwrap().ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
         // Singleton layers → tip rightness 0.5 ≥ 0.5 → East.
         assert_eq!(ports["back"].source.side, Side::East);
         assert_eq!(ports["back"].target.side, Side::East);
@@ -1175,7 +1168,7 @@ mod tests {
                 to: 1,
             }],
             layers: vec![vec![0], vec![1]],
-                    ..Default::default()
+            ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
@@ -1191,16 +1184,52 @@ mod tests {
         let ew = Side::East;
         // (label, span, own_r, peer_r, twin, load, cross_group, want)
         let cases: &[(&str, usize, f64, f64, bool, u32, bool, Side)] = &[
-            ("span≥3 near-col same-group → NS", 3, 0.5, 0.5, false, 0, false, ns),
-            ("span≥3 near-col cross-group → EW", 3, 0.5, 0.5, false, 0, true, ew),
+            (
+                "span≥3 near-col same-group → NS",
+                3,
+                0.5,
+                0.5,
+                false,
+                0,
+                false,
+                ns,
+            ),
+            (
+                "span≥3 near-col cross-group → EW",
+                3,
+                0.5,
+                0.5,
+                false,
+                0,
+                true,
+                ew,
+            ),
             ("span≥3 divergent → EW", 3, 0.0, 1.0, false, 0, false, ew),
             ("span=2 near-col → EW", 2, 0.0, 0.0, false, 0, false, ew),
-            ("span=2 twin divergent → EW", 2, 0.0, 1.0, true, 0, false, ew),
+            (
+                "span=2 twin divergent → EW",
+                2,
+                0.0,
+                1.0,
+                true,
+                0,
+                false,
+                ew,
+            ),
             ("twin short same-col → NS", 1, 0.0, 0.0, true, 0, false, ns),
             ("twin short far-col → NS", 1, 0.0, 1.0, true, 0, false, ns),
             ("twin short crowded → NS", 1, 0.0, 0.0, true, 2, false, ns),
             ("no twin short → EW", 1, 0.0, 0.0, false, 0, false, ew),
-            ("no twin short crowded → EW", 1, 0.0, 0.0, false, 2, false, ew),
+            (
+                "no twin short crowded → EW",
+                1,
+                0.0,
+                0.0,
+                false,
+                2,
+                false,
+                ew,
+            ),
         ];
         for (label, span, own_r, peer_r, twin, load, xg, want) in cases {
             let got = pick_reversed_side(ns, ew, *span, *own_r, *peer_r, *twin, *load, *xg);
@@ -1288,7 +1317,7 @@ mod tests {
                 },
             ],
             layers: vec![vec![0], vec![1]],
-                    ..Default::default()
+            ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
@@ -1363,7 +1392,7 @@ mod tests {
                 to: 1,
             }],
             layers: vec![vec![0], vec![1]],
-                    ..Default::default()
+            ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
@@ -1371,11 +1400,6 @@ mod tests {
         assert_eq!(ports["back"].source.side, Side::South);
         assert_eq!(ports["back"].target.side, Side::North);
     }
-
-
-
-
-
 
     fn parallel_plan_and_graph() -> (RealGraph, PlanGraph) {
         let ids = vec!["a".to_string(), "b".to_string()];
@@ -1457,7 +1481,7 @@ mod tests {
             decl_index: vec![0, 1],
             segments,
             layers,
-                    ..Default::default()
+            ..Default::default()
         };
         (graph, plan)
     }
@@ -1465,7 +1489,9 @@ mod tests {
     #[test]
     fn auto_edge_grouping_clusters_parallel_ends() {
         let (graph, plan) = parallel_plan_and_graph();
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, true).unwrap().ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, true)
+            .unwrap()
+            .ports;
         assert_eq!(ordered(ports["e0"].source), ordered(ports["e1"].source));
         assert_eq!(ordered(ports["e0"].source).1, 1, "cluster takes one slot");
         let (c0, c1) = (
@@ -1477,7 +1503,9 @@ mod tests {
         assert_eq!(ordered(ports["e0"].target), ordered(ports["e1"].target));
         assert!(ports["e0"].target_cluster.is_some());
 
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false).unwrap().ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
         assert_eq!(ordered(ports["e0"].source).1, 2);
         assert!(ports["e0"].source_cluster.is_none());
     }
@@ -1487,7 +1515,9 @@ mod tests {
     #[test]
     fn auto_edge_grouping_merges_fan_out() {
         let (graph, plan) = small_plan_and_graph(); // a→b, a→c: distinct neighbors
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, true).unwrap().ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, true)
+            .unwrap()
+            .ports;
         assert_eq!(ordered(ports["e0"].source), ordered(ports["e1"].source));
         let (c0, c1) = (
             ports["e0"].source_cluster.unwrap(),
@@ -1536,7 +1566,6 @@ mod tests {
         assert_eq!(ports["e1"].source.side, Side::South);
     }
 
-
     #[test]
     fn fixed_side_north_on_person_wins() {
         let (mut graph, plan) = small_plan_and_graph();
@@ -1556,12 +1585,7 @@ mod tests {
         // hub → near (adj); hub → far (long). Layer1: [dummy_far, near] so dummy
         // is left of near; far sits rightmost on rank2. Immediate-neighbor sort
         // would put far edge left; far-real sort keeps near left of far.
-        let ids: Vec<String> = vec![
-            "hub".into(),
-            "near".into(),
-            "far".into(),
-            "pad".into(),
-        ];
+        let ids: Vec<String> = vec!["hub".into(), "near".into(), "far".into(), "pad".into()];
         let index_of = ids
             .iter()
             .enumerate()
@@ -1661,7 +1685,7 @@ mod tests {
                 },
             ],
             layers: vec![vec![0], vec![1, 2], vec![3, 4]],
-                    ..Default::default()
+            ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()

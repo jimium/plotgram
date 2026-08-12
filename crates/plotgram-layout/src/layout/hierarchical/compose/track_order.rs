@@ -341,7 +341,7 @@ mod tests {
                 },
             ],
             layers: vec![vec![0, 1], vec![2, 3]],
-                    ..Default::default()
+            ..Default::default()
         };
         let mut ids = BTreeMap::new();
         for (i, id) in ["a", "b", "c", "d"].iter().enumerate() {
@@ -382,24 +382,19 @@ mod tests {
             ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
-        let ports = assign_ports(
-            &graph,
-            &plan,
-            AlgoOrientation::Tb,
-            false,
-        )
-        .unwrap()
-        .ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
         // Adjacent-layer: one Cross track between ranks.
         let cross = idx.cross_at(1, 0).expect("cross gap");
         let mut routes = BTreeMap::new();
         routes.insert(
             "e0".into(),
-            RouteTopology::Orthogonal(ChannelPath::new(vec![cross], vec![],)),
+            RouteTopology::Orthogonal(ChannelPath::new(vec![cross], vec![])),
         );
         routes.insert(
             "e1".into(),
-            RouteTopology::Orthogonal(ChannelPath::new(vec![cross], vec![],)),
+            RouteTopology::Orthogonal(ChannelPath::new(vec![cross], vec![])),
         );
         let route_plan = ChannelRoutePlan {
             substrate: sub,
@@ -472,7 +467,7 @@ mod tests {
                 },
             ],
             layers: vec![vec![0], vec![1], vec![2]],
-                    ..Default::default()
+            ..Default::default()
         };
         let mut ids = BTreeMap::new();
         for (i, id) in ["a", "b", "c"].iter().enumerate() {
@@ -513,14 +508,9 @@ mod tests {
             ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
-        let ports = assign_ports(
-            &graph,
-            &plan,
-            AlgoOrientation::Tb,
-            false,
-        )
-        .unwrap()
-        .ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
+            .unwrap()
+            .ports;
         // Outer Main: order_gap == column count == 1 → line 1.
         let main_id = sub
             .tracks()
@@ -531,7 +521,7 @@ mod tests {
         for eid in ["e_low", "e_high"] {
             routes.insert(
                 eid.into(),
-                RouteTopology::Orthogonal(ChannelPath::new(vec![main_id], vec![],)),
+                RouteTopology::Orthogonal(ChannelPath::new(vec![main_id], vec![])),
             );
         }
         let route_plan = ChannelRoutePlan {
@@ -619,7 +609,7 @@ mod tests {
                 })
                 .collect(),
             layers: vec![vec![0], vec![1, 2, 3, 4]],
-                    ..Default::default()
+            ..Default::default()
         };
         let mut ids = BTreeMap::new();
         for (i, id) in ["hub", "svc_b", "svc_c", "svc_d", "svc_a"]
@@ -683,7 +673,7 @@ mod tests {
         for eid in edge_ids {
             routes.insert(
                 eid.into(),
-                RouteTopology::Orthogonal(ChannelPath::new(vec![cross], vec![],)),
+                RouteTopology::Orthogonal(ChannelPath::new(vec![cross], vec![])),
             );
         }
         let route_plan = ChannelRoutePlan {
@@ -727,8 +717,8 @@ mod tests {
     /// Lane indices must stay corridor-coherent and span-nested.
     #[test]
     fn cross_corridor_colors_gate_cut_tracks_coherently() {
-        use crate::layout::hierarchical::compose::ports::ResolvedPort;
         use crate::layout::hierarchical::channel::substrate::Substrate;
+        use crate::layout::hierarchical::compose::ports::ResolvedPort;
         use plotgram_algo::orientation::Side as AlgoSide;
         use plotgram_model::port::AlongSpec;
 
@@ -785,7 +775,7 @@ mod tests {
                 },
             ],
             layers: vec![vec![0, 1], vec![2, 3]],
-                    ..Default::default()
+            ..Default::default()
         };
         let mut ids = BTreeMap::new();
         for (i, id) in ["s1", "s2", "t1", "t2"].iter().enumerate() {

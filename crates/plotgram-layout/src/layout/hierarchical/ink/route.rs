@@ -18,8 +18,8 @@
 
 use std::collections::BTreeMap;
 
-use plotgram_algo::path_ortho::{normalize_orthogonal, NormalizeOptions};
 use plotgram_algo::orientation::Side;
+use plotgram_algo::path_ortho::{normalize_orthogonal, NormalizeOptions};
 use plotgram_engine_api::LayoutError;
 use plotgram_model::geometry::{Point, Rect};
 
@@ -138,12 +138,15 @@ fn lane_coord(
     track_order: &TrackOrderPlan,
     track_coords: &TrackCoords,
 ) -> Result<f64, LayoutError> {
-    let hop = track_order.assignments.get(&(edge_id.to_string(), tid)).ok_or_else(|| {
-        LayoutError::message(format!(
-            "hierarchical: InternalInvariant — edge `{edge_id}` missing TrackOrder \
+    let hop = track_order
+        .assignments
+        .get(&(edge_id.to_string(), tid))
+        .ok_or_else(|| {
+            LayoutError::message(format!(
+                "hierarchical: InternalInvariant — edge `{edge_id}` missing TrackOrder \
              assignment for track {tid:?} (TrackOrder is the sole writer of track_index)"
-        ))
-    })?;
+            ))
+        })?;
     track_coords.lane(tid, hop.track_index).ok_or_else(|| {
         LayoutError::message(format!(
             "hierarchical: edge `{edge_id}` missing Metric coord for track {:?}",
@@ -356,9 +359,10 @@ fn expand_channel_path(
             EscapeEnd::ViaGap(line) => {
                 // Prefer a Cross track already on the path (TrackOrder lane).
                 for &tid in tracks {
-                    if substrate.track(tid).is_some_and(|t| {
-                        t.orient == TrackOrient::Cross && t.line == line
-                    }) {
+                    if substrate
+                        .track(tid)
+                        .is_some_and(|t| t.orient == TrackOrient::Cross && t.line == line)
+                    {
                         if let Ok(y) = lane_coord(edge_id, tid, track_order, track_coords) {
                             return y;
                         }
@@ -565,10 +569,7 @@ fn append_bus_bend(path: &mut Vec<Point>, to: Point) {
     let from = *path.last().unwrap();
     if (from.x - to.x).abs() > 1e-9 && (from.y - to.y).abs() > 1e-9 {
         // Prefer staying on current Y (bus rail) then vertical into `to`.
-        path.push(Point {
-            x: to.x,
-            y: from.y,
-        });
+        path.push(Point { x: to.x, y: from.y });
     }
     path.push(to);
 }
@@ -595,10 +596,7 @@ fn orthogonal_bus_path(
     let mut path = vec![start];
     if let Some(by) = src_bus_y {
         // Shared vertical trunk to the bus level.
-        path.push(Point {
-            x: start.x,
-            y: by,
-        });
+        path.push(Point { x: start.x, y: by });
     }
     for &wp in mid_waypoints {
         if let Some(by) = src_bus_y {
@@ -770,8 +768,7 @@ pub fn route_edges(
 mod tests {
     use super::*;
     use crate::layout::hierarchical::channel::{
-        substrate::derive_root_substrate, ChannelPath, ChannelRoutePlan, EscapePlan,
-        RouteTopology,
+        substrate::derive_root_substrate, ChannelPath, ChannelRoutePlan, EscapePlan, RouteTopology,
     };
     use crate::layout::hierarchical::compose::track_order::HopTrack;
     use crate::layout::hierarchical::model::{Elem, ElemKey, RealEdge};
@@ -783,7 +780,10 @@ mod tests {
     }
 
     /// Minimal Channel plan: single Cross track for `e0` (adjacent-layer).
-    fn single_cross_route(plan: &PlanGraph, track_y: f64) -> (ChannelRoutePlan, TrackOrderPlan, TrackCoords) {
+    fn single_cross_route(
+        plan: &PlanGraph,
+        track_y: f64,
+    ) -> (ChannelRoutePlan, TrackOrderPlan, TrackCoords) {
         let (substrate, index) = derive_root_substrate(plan);
         let cross_id = index
             .cross_lines
@@ -794,7 +794,7 @@ mod tests {
         let mut routes = BTreeMap::new();
         routes.insert(
             "e0".into(),
-            RouteTopology::Orthogonal(ChannelPath::new(vec![cross_id], Vec::new(),)),
+            RouteTopology::Orthogonal(ChannelPath::new(vec![cross_id], Vec::new())),
         );
         let route_plan = ChannelRoutePlan {
             substrate,
@@ -884,8 +884,18 @@ mod tests {
     ) -> Vec<CanonicalEdge> {
         let (rp, to, tc) = single_main_route(plan, og, rail_x, escape);
         route_edges(
-            graph, plan, ports, frames, &empty_bus(), &rp, &to, &tc, RoutingStyle::Orthogonal,
-            60.0, 24.0, 12.0,
+            graph,
+            plan,
+            ports,
+            frames,
+            &empty_bus(),
+            &rp,
+            &to,
+            &tc,
+            RoutingStyle::Orthogonal,
+            60.0,
+            24.0,
+            12.0,
         )
         .unwrap()
     }
@@ -898,7 +908,10 @@ mod tests {
         style: RoutingStyle,
         bus: &BusLevels,
     ) -> Vec<CanonicalEdge> {
-        let (rp, to, tc) = if style == RoutingStyle::Orthogonal && bus.source.is_empty() && bus.target.is_empty() {
+        let (rp, to, tc) = if style == RoutingStyle::Orthogonal
+            && bus.source.is_empty()
+            && bus.target.is_empty()
+        {
             // Aligned / bus tests: provide a Cross route when orthogonal.
             single_cross_route(plan, 25.0)
         } else {
@@ -989,7 +1002,7 @@ mod tests {
             decl_index: vec![0, 1],
             segments,
             layers,
-                    ..Default::default()
+            ..Default::default()
         };
 
         let mut ports = BTreeMap::new();
@@ -1118,8 +1131,20 @@ mod tests {
             } => {
                 assert_eq!(*s, start);
                 assert_eq!(*e, end);
-                assert_eq!(controls[0], Point { x: start.x, y: start.y + d });
-                assert_eq!(controls[1], Point { x: end.x, y: end.y - d });
+                assert_eq!(
+                    controls[0],
+                    Point {
+                        x: start.x,
+                        y: start.y + d
+                    }
+                );
+                assert_eq!(
+                    controls[1],
+                    Point {
+                        x: end.x,
+                        y: end.y - d
+                    }
+                );
             }
             other => panic!("expected cubic, got {other:?}"),
         }
@@ -1195,17 +1220,11 @@ mod tests {
             let ep = ports.get_mut("e0").unwrap();
             ep.source = ResolvedPort {
                 side: case.side,
-                along: AlongSpec::Ordered {
-                    order: 0,
-                    count: 1,
-                },
+                along: AlongSpec::Ordered { order: 0, count: 1 },
             };
             ep.target = ResolvedPort {
                 side: case.side,
-                along: AlongSpec::Ordered {
-                    order: 0,
-                    count: 1,
-                },
+                along: AlongSpec::Ordered { order: 0, count: 1 },
             };
             let escape = EscapePlan {
                 source: case.escape,
@@ -1213,7 +1232,12 @@ mod tests {
             };
             let routed = route_main(&graph, &plan, &ports, &frames, case.og, case.rail_x, escape);
             let pts = routed[0].path.polyline_points();
-            assert!(pts.len() >= 3, "{}: expected stub + jog, got {:?}", case.label, pts);
+            assert!(
+                pts.len() >= 3,
+                "{}: expected stub + jog, got {:?}",
+                case.label,
+                pts
+            );
 
             let n = side_normal(case.side);
             let (dx0, dy0) = (pts[1].x - pts[0].x, pts[1].y - pts[0].y);
@@ -1283,7 +1307,8 @@ mod tests {
         let pts = routed[0].path.polyline_points();
         assert_eq!(*pts.first().unwrap(), anchor);
         assert!(
-            pts.iter().any(|p| (p.x - anchor.x).abs() < 1e-9 && (p.y - bus_y).abs() < 1e-9),
+            pts.iter()
+                .any(|p| (p.x - anchor.x).abs() < 1e-9 && (p.y - bus_y).abs() < 1e-9),
             "expected trunk tip at ({}, {}), got {:?}",
             anchor.x,
             bus_y,
