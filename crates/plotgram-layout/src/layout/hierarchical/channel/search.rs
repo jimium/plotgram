@@ -265,6 +265,14 @@ pub struct SpanAffinity {
     pub tgt_rank: usize,
     pub src_order: usize,
     pub tgt_order: usize,
+    /// Median order of the edge's own dummy-chain column (`None` = span 1).
+    ///
+    /// The endpoint band alone is flat across every interior gap, so a long
+    /// edge could take any corridor between its two columns while its chain
+    /// — the element Order/Metric already reserved for it — sat elsewhere.
+    /// Keeping the corridor on the chain column is what makes the routed ink
+    /// and the reserved column the same object.
+    pub chain_order: Option<usize>,
 }
 
 /// Soft search preferences (D1.2 params + D1.3 span / inner-corridor).
@@ -455,6 +463,21 @@ pub fn main_span_dist(order_gap: usize, src_order: usize, tgt_order: usize) -> u
     }
 }
 
+/// Main order-gap `og` distance to the two gaps flanking the edge's own
+/// dummy-chain column. Zero when the corridor runs along the chain.
+pub fn main_chain_dist(order_gap: usize, chain_order: Option<usize>) -> u32 {
+    let Some(k) = chain_order else {
+        return 0;
+    };
+    if order_gap <= k {
+        (k - order_gap) as u32
+    } else if order_gap > k + 1 {
+        (order_gap - (k + 1)) as u32
+    } else {
+        0
+    }
+}
+
 fn track_span_affinity(substrate: &Substrate, track: TrackId, hints: &RouteHints) -> u32 {
     let Some(span) = hints.span else {
         return 0;
@@ -464,7 +487,8 @@ fn track_span_affinity(substrate: &Substrate, track: TrackId, hints: &RouteHints
     };
     match t.orient {
         TrackOrient::Cross => cross_span_dist(t.line, span.src_rank, span.tgt_rank),
-        TrackOrient::Main => main_span_dist(t.line, span.src_order, span.tgt_order),
+        TrackOrient::Main => main_span_dist(t.line, span.src_order, span.tgt_order)
+            .saturating_add(main_chain_dist(t.line, span.chain_order)),
     }
 }
 
@@ -1066,6 +1090,7 @@ mod tests {
                 tgt_rank: 2,
                 src_order: 0,
                 tgt_order: 0,
+                chain_order: None,
             }),
             order_count: idx.order_count,
             outer_main_as_overflow: true,
@@ -1171,6 +1196,7 @@ mod tests {
                 tgt_rank: 2,
                 src_order: 1,
                 tgt_order: 0,
+                chain_order: None,
             }),
             order_count: idx.order_count,
             outer_main_as_overflow: true,
@@ -1241,6 +1267,7 @@ mod tests {
                 tgt_rank: 2,
                 src_order: 0,
                 tgt_order: 0,
+                chain_order: None,
             }),
             order_count: idx.order_count,
             outer_main_as_overflow: true,
@@ -1317,6 +1344,7 @@ mod tests {
                 tgt_rank: 2,
                 src_order: 1,
                 tgt_order: 1,
+                chain_order: None,
             }),
             order_count: idx.order_count,
             outer_main_as_overflow: true,
@@ -1384,6 +1412,7 @@ mod tests {
                 tgt_rank: 2,
                 src_order: 0,
                 tgt_order: 0,
+                chain_order: None,
             }),
             order_count: idx.order_count,
             outer_main_as_overflow: true,
@@ -1544,6 +1573,7 @@ mod tests {
                 tgt_rank: 0,
                 src_order: 0,
                 tgt_order: 0,
+                chain_order: None,
             }),
             order_count: idx.order_count,
             outer_main_as_overflow: true,
@@ -1629,6 +1659,7 @@ mod tests {
                 tgt_rank: 2,
                 src_order: 0,
                 tgt_order: 1,
+                chain_order: None,
             }),
             order_count: idx.order_count,
             outer_main_as_overflow: true,

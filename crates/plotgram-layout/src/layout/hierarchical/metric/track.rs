@@ -1,6 +1,6 @@
 //! Publish main/cross coordinates for Channel TrackOrder lanes.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use plotgram_algo::orientation::Size;
 use plotgram_model::diagnostics::Relaxation;
@@ -8,7 +8,44 @@ use plotgram_model::diagnostics::Relaxation;
 use crate::layout::hierarchical::channel::{ChannelRoutePlan, TrackId, TrackOrient};
 use crate::layout::hierarchical::compose::track_order::TrackOrderPlan;
 use crate::layout::hierarchical::group_frame::GroupShellBands;
-use crate::layout::hierarchical::model::PlanGraph;
+use crate::layout::hierarchical::model::{ElemKey, PlanGraph};
+
+/// Per-edge facts a Main corridor needs to place itself (Metric-owned, read
+/// from upstream writers only): the two endpoint port X's, the reserved
+/// dummy-chain columns, and the rank interval the corridor spans.
+#[derive(Debug, Clone, Default)]
+pub struct MainLaneFacts {
+    /// edge id → (source port X, target port X).
+    pub endpoint_x: BTreeMap<String, (f64, f64)>,
+    /// edge id → inclusive endpoint rank interval (lane overlap test).
+    pub rank_span: BTreeMap<String, (usize, usize)>,
+    /// edge id → inclusive ranks the vertical corridor actually crosses.
+    ///
+    /// An N/S end leaves through the layer gap, so its own rank is never
+    /// crossed; an E/W end runs alongside its row and is. `None` = the
+    /// corridor crosses no row at all.
+    pub corridor_ranks: BTreeMap<String, Option<(usize, usize)>>,
+    /// edge id → endpoint elem indices (never obstacles for their own edge).
+    pub endpoint_elems: BTreeMap<String, (usize, usize)>,
+    /// edge id → groups either endpoint sits in (own frames are never
+    /// obstacles — an edge must be able to run inside its own group).
+    pub own_groups: BTreeMap<String, BTreeSet<String>>,
+    /// edge id → corridor X interval the edge's port sides admit.
+    ///
+    /// An E/W port fixes which side of its own face the rail must live on;
+    /// a rail on the wrong side makes the first segment ride the node face
+    /// (ink-and-verification §4). Compose owns the side, Metric only obeys.
+    pub x_bounds: BTreeMap<String, (f64, f64)>,
+}
+
+/// A bend costs this many pixels of horizontal run (`w_bend / w_len`).
+///
+/// Mirrors the Channel search ratio so corridor placement and corridor
+/// selection agree on what a bend is worth.
+const LANE_BEND_FACTOR: f64 = 10.0;
+/// Weight of staying on the reserved chain column, relative to run length.
+/// Below 1 so a jog-free corridor always beats a merely well-centered one.
+const LANE_CHAIN_WEIGHT: f64 = 0.5;
 
 /// Per-substrate-track lane coordinates (main Y for Cross, cross X for Main).
 #[derive(Debug, Default, Clone)]
@@ -48,7 +85,8 @@ pub fn assign_track_coords(
     route_plan: &ChannelRoutePlan,
     shell: &GroupShellBands,
     edge_gap: f64,
-    group_obstacles: &[(f64, f64, f64, f64)],
+    groups: &[(String, (f64, f64, f64, f64))],
+    facts: &MainLaneFacts,
 ) -> (TrackCoords, Vec<Relaxation>) {
     // Real-node frames for Main-lane clearance (InkVerifier node-penetration).
     let mut obstacles: Vec<(f64, f64, f64, f64)> = Vec::new(); // l,t,r,b
@@ -67,6 +105,16 @@ pub fn assign_track_coords(
                 y + s.height,
             ));
         }
+    }
+
+    // (track, lane) → routed member edges (TrackOrder is the sole writer of
+    // lane indices; Metric only reads the inverse map).
+    let mut lane_members: BTreeMap<(TrackId, u32), Vec<String>> = BTreeMap::new();
+    for ((edge_id, tid), hop) in &track_order.assignments {
+        lane_members
+            .entry((*tid, hop.track_index))
+            .or_default()
+            .push(edge_id.clone());
     }
 
     let mut out = TrackCoords::default();
@@ -164,53 +212,46 @@ pub fn assign_track_coords(
                 grid.iter().take(count).copied().collect()
             }
             TrackOrient::Main => {
-                // Vertical corridor X: sit in order *gaps* (or outside the
-                // outer columns), never on a node center — otherwise a
-                // full-height Main rail penetrates intermediate nodes.
+                // Vertical corridor X: the corridor an edge actually runs in
+                // must be the column Order/Metric already reserved for it —
+                // its dummy chain — snapped onto an endpoint port whenever
+                // that is reachable, since that is what erases a jog. The
+                // order-gap midpoint is only the fallback for corridors with
+                // no routed member (`main_line_backbone_x` folds every rank,
+                // so it means little for a corridor that spans a few).
                 let og = t.line;
                 let max_cols = plan.layers.iter().map(|l| l.len()).max().unwrap_or(0);
-                let mut backbone =
-                    main_line_backbone_x(plan, cross_centers, size_of, og, edge_gap);
-                backbone = clear_main_x(backbone, &obstacles, edge_gap);
-                // Outer rails additionally clear group envelopes (SM-4).
                 let outer = og == 0 || og >= max_cols;
-                if outer {
-                    backbone = clear_outside(backbone, &obstacles, group_obstacles, edge_gap);
+                let backbone = main_line_backbone_x(plan, cross_centers, size_of, og, edge_gap);
+
+                let mut xs: Vec<f64> = Vec::with_capacity(count);
+                let mut bands: Vec<Option<(usize, usize)>> = Vec::with_capacity(count);
+                for lane in 0..count {
+                    let members: &[String] = lane_members
+                        .get(&(tid, lane as u32))
+                        .map(|v| v.as_slice())
+                        .unwrap_or(&[]);
+                    let band = lane_rank_band(facts, members);
+                    let lane_obstacles = band_obstacles(
+                        plan, main, cross_centers, size_of, facts, members,
+                    );
+                    let _ = outer;
+                    let foreign = foreign_group_frames(groups, facts, members);
+                    let settle = |x: f64| -> f64 {
+                        clear_outside(x, &lane_obstacles, &foreign, edge_gap)
+                    };
+                    let (blo, bhi) = lane_x_bounds(facts, members);
+                    let settle = |x: f64| settle_within(x, blo, bhi, edge_gap, &settle);
+                    let x = if members.is_empty() {
+                        settle(backbone - (lane as f64) * if og == 0 { edge_gap } else { 0.0 })
+                    } else {
+                        best_lane_x(plan, cross_centers, facts, members, backbone, edge_gap, &settle)
+                    };
+                    xs.push(x);
+                    bands.push(band);
                 }
-                let ys: Vec<f64> = if og == 0 {
-                    // West outer: pack further left so parallel returns stay outside.
-                    (0..count)
-                        .map(|i| {
-                            clear_outside(
-                                backbone - i as f64 * edge_gap,
-                                &obstacles,
-                                group_obstacles,
-                                edge_gap,
-                            )
-                        })
-                        .collect()
-                } else if og >= max_cols {
-                    // East outer: pack further right.
-                    (0..count)
-                        .map(|i| {
-                            clear_outside(
-                                backbone + i as f64 * edge_gap,
-                                &obstacles,
-                                group_obstacles,
-                                edge_gap,
-                            )
-                        })
-                        .collect()
-                } else {
-                    let span = (count.saturating_sub(1) as f64) * edge_gap;
-                    let start = backbone - span * 0.5;
-                    (0..count)
-                        .map(|i| {
-                            clear_main_x(start + i as f64 * edge_gap, &obstacles, edge_gap)
-                        })
-                        .collect()
-                };
-                ys
+                separate_overlapping_lanes(&mut xs, &bands, edge_gap);
+                xs
             }
         };
         out.coords.insert(tid, ys);
@@ -243,6 +284,247 @@ fn cross_lane_start(
     let usable = (hi - lo).max(0.0);
     let fallback = !fits_free && (below_band > 0.0 || above_band > 0.0);
     (lo + (usable - span) * 0.5, fallback)
+}
+
+/// Union of the member edges' inclusive endpoint rank intervals.
+fn lane_rank_band(facts: &MainLaneFacts, members: &[String]) -> Option<(usize, usize)> {
+    let mut band: Option<(usize, usize)> = None;
+    for id in members {
+        let Some(&(lo, hi)) = facts.rank_span.get(id) else {
+            continue;
+        };
+        band = Some(match band {
+            None => (lo, hi),
+            Some((a, b)) => (a.min(lo), b.max(hi)),
+        });
+    }
+    band
+}
+
+/// Node bodies a corridor on this lane can actually hit: the rows its member
+/// edges cross, minus the members' own endpoints (an edge may always touch
+/// those). Rows outside the crossed band must not constrain the corridor —
+/// folding all of them into one wall is what used to push corridors onto the
+/// canvas rim.
+fn band_obstacles(
+    plan: &PlanGraph,
+    main: &[f64],
+    cross_centers: &[f64],
+    size_of: &dyn Fn(usize) -> Size,
+    facts: &MainLaneFacts,
+    members: &[String],
+) -> Vec<(f64, f64, f64, f64)> {
+    let mut own: BTreeSet<usize> = BTreeSet::new();
+    let mut ranks: BTreeSet<usize> = BTreeSet::new();
+    for id in members {
+        if let Some(&(s, t)) = facts.endpoint_elems.get(id) {
+            own.insert(s);
+            own.insert(t);
+        }
+        match facts.corridor_ranks.get(id) {
+            Some(Some((lo, hi))) => ranks.extend(*lo..=*hi),
+            Some(None) => {}
+            // Unknown member (no facts): stay conservative.
+            None => ranks.extend(0..plan.layers.len()),
+        }
+    }
+    let mut out = Vec::new();
+    for rank in ranks {
+        let Some(layer) = plan.layers.get(rank) else {
+            continue;
+        };
+        for &e in layer {
+            if plan.elems[e].key.is_zero_width() || own.contains(&e) {
+                continue;
+            }
+            let s = size_of(e);
+            out.push((
+                cross_centers[e] - s.width / 2.0,
+                main[e],
+                cross_centers[e] + s.width / 2.0,
+                main[e] + s.height,
+            ));
+        }
+    }
+    out
+}
+
+/// Group frames a corridor on this lane must stay out of: every group frame
+/// except the ones the member edges' own endpoints live in.
+fn foreign_group_frames(
+    groups: &[(String, (f64, f64, f64, f64))],
+    facts: &MainLaneFacts,
+    members: &[String],
+) -> Vec<(f64, f64, f64, f64)> {
+    let mut own: BTreeSet<&str> = BTreeSet::new();
+    for id in members {
+        if let Some(set) = facts.own_groups.get(id) {
+            own.extend(set.iter().map(String::as_str));
+        }
+    }
+    groups
+        .iter()
+        .filter(|(id, _)| !own.contains(id.as_str()))
+        .map(|(_, r)| *r)
+        .collect()
+}
+
+/// Intersection of the member edges' admissible corridor X intervals.
+fn lane_x_bounds(facts: &MainLaneFacts, members: &[String]) -> (f64, f64) {
+    let mut lo = f64::NEG_INFINITY;
+    let mut hi = f64::INFINITY;
+    for id in members {
+        if let Some(&(l, h)) = facts.x_bounds.get(id) {
+            lo = lo.max(l);
+            hi = hi.min(h);
+        }
+    }
+    if lo > hi {
+        // Contradictory sides (a corridor shared by opposite normals): the
+        // clearance pass alone decides, as before.
+        return (f64::NEG_INFINITY, f64::INFINITY);
+    }
+    (lo, hi)
+}
+
+/// Clear `x` of node bodies **without** leaving `[lo, hi]`: clearance may push
+/// a rail across the bound, so step back inward until both hold.
+fn settle_within(
+    x: f64,
+    lo: f64,
+    hi: f64,
+    edge_gap: f64,
+    settle: &dyn Fn(f64) -> f64,
+) -> f64 {
+    let clamp = |v: f64| v.clamp(lo, hi);
+    let first = settle(clamp(x));
+    if first >= lo - 1e-9 && first <= hi + 1e-9 {
+        return first;
+    }
+    // Walk inward from the violated bound until clearance is a fixpoint.
+    let (start, step) = if first < lo {
+        (lo, edge_gap)
+    } else {
+        (hi, -edge_gap)
+    };
+    for i in 0..32 {
+        let cand = start + step * i as f64;
+        if cand < lo - 1e-9 || cand > hi + 1e-9 {
+            break;
+        }
+        if (settle(cand) - cand).abs() < 1e-9 {
+            return cand;
+        }
+    }
+    clamp(first)
+}
+
+/// Pick the lane X minimising `J = w_bend·jogs + run_length + w_chain·chain_drift`
+/// over the candidate columns the upstream writers already produced (each
+/// endpoint port X, each reserved chain column, and the order-gap backbone).
+///
+/// The `J` minimum sits on an endpoint port X whenever that column is
+/// reachable — which is exactly the corridor that needs only one jog.
+fn best_lane_x(
+    plan: &PlanGraph,
+    cross_centers: &[f64],
+    facts: &MainLaneFacts,
+    members: &[String],
+    backbone: f64,
+    edge_gap: f64,
+    settle: &dyn Fn(f64) -> f64,
+) -> f64 {
+    let chains: Vec<Vec<f64>> = members
+        .iter()
+        .map(|id| chain_columns(plan, cross_centers, id))
+        .collect();
+
+    let mut candidates: Vec<f64> = vec![backbone];
+    for id in members {
+        if let Some(&(sx, tx)) = facts.endpoint_x.get(id) {
+            candidates.push(sx);
+            candidates.push(tx);
+        }
+    }
+    for c in chains.iter().flatten() {
+        candidates.push(*c);
+    }
+
+    let w_bend = LANE_BEND_FACTOR * edge_gap.max(1e-9);
+    let cost = |x: f64| -> f64 {
+        let mut j = 0.0;
+        for (id, chain) in members.iter().zip(&chains) {
+            if let Some(&(sx, tx)) = facts.endpoint_x.get(id) {
+                for e in [sx, tx] {
+                    let d = (x - e).abs();
+                    j += d;
+                    if d > 1e-6 {
+                        j += w_bend;
+                    }
+                }
+            }
+            // Mean, not sum: a long chain must not outweigh the run-length
+            // term just by having more links.
+            if !chain.is_empty() {
+                let drift: f64 = chain.iter().map(|c| (x - c).abs()).sum();
+                j += LANE_CHAIN_WEIGHT * drift / chain.len() as f64;
+            }
+        }
+        j
+    };
+
+    let mut best: Option<(f64, f64)> = None;
+    for cand in candidates {
+        let x = settle(cand);
+        let j = cost(x);
+        // Ties break on the smaller X for determinism.
+        if best.is_none_or(|(bj, bx)| j < bj - 1e-9 || (j < bj + 1e-9 && x < bx)) {
+            best = Some((j, x));
+        }
+    }
+    best.map(|(_, x)| x).unwrap_or(backbone)
+}
+
+/// Cross coordinates of `edge_id`'s dummy chain (its reserved columns).
+fn chain_columns(plan: &PlanGraph, cross_centers: &[f64], edge_id: &str) -> Vec<f64> {
+    plan.elems
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| matches!(&e.key, ElemKey::Virtual { edge_id: id, .. } if id == edge_id))
+        .map(|(i, _)| cross_centers[i])
+        .collect()
+}
+
+/// Push lanes of one corridor apart when their rank bands overlap — lanes
+/// with disjoint bands are free to share an X.
+fn separate_overlapping_lanes(
+    xs: &mut [f64],
+    bands: &[Option<(usize, usize)>],
+    edge_gap: f64,
+) {
+    let overlaps = |a: usize, b: usize| match (bands.get(a), bands.get(b)) {
+        (Some(Some((a0, a1))), Some(Some((b0, b1)))) => a0 <= b1 && b0 <= a1,
+        _ => true,
+    };
+    for _ in 0..xs.len().max(1) {
+        let mut order: Vec<usize> = (0..xs.len()).collect();
+        order.sort_by(|&a, &b| xs[a].total_cmp(&xs[b]).then(a.cmp(&b)));
+        let mut moved = false;
+        for w in order.windows(2) {
+            let (a, b) = (w[0], w[1]);
+            if !overlaps(a, b) {
+                continue;
+            }
+            let need = edge_gap - (xs[b] - xs[a]);
+            if need > 1e-9 {
+                xs[b] += need;
+                moved = true;
+            }
+        }
+        if !moved {
+            break;
+        }
+    }
 }
 
 fn main_line_backbone_x(
@@ -464,6 +746,7 @@ mod tests {
                 &shell,
                 16.0,
                 &[],
+                &MainLaneFacts::default(),
             );
             assert_eq!(
                 &coords.coords[&t_wide],
@@ -614,7 +897,7 @@ mod tests {
             outer_bottom: 0.0,
         };
         // Node bodies [0,20]×two rows; group envelope extends to x=36.
-        let group_env = vec![(0.0, -24.0, 36.0, 130.0)];
+        let group_env = vec![("g".to_string(), (0.0, -24.0, 36.0, 130.0))];
         let (with_group, _) = assign_track_coords(
             &plan,
             &[0.0, 100.0],
@@ -625,6 +908,7 @@ mod tests {
             &shell,
             16.0,
             &group_env,
+            &MainLaneFacts::default(),
         );
         // Node-only backbone is 28 (east face 20 + margin 8) — inside the
         // envelope; clearance pushes past 36 + margin.
@@ -640,6 +924,7 @@ mod tests {
             &shell,
             16.0,
             &[],
+            &MainLaneFacts::default(),
         );
         assert_eq!(no_group.coords[&t_main], vec![28.0]);
     }

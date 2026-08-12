@@ -35,8 +35,12 @@ Compose 写 `along_spec`；Metric 写导出的 `PortPoint`。
 
 1. 排除违反 fixed side、scope 出针或 group boundary 的 side；
 2. 以 working 流向估计逆向出针与最小 bend；
-3. **回边走廊角色**（`pick_reversed_side`）：`span≥2` → E/W；`has_twin ∧ span=1 ∧ Δorder≤1` → N/S（平行）；无 twin 短回边 → E/W；FixedSide 尊守。  
-   **E/W 极性**（两端同写）：取两 real 端中 rank 更大者为 tip；`tip.order > peer.order` → East；`<` → West；同列 → East。禁止 per-end「朝 peer」。
+3. **回边走廊角色**（`pick_reversed_side`）：  
+   - `span≥3` 且两端层内归一化位置接近（near-column）且**同 group_path** → N/S 主脊（长边 dummy 链已占列；跨组长回边仍走侧廊，避免穿组）；  
+   - 其余 `span≥2`（含 span=2 闭环、跨列长回边、跨组）→ E/W 侧廊；  
+   - `has_twin ∧ span=1` → N/S（平行，不看 near-column）；  
+   - 无 twin 短回边 → E/W；FixedSide 尊守。  
+   **E/W 极性**（两端同写）：取两 real 端中 rank 更大者为 tip；比较两端在**各自层内非零宽节点**上的归一化左右位置（单节点层视为 0.5），tip 更右 → East，更左 → West，同侧则按 tip 半区（≥0.5 East）。禁止用原始 `order` 跨层宽直接比大小。正向边一律走 rank 方向（N/S），不另开侧廊特判。
 4. 平局按固定 Side 顺序；
 5. 同侧边按对侧**远真实端** `(layer_order, rank, EdgeId)` 排序（immediate neighbor 为 long-edge dummy 时不得用 dummy 的 layer order，避免扇出左右交叉）；
 6. edge_group / port_group 先折叠成一个端口单位，再分 slot；

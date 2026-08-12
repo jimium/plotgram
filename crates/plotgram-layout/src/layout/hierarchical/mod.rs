@@ -254,7 +254,9 @@ fn compute_weak<'g>(
         Vec::new()
     };
     let size_of =
-        |elem_idx: usize| -> algo_orient::Size { elem_size(&plan, &real_graph, &canonical_size, elem_idx) };
+        |elem_idx: usize| -> algo_orient::Size {
+            elem_size(&plan, &real_graph, &canonical_size, elem_idx)
+        };
     let main_prelim =
         metric::main_axis::assign_main_axis(&plan, &size_of, &prelim_gaps, params.layer_alignment);
     // Infeasibility here can only come from crossing BK blocks — a bug, not
@@ -340,7 +342,9 @@ fn compute_channel_ink_tail<'g>(
     frames: TailFrames,
 ) -> Result<(LayoutOutput, debug::Captures<'g>), LayoutError> {
     let size_of =
-        |elem_idx: usize| -> algo_orient::Size { elem_size(&plan, &real_graph, &canonical_size, elem_idx) };
+        |elem_idx: usize| -> algo_orient::Size {
+            elem_size(&plan, &real_graph, &canonical_size, elem_idx)
+        };
     diagnostics.relaxations.extend(route_plan.relaxations.iter().cloned());
     let mut bus_edge_ids: Vec<String> = compose::bundle::end_bus_edge_ids(&route_plan.bundles)
         .into_iter()
@@ -491,10 +495,17 @@ fn compute_channel_ink_tail<'g>(
     // SM-4 + D₂.0 §8.4: outer Main rails clear the layout-owned group
     // envelopes (Weak: Metric Fit; Strong: MacroBlockWriter — never a second
     // VPSC frame solve on Strong).
-    let group_obstacles: Vec<(f64, f64, f64, f64)> = canonical_group_placements
+    let group_obstacles: Vec<(String, (f64, f64, f64, f64))> = canonical_group_placements
         .iter()
-        .map(|g| (g.frame.x, g.frame.y, g.frame.right(), g.frame.bottom()))
+        .map(|g| {
+            (
+                g.id.clone(),
+                (g.frame.x, g.frame.y, g.frame.right(), g.frame.bottom()),
+            )
+        })
         .collect();
+    let lane_facts =
+        main_lane_facts(&plan, &real_graph, &ports, &canonical_frames, params.edge_gap);
     let (track_coords, track_relaxations) = metric::track::assign_track_coords(
         &plan,
         &main,
@@ -505,6 +516,7 @@ fn compute_channel_ink_tail<'g>(
         &shell_bands,
         params.edge_gap,
         &group_obstacles,
+        &lane_facts,
     );
     diagnostics.relaxations.extend(track_relaxations);
 
@@ -770,6 +782,87 @@ fn elem_size(
         | ElemKey::PartitionBoundary { .. }
         | ElemKey::OrderPad { .. } => algo_orient::Size::new(0.0, 0.0),
     }
+}
+
+/// Endpoint facts every Main corridor needs to place its X: the finalized
+/// port anchors, the endpoint rank interval, and the endpoint elems.
+fn main_lane_facts(
+    plan: &model::PlanGraph,
+    real_graph: &model::RealGraph,
+    ports: &BTreeMap<String, EdgePorts>,
+    frames: &[Rect],
+    edge_gap: f64,
+) -> metric::track::MainLaneFacts {
+    let mut facts = metric::track::MainLaneFacts::default();
+    for e in &real_graph.edges {
+        let Some(rp) = ports.get(&e.edge_id) else {
+            continue;
+        };
+        let src = plan
+            .index_of
+            .get(&ElemKey::Real(real_graph.ids[e.original_source].clone()));
+        let tgt = plan
+            .index_of
+            .get(&ElemKey::Real(real_graph.ids[e.original_target].clone()));
+        let (Some(&src), Some(&tgt)) = (src, tgt) else {
+            continue;
+        };
+        facts.endpoint_x.insert(
+            e.edge_id.clone(),
+            (
+                metric::anchor::port_anchor(frames[src], rp.source).x,
+                metric::anchor::port_anchor(frames[tgt], rp.target).x,
+            ),
+        );
+        let (sr, tr) = (
+            plan.elems[src].rank as usize,
+            plan.elems[tgt].rank as usize,
+        );
+        let (lo, hi) = (sr.min(tr), sr.max(tr));
+        facts.rank_span.insert(e.edge_id.clone(), (lo, hi));
+        facts.endpoint_elems.insert(e.edge_id.clone(), (src, tgt));
+
+        // A rail exactly on an E/W face makes the port stub run *along* the
+        // face; keep it one clearance margin off, matching `clear_main_x`.
+        let margin = edge_gap.max(1.0) * 0.5;
+        let mut bounds = (f64::NEG_INFINITY, f64::INFINITY);
+        for (elem, port) in [(src, rp.source), (tgt, rp.target)] {
+            match port.side {
+                algo_orient::Side::East => {
+                    bounds.0 = bounds.0.max(frames[elem].right() + margin)
+                }
+                algo_orient::Side::West => bounds.1 = bounds.1.min(frames[elem].x - margin),
+                _ => {}
+            }
+        }
+        facts.x_bounds.insert(e.edge_id.clone(), bounds);
+        // Only groups that contain *both* ends: a rail may live inside a
+        // group it is entirely internal to, never inside one it merely
+        // enters (that crossing belongs to a gate).
+        facts.own_groups.insert(
+            e.edge_id.clone(),
+            plan.elems[src]
+                .group_path
+                .iter()
+                .filter(|g| plan.elems[tgt].group_path.contains(g))
+                .cloned()
+                .collect(),
+        );
+
+        let ns = |side| matches!(side, algo_orient::Side::North | algo_orient::Side::South);
+        let (lo_side, hi_side) = if sr <= tr {
+            (rp.source.side, rp.target.side)
+        } else {
+            (rp.target.side, rp.source.side)
+        };
+        let cross_lo = if ns(lo_side) { lo + 1 } else { lo };
+        let cross_hi = if ns(hi_side) { hi.saturating_sub(1) } else { hi };
+        facts.corridor_ranks.insert(
+            e.edge_id.clone(),
+            (cross_lo <= cross_hi).then_some((cross_lo, cross_hi)),
+        );
+    }
+    facts
 }
 
 /// Group ids carrying a label (recursive — nested groups included); their

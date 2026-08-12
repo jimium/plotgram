@@ -113,8 +113,8 @@ fn spine_ns_load(usage: &BTreeMap<(usize, Side), u32>, node_real: usize) -> u32 
 const NS_LOAD_SPINE_THRESHOLD: u32 = 2;
 
 /// FREE side inference (canonical TB). Forward edges follow the rank
-/// direction (downstream → South, upstream → North). Reversed (back) edges
-/// pick spine vs side corridor via [`pick_reversed_side`] (no Channel call).
+/// direction (downstream → South, upstream → North). Reversed edges pick
+/// spine vs side corridor via [`pick_reversed_side`] (no Channel call).
 fn free_side(
     plan: &PlanGraph,
     pos: &[usize],
@@ -144,26 +144,33 @@ fn free_side(
         | crate::layout::hierarchical::model::ElemKey::OrderPad { .. } => neighbor,
     };
     let peer_rank = plan.elems[peer].rank;
-    let own_order = pos[node_real];
-    let peer_order = pos.get(peer).copied().unwrap_or(0);
-    // Side-corridor polarity is edge-level (both ends same face): tip = the
-    // lower-on-TB real endpoint; East/West from tip vs peer layer order —
-    // outer leaf side, not "toward peer" (expectations §3 闭环走侧廊).
-    let cross_axis = side_corridor_polarity(plan, pos, node_real, peer);
     let span = (own_rank as usize).abs_diff(peer_rank as usize);
+    // Side-corridor polarity is edge-level (both ends same face): tip = the
+    // lower-on-TB real endpoint; East/West from tip vs peer **normalized**
+    // layer position among non-zero-width elems — outer leaf side, not
+    // "toward peer".
+    let cross_axis = side_corridor_polarity(plan, pos, node_real, peer);
+    let own_r = layer_rightness(plan, pos, node_real);
+    let peer_r = layer_rightness(plan, pos, peer);
+    let cross_group = plan.elems[node_real].group_path != plan.elems[peer].group_path;
     pick_reversed_side(
         rank_dir,
         cross_axis,
         span,
-        own_order,
-        peer_order,
+        own_r,
+        peer_r,
         has_twin,
         ns_load,
+        cross_group,
     )
 }
 
-/// Shared E/W face for a side-corridor reverse: tip is the higher-rank real
-/// end; polarity follows tip's order relative to the other end.
+/// Shared E/W face for a side corridor: tip is the higher-rank real end;
+/// polarity compares **within-layer rightness** among non-zero-width elems
+/// (`order_among_reals / (n_reals−1)`), not raw order indices — those are
+/// not comparable across layers of different widths (mech e29: tip n14
+/// order 1/2 vs n11 order 4/5 both sit on the right, but raw `1 < 4`
+/// wrongly picked West and forced a full-width U).
 fn side_corridor_polarity(
     plan: &PlanGraph,
     pos: &[usize],
@@ -175,52 +182,99 @@ fn side_corridor_polarity(
         std::cmp::Ordering::Less => (b, a),
         std::cmp::Ordering::Equal => return Side::East,
     };
-    let tip_o = pos.get(tip).copied().unwrap_or(0);
-    let other_o = pos.get(other).copied().unwrap_or(0);
-    match tip_o.cmp(&other_o) {
-        std::cmp::Ordering::Greater => Side::East,
-        std::cmp::Ordering::Less => Side::West,
-        std::cmp::Ordering::Equal => Side::East,
+    let tip_r = layer_rightness(plan, pos, tip);
+    let other_r = layer_rightness(plan, pos, other);
+    const EPS: f64 = 1e-9;
+    if tip_r > other_r + EPS {
+        Side::East
+    } else if tip_r + EPS < other_r {
+        Side::West
+    } else if tip_r + EPS >= 0.5 {
+        // Same rightness (incl. both singleton layers): prefer the tip's
+        // half of the diagram — right → East, left → West.
+        Side::East
+    } else {
+        Side::West
     }
+}
+
+/// 0.0 = leftmost non-zero-width of layer, 1.0 = rightmost; singleton → 0.5.
+/// Zero-width dummies / clamps are excluded so rightness does not drift with
+/// long-edge occupancy.
+fn layer_rightness(plan: &PlanGraph, pos: &[usize], elem: usize) -> f64 {
+    let rank = plan.elems[elem].rank as usize;
+    let Some(layer) = plan.layers.get(rank) else {
+        return 0.5;
+    };
+    let mut reals: Vec<(usize, usize)> = layer
+        .iter()
+        .copied()
+        .filter(|&e| !plan.elems[e].key.is_zero_width())
+        .map(|e| (pos.get(e).copied().unwrap_or(0), e))
+        .collect();
+    if reals.len() <= 1 {
+        return 0.5;
+    }
+    reals.sort_by_key(|&(o, e)| (o, e));
+    let Some(idx) = reals.iter().position(|&(_, e)| e == elem) else {
+        // Virtual / pad queried: interpolate from full-layer pos.
+        let len = layer.len().max(2);
+        let o = pos.get(elem).copied().unwrap_or(0);
+        return o as f64 / (len - 1) as f64;
+    };
+    idx as f64 / (reals.len() - 1) as f64
 }
 
 /// Corridor-role pick for FREE reversed ends (Compose-only; no Channel).
 ///
-/// - Twin short (span=1, Δorder≤1): flow spine (`rank_dir`) — parallel aesthetics.
-/// - Long reverse (span≥2): side corridor (`cross_axis`).
-/// - Short without twin: side corridor (workflow feedback); crowded spine too.
+/// - Twin short (span=1): flow spine (`rank_dir`) — parallel aesthetics.
+/// - Long reverse (span≥3) near-column **same group**: flow spine — dummy
+///   chain is the private corridor (mech e29/e30).
+/// - Cross-group long reverse, span=2 feedback, or divergent columns: side
+///   corridor (ticket-triage / order-approval / strong-macro swimlanes).
+/// - Short without twin (span=1): side corridor (workflow feedback).
 fn pick_reversed_side(
     rank_dir: Side,
     cross_axis: Side,
     span: usize,
-    own_order: usize,
-    peer_order: usize,
+    own_rightness: f64,
+    peer_rightness: f64,
     has_twin: bool,
     ns_load: u32,
+    cross_group: bool,
 ) -> Side {
-    let delta_order = own_order.abs_diff(peer_order);
+    // Near-column: within ~one slot of a typical 3-wide layer.
+    const NEAR_COL: f64 = 0.35;
+    let delta_r = (own_rightness - peer_rightness).abs();
+    let near_col = delta_r <= NEAR_COL;
 
+    if span >= 3 && near_col && !cross_group {
+        return rank_dir;
+    }
     if span >= 2 {
         return cross_axis;
     }
-    if has_twin && span == 1 && delta_order <= 1 {
+    if has_twin && span == 1 {
+        // Req-resp twins always share the flow spine (parallel aesthetics),
+        // even when layer widths differ enough that rightness looks far.
         return rank_dir;
     }
     if !has_twin && span == 1 {
         // Short feedback without a forward twin → side corridor
         // (also covers same-column crowded spine: ns_load ≥ threshold).
+        let _ = ns_load; // reserved for soft remainder / crowded spine
         return cross_axis;
     }
 
     // Remainder: soft costs; twin-like prefers spine, else side corridor.
     let c_ns: u32 = if has_twin { 0 } else { 2 }
-        + if delta_order == 0 { 1 } else { 0 }
+        + if near_col { 1 } else { 0 }
         + if ns_load >= NS_LOAD_SPINE_THRESHOLD {
             2
         } else {
             0
         };
-    let c_ew: u32 = if has_twin { 2 } else { 0 } + if delta_order >= 2 { 0 } else { 1 };
+    let c_ew: u32 = if has_twin { 2 } else { 0 } + if near_col { 1 } else { 0 };
     if c_ew <= c_ns {
         cross_axis
     } else {
@@ -983,9 +1037,9 @@ mod tests {
         );
     }
 
-    /// Multi-rank reversed (span≥2) takes the side corridor even when columns align.
+    /// Two-hop reversed without twin (span=2) takes the side corridor.
     #[test]
-    fn long_reversed_edge_same_column_prefers_cross_axis() {
+    fn two_hop_reversed_without_twin_prefers_cross_axis() {
         let ids = vec!["a".to_string(), "b".to_string()];
         let index_of = ids
             .iter()
@@ -1059,6 +1113,7 @@ mod tests {
                     ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false).unwrap().ports;
+        // Singleton layers → tip rightness 0.5 ≥ 0.5 → East.
         assert_eq!(ports["back"].source.side, Side::East);
         assert_eq!(ports["back"].target.side, Side::East);
     }
@@ -1134,24 +1189,21 @@ mod tests {
     fn pick_reversed_side_corridor_roles() {
         let ns = Side::North;
         let ew = Side::East;
-        let cases: &[(
-            &str,
-            usize,
-            usize,
-            usize,
-            bool,
-            u32,
-            Side,
-        )] = &[
-            ("long span → EW", 2, 0, 0, false, 0, ew),
-            ("long + twin → EW", 2, 0, 0, true, 0, ew),
-            ("twin short same-col → NS", 1, 0, 0, true, 0, ns),
-            ("twin short Δorder=1 → NS", 1, 0, 1, true, 0, ns),
-            ("no twin short → EW", 1, 0, 0, false, 0, ew),
-            ("no twin short crowded → EW", 1, 0, 0, false, 2, ew),
+        // (label, span, own_r, peer_r, twin, load, cross_group, want)
+        let cases: &[(&str, usize, f64, f64, bool, u32, bool, Side)] = &[
+            ("span≥3 near-col same-group → NS", 3, 0.5, 0.5, false, 0, false, ns),
+            ("span≥3 near-col cross-group → EW", 3, 0.5, 0.5, false, 0, true, ew),
+            ("span≥3 divergent → EW", 3, 0.0, 1.0, false, 0, false, ew),
+            ("span=2 near-col → EW", 2, 0.0, 0.0, false, 0, false, ew),
+            ("span=2 twin divergent → EW", 2, 0.0, 1.0, true, 0, false, ew),
+            ("twin short same-col → NS", 1, 0.0, 0.0, true, 0, false, ns),
+            ("twin short far-col → NS", 1, 0.0, 1.0, true, 0, false, ns),
+            ("twin short crowded → NS", 1, 0.0, 0.0, true, 2, false, ns),
+            ("no twin short → EW", 1, 0.0, 0.0, false, 0, false, ew),
+            ("no twin short crowded → EW", 1, 0.0, 0.0, false, 2, false, ew),
         ];
-        for (label, span, own_o, peer_o, twin, load, want) in cases {
-            let got = pick_reversed_side(ns, ew, *span, *own_o, *peer_o, *twin, *load);
+        for (label, span, own_r, peer_r, twin, load, xg, want) in cases {
+            let got = pick_reversed_side(ns, ew, *span, *own_r, *peer_r, *twin, *load, *xg);
             assert_eq!(got, *want, "{label}");
         }
     }

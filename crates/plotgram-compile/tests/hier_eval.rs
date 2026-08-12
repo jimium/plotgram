@@ -50,7 +50,7 @@
 //! (`smoke.flat-gateway-fanout`).
 //! TrackOrder Cross nest: `smoke.fan-out-four` outer/inner horizontals
 //! share rails symmetrically (no right-half cross).
-//! Side-corridor polarity: `product.ticket-triage` escalate→handle both East.
+//! Side-corridor polarity: `product.ticket-triage` escalate→handle both West.
 //! Upstream axis inheritance: `ticket-triage` resolve_gate shares handle cx.
 //! Primary arm on spine: `order-approval` finance under check; approved left;
 //! rejected→submit same-face East corridor (no overshoot past submit East);
@@ -1517,10 +1517,11 @@ fn fan_out_four_cross_rails_nest_outer_inner() {
     );
 }
 
-/// Side-corridor polarity: right-tip feedback uses East on both ends
-/// (`product.ticket-triage` escalate → handle).
+/// Side-corridor polarity: left-tip feedback uses West on both ends
+/// (`product.ticket-triage` escalate → handle). Escalate sits left of
+/// `close` on L6; within-layer rightness picks West (not raw order equality).
 #[test]
-fn ticket_triage_escalate_handle_side_corridor_east() {
+fn ticket_triage_escalate_handle_side_corridor_west() {
     let path = showcase_dir().join("flat/product.ticket-triage.pgm");
     let source = fs::read_to_string(&path).expect("ticket-triage fixture");
     let result = build_layout(&source, &BuildOptions::default()).expect("layout");
@@ -1533,14 +1534,14 @@ fn ticket_triage_escalate_handle_side_corridor_east() {
     let to = e.to_port.as_ref().expect("to_port");
     assert_eq!(
         from.side,
-        Side::East,
-        "escalate (right tip) must exit East, got {:?}",
+        Side::West,
+        "escalate (left tip) must exit West, got {:?}",
         from.side
     );
     assert_eq!(
         to.side,
-        Side::East,
-        "handle must enter East (shared right corridor), got {:?}",
+        Side::West,
+        "handle must enter West (shared left corridor), got {:?}",
         to.side
     );
 }
@@ -1683,11 +1684,11 @@ fn d22b_fallback_observability_and_demand_floor() {
     // (fixture, expect_fallback) — the five D₂.2a class-C-fallback fixtures
     // plus the derive-level one; two gate-on fixtures stay clean.
     let cases: &[(&str, bool)] = &[
-        ("group-weak/demo.k8s-blue-green-release-topology", true),
+        ("group-weak/demo.k8s-blue-green-release-topology", false),
         ("group-weak/demo.k8s-multi-namespace-overview", true),
         ("group-weak/demo.k8s-platform-stack", true),
         ("group-weak/demo.k8s-tenant-isolation", true),
-        ("group-weak/demo.plotgram-core-mod-deps", true),
+        ("group-weak/demo.plotgram-core-mod-deps", false),
         ("group-weak/product.d2-cell-tower-network", true),
         ("group-weak/demo.ai-agent-docops-pipeline", false),
         ("group-weak/demo.hybrid-cloud-dr-topology", false),

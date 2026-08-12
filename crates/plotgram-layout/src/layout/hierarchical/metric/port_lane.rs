@@ -32,7 +32,7 @@ struct CorridorGroup {
     edges: Vec<String>,
 }
 
-/// Align twin N/S corridors and close absolute along on every touched face.
+/// Align twin N/S corridors and adsorb Ordered N/S ports onto corridor x.
 pub fn apply_port_lanes(
     plan: &PlanGraph,
     graph: &RealGraph,
@@ -41,10 +41,6 @@ pub fn apply_port_lanes(
     port_pitch: f64,
 ) {
     let groups = collect_corridor_groups(plan, graph, ports);
-    if groups.is_empty() {
-        return;
-    }
-
     let edge_of = graph.edge_index_map();
     let corridor_edges: BTreeSet<String> = groups
         .iter()
@@ -82,7 +78,7 @@ pub fn apply_port_lanes(
         }
     }
 
-    // Shared lane per corridor edge.
+    // Shared lane per twin corridor edge.
     let mut lanes: BTreeMap<String, f64> = BTreeMap::new();
     for edge_id in &corridor_edges {
         let ps = provisional
@@ -116,7 +112,7 @@ pub fn apply_port_lanes(
         lanes.insert(e1.clone(), right);
     }
 
-    // Clip each lane into the intersection of both endpoint frames.
+    // Clip each twin lane into the intersection of both endpoint frames.
     for edge_id in &corridor_edges {
         let Some((src, tgt)) = endpoint_elems(plan, graph, &edge_of, edge_id) else {
             continue;
@@ -130,7 +126,7 @@ pub fn apply_port_lanes(
         }
     }
 
-    // Face-level LocalOffset for every end on touched faces.
+    // Face-level LocalOffset for twin-touched faces.
     for &face in &touched {
         let Some(ends) = face_ends.get(&face) else {
             continue;
@@ -155,6 +151,7 @@ pub fn apply_port_lanes(
         }
     }
 }
+
 
 fn pack_face_absolute(
     ends: &[FaceEnd],

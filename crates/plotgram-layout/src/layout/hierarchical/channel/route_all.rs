@@ -244,6 +244,26 @@ fn edge_rank_span(
     sr.abs_diff(tr)
 }
 
+/// Median layer order of `edge_id`'s dummy chain (`None` when span 1).
+fn chain_median_order(
+    plan: &PlanGraph,
+    layer_pos: &[usize],
+    edge_id: &str,
+) -> Option<usize> {
+    let mut orders: Vec<usize> = plan
+        .elems
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| matches!(&e.key, ElemKey::Virtual { edge_id: id, .. } if id == edge_id))
+        .map(|(i, _)| layer_pos[i])
+        .collect();
+    if orders.is_empty() {
+        return None;
+    }
+    orders.sort_unstable();
+    Some(orders[orders.len() / 2])
+}
+
 fn dummy_chain_len(segs_by_edge: &BTreeMap<String, Vec<usize>>, edge_id: &str) -> usize {
     segs_by_edge
         .get(edge_id)
@@ -262,6 +282,7 @@ fn hints_for_edge(
     let pitch = params.edge_gap.max(1e-9);
     let (src_rank, src_order) = endpoint_rank_order(plan, graph, layer_pos, edge.original_source);
     let (tgt_rank, tgt_order) = endpoint_rank_order(plan, graph, layer_pos, edge.original_target);
+    let chain_order = chain_median_order(plan, layer_pos, &edge.edge_id);
     RouteHints {
         min_first_span: if params.min_first_segment > 0.0 {
             (params.min_first_segment / pitch).max(1.0)
@@ -282,6 +303,7 @@ fn hints_for_edge(
             tgt_rank,
             src_order,
             tgt_order,
+            chain_order,
         }),
         weights: CostWeights::from_params(
             params.edge_gap,
@@ -931,6 +953,7 @@ mod tests {
                 tgt_rank: 1,
                 src_order: 0,
                 tgt_order: 1,
+                chain_order: None,
             }),
             ..RouteHints::default()
         };

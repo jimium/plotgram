@@ -178,6 +178,29 @@ Metric 根据 `PortPlan` 与最终 node frame 展开：
 4. 固定 order，只求像素坐标；
 5. 若可用区间不足，说明 MetricBudget 或 Plan 容量错误，硬失败。
 
+### 8.1 Main 竖廊 X：目标函数而非全图均值
+
+Main 走廊只有 order-gap 这一个离散身份，落到哪个像素由 Metric 定。曾经取「该 gap 两侧列在**所有层**上的中点均值」——一个与这条边无关的全图统计量，于是长边的竖段既不对齐自己的端口，也不对齐 Order 给它留的 dummy 链列，两头各补一个折点，Z-Z 四折。
+
+改为在候选集上最小化 `J`：
+
+```text
+候选 x ∈ { src_port.x, tgt_port.x, chain_median.x, backbone_mid }
+        （逐个过 clear_main_x 清障后再评估）
+
+J(x) = w_bend · Σ_{p ∈ {src_port, tgt_port}} [ |x − p.x| > ε ]   # 每端不共线记一折
+     + w_len  · Σ |x − p.x|                                      # 横移总长
+     + w_chain· mean_{c ∈ chain} |x − c.x|                        # 与自己 dummy 链列的漂移
+```
+
+硬约束（不进 `J`，直接夹）：
+
+- **E/W 端口侧**：East 端 ⇒ `x ≥ frame.right + edge_gap/2`；West 端 ⇒ `x ≤ frame.left − edge_gap/2`。半个 `edge_gap` 是为了让竖廊**离开**节点脸而不是贴着走——贴脸会被 Ink 的 stub 法向校验判为骑脸。
+- **外组包络**：只避让 **foreign group**（不同时含两端点的组）。完全内含于某组的边可以在组内走廊，不必绕出去（否则组图画布无故膨胀）。
+- **同带相邻廊**：rank 带重叠的两条 Main 廊之间保底 `edge_gap`。
+
+`w_chain` 取**均值**而非求和：链长本身不该改变这条边对齐链的意愿，否则长边会为了贴链把其它项全部压掉。
+
 ## 9. MetricVerifier
 
 最低检查：

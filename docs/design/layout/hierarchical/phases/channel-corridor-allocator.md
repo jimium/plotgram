@@ -131,6 +131,16 @@ main_dist(og) = 0  if og ∈ [order_lo, order_hi+1]   # 端点列之间的内侧
 
 同列端点（`order_lo == order_hi`）时，`og ∈ {order_lo, order_lo+1}` 为内侧脸；`og==0` / `og==order_count` 仅当区间触边才零代价。
 
+**链亲和（chain affinity）**：端点带在整个内侧区间上是平的，长边可以落在任意一条内侧缝上，而 Order 早已为它预留了一列——它自己的 dummy 链。带内再叠一项到链列的距离，让「走的廊」与「占的列」是同一个对象：
+
+```text
+k = 该边 dummy 链的 order 中位数（短边为 None → 该项恒 0）
+chain_dist(og) = 0                     if og ∈ {k, k+1}   # 链列两侧的缝
+               = |og 到该区间的距离|
+
+main_affinity(og) = main_dist(og) + chain_dist(og)
+```
+
 ### 2.4 验收
 
 | 门禁 | 标准 |
@@ -329,16 +339,21 @@ Consumer（Metric track.rs / main_axis layer gap）:
 
 ```text
 FixedSide                         → 尊守
-span ≥ 2                          → cross_axis (E/W)
-has_twin ∧ span=1 ∧ Δorder≤1      → rank_dir (N/S)   # 平行美学
+span≥3 ∧ near-column ∧ ¬cross_group → rank_dir (N/S)  # 同组共列长回边 → dummy 脊
+span≥2（其余）                    → cross_axis (E/W) # span=2 闭环 / 跨列 / 跨组
+has_twin ∧ span=1                 → rank_dir (N/S)   # 平行美学
 ¬twin ∧ span=1                    → cross_axis       # 短反馈默认侧廊
 其余                              → 软代价 argmin；平局跟已上规则
 
+# near-column：|rightness(a)−rightness(b)| ≤ 0.35
+# rightness：层内非零宽节点序归一化到 [0,1]；单节点层 = 0.5
+# cross_group：两端 group_path 不同
+
 # cross_axis 极性（边级，两端同脸；非朝 peer）
 tip = max-rank real 端；peer = 另一端
-tip.order > peer.order → East
-tip.order < peer.order → West
-equal                  → East
+tip.rightness > peer.rightness → East
+tip.rightness < peer.rightness → West
+equal                          → tip 半区（≥0.5 East）
 ```
 
 `Arrow::Response` **不**进决策（与 FAS `reversed` 正交）。
@@ -347,9 +362,9 @@ equal                  → East
 
 | 门禁 | 标准 |
 |------|------|
-| 单测 | 表驱动：twin 短→N/S；span≥2→E/W；无 twin 短→E/W；FixedSide 不被覆盖 |
+| 单测 | 表驱动：twin 短→N/S；span≥3 近列→N/S；span≥2 跨列 / span=2→E/W；FixedSide 不被覆盖 |
 | Showcase A | `product.three-tier` 响应边 N/S 平行，非默认右绕 |
-| Showcase B | `smoke.multi-rank-backedge` 长回边仍 E/W |
+| Showcase B | `mech.layout-styles` 长回边 e29/e30 走 N/S；`product.ticket-triage` / `order-approval` 闭环仍 E/W |
 | 回归 | `hier_eval`；`user-auth` twin 优先 N/S（crossings 允许相对全 EW 小幅回升） |
 | 写权 | ports 不调用 Channel |
 
@@ -438,7 +453,7 @@ HIER_EVAL_WRITE_BASELINE=1 cargo test -p plotgram-compile --test hier_eval
 
 **D1.3.4 已交付**（2026-08-06）：`demand::DemandBoard`（`DemandKey::LayerGap` max-merge + freeze）；`publish_channel_layer_gap_demand` 仅内层缝；外沿 Cross 不抬 LayerGap；freeze 后再 publish / 未 freeze 就 resolve → panic。
 
-**D1.3.5 已交付**（2026-08-06；2026-08-06 修订为走廊角色表）：`pick_reversed_side` 按 twin/span/Δorder 分脊（N/S）与侧廊（E/W）；twin 短回边平行；长/无 twin 短回边走侧廊；FixedSide 尊守。
+**D1.3.5 已交付**（2026-08-06；2026-08-12 修订）：`pick_reversed_side` 按 twin/span/near-column 分脊（N/S）与侧廊（E/W）；twin 短回边平行；共列长回边（span≥3）走主脊；span=2 闭环与跨列长回边走侧廊；E/W 极性用层内归一化 rightness；FixedSide 尊守。
 
 **同脸 E/W 共廊（host）**：跨列两端同为 East → 共用 `Main(max(src_order,tgt_order)+1)`；同为 West → 共用 `Main(min(...))`。禁止逐端 `order±1` 拆双 Main（否则 Ink 顶缝会越过进港点再折回）。N/S 与异脸仍逐端解析。
 

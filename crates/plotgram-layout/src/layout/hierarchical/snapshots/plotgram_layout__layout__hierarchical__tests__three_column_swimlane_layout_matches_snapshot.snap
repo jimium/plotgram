@@ -1,6 +1,5 @@
 ---
 source: crates/plotgram-layout/src/layout/hierarchical/mod.rs
-assertion_line: 1204
 expression: "serde_json::json!(frames.iter().map(|(id, f)|\nserde_json::json!({\n    \"id\": id, \"x\": f.x, \"y\": f.y, \"w\": f.width, \"h\": f.height,\n})).collect::<Vec<_>>())"
 ---
 [

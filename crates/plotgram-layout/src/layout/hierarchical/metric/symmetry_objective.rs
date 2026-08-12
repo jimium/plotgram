@@ -55,6 +55,10 @@ pub fn solve_symmetry_objective(
     // cannot be disjoint anyway and we degrade gracefully. Partition band
     // separation rides EVERY level and never degrades — an infeasible mix
     // surfaces as `Infeasible`, never silently (partition-grid.md PG-1).
+    //
+    // Real↔virtual BK collinear is intentionally soft (via median / J), not
+    // hard: hard RV equality lets a long side-leaf corridor yank the hub off
+    // its short primary arm (order-approval).
     let bands = PartitionBandPlan::build(plan, params.node_gap);
     let bands = bands.as_ref();
     let chains = [
@@ -1445,11 +1449,14 @@ fn apply_port_anchor_desired(
                 continue;
             }
             desired[nb] = port_anchor(frame_of(real_elem), port).x;
-            // Port-anchor dummies must dominate soft median drift.
+            // Soft pull only: node centers are owned by cross-axis J; port
+            // slots adsorb to corridors later (port_lane). Keep weight at RV
+            // edge-weight scale so anchors cannot yank reals off their parents.
             weights[nb] = weights[nb].max(VIRTUAL_WEIGHT * 16.0);
         }
     }
 }
+
 
 #[cfg(test)]
 mod tests {
