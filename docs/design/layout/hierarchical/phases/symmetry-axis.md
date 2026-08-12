@@ -58,7 +58,7 @@ J(x) = Σ_seg w_uv · |x_u − x_v|
 |------|------|------|
 | `lambda_sym` | `1.0` | hub 贴扇心强度 |
 | `twin_spine_boost` | `8.0` | 2-cycle 对端占脊 |
-| `primary_arm_boost` | `4.0` | 唯一最短跨主臂占脊 |
+| `primary_arm_boost` | `4.0` | 最短跨主臂占脊；flat 扇入奇数并列时取层序中位父 |
 | `symmetry_iters` | `8` | 中位迭代轮数 |
 | `layer_alignment` | `0.5` | 主轴：实节点在层带内对齐；**零高 elem 钉层带顶边**（避免中心走廊穿同层节点） |
 

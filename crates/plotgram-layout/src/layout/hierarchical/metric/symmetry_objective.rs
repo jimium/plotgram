@@ -18,8 +18,8 @@ use crate::layout::hierarchical::metric::partition_bands::{
     PartitionBandPlan, PARTITION_EMPTY_BAND_MIN,
 };
 use crate::layout::hierarchical::metric::symmetry::{
-    axis_from_neighbors, degrees_of, fan_pitch, forward_real_adjacency, slot_multipliers,
-    twin_plan_pairs, unique_min_span_primary,
+    axis_from_neighbors, degrees_of, fan_pitch, forward_real_adjacency,
+    min_span_primary_median_tie, slot_multipliers, twin_plan_pairs, unique_min_span_primary,
 };
 use crate::layout::hierarchical::model::{BoundarySide, Elem, ElemKey, PlanGraph, RealGraph};
 use crate::layout::hierarchical::params::{GroupPolicy, HierarchicalParams};
@@ -49,7 +49,10 @@ pub fn solve_symmetry_objective(
     let down_deg = degrees_of(&down_nbs);
     let up_deg = degrees_of(&up_nbs);
     let twins = twin_plan_pairs(plan, graph);
-    let primary = primary_arm_pairs(plan, &down_nbs, &up_nbs, &down_deg, &up_deg, &twins);
+    let layer_pos = plan.layer_positions();
+    let primary = primary_arm_pairs(
+        plan, &down_nbs, &up_nbs, &down_deg, &up_deg, &twins, &layer_pos,
+    );
     // Constraint degradation chain: full (twin hard + cross-rank clamp
     // equalities) → twin soft → no clamp equalities. The gb equalities make
     // each clamp column the cross-rank frame edge; they can only cycle when
@@ -60,7 +63,8 @@ pub fn solve_symmetry_objective(
     //
     // Real↔virtual BK collinear is intentionally soft (via median / J), not
     // hard: hard RV equality lets a long side-leaf corridor yank the hub off
-    // its short primary arm (order-approval).
+    // its short primary arm (order-approval). Primary-arm collinearity stays
+    // soft too — hard primary equalities bloat the canvas on dense layers.
     let bands = PartitionBandPlan::build(plan, params.node_gap);
     let bands = bands.as_ref();
     let chains = [
@@ -104,7 +108,6 @@ pub fn solve_symmetry_objective(
         })
         .collect();
     let segs_by_edge = plan.segments_by_edge();
-    let layer_pos = plan.layer_positions();
 
     // Prefer the full chain; degrade only when it cycles with separation.
     let mut chain_idx = 0usize;
@@ -1369,6 +1372,7 @@ fn primary_arm_pairs(
     down_deg: &[usize],
     up_deg: &[usize],
     twins: &BTreeSet<(usize, usize)>,
+    layer_pos: &[usize],
 ) -> BTreeSet<(usize, usize)> {
     let mut out = BTreeSet::new();
     let n = plan.elems.len();
@@ -1376,11 +1380,22 @@ fn primary_arm_pairs(
         if plan.elems[h].key.is_virtual() || plan.elems[h].key.is_zero_width() {
             continue;
         }
-        // At most one primary arm per hub (prefer down fan, else up).
+        // At most one primary arm per hub (prefer down fan-out, else up fan-in).
+        // Fan-out: unique min-span (ties → None). Fan-in on flat (no group_path):
+        // odd-tie median parent (§10.2). Grouped fan-in keeps unique-min-span —
+        // median+1e6 lock on parents inside weak groups bloats frames.
         let nb = if down_deg[h] >= 2 {
             unique_min_span_primary(h, &down_nbs[h], plan, twins)
         } else if up_deg[h] >= 2 {
-            unique_min_span_primary(h, &up_nbs[h], plan, twins)
+            let flat = plan.elems[h].group_path.is_empty()
+                && up_nbs[h]
+                    .iter()
+                    .all(|&p| plan.elems[p].group_path.is_empty());
+            if flat {
+                min_span_primary_median_tie(h, &up_nbs[h], plan, twins, layer_pos)
+            } else {
+                unique_min_span_primary(h, &up_nbs[h], plan, twins)
+            }
         } else {
             None
         };

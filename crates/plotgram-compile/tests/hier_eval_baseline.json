@@ -161,19 +161,19 @@
   },
   "flat/mech.layout-styles": {
     "bbox_h": 655.1999999999999,
-    "bbox_w": 472.53383434965764,
+    "bbox_w": 460.74336500099866,
     "channel_used_gates": false,
-    "crossings": 6,
-    "gap_uniformity_max": 0.07691973145102617,
+    "crossings": 4,
+    "gap_uniformity_max": 0.07691973145102572,
     "max_bends": 2,
     "overlap_len": 0.0,
     "relaxations": 1,
     "reversed_count": 2,
     "ripup_rounds": 1,
     "straightness": 0.0,
-    "sum_bends": 58,
+    "sum_bends": 50,
     "symmetry_deviation_max": 7.663910250309037,
-    "symmetry_deviation_sum": 39.14042573899446
+    "symmetry_deviation_sum": 35.17997475168639
   },
   "flat/product.employee-onboarding": {
     "bbox_h": 456.29999999999995,
@@ -368,20 +368,20 @@
     "symmetry_deviation_sum": 1.100694444444444
   },
   "flat/product.typical-microservice-architecture": {
-    "bbox_h": 307.6,
-    "bbox_w": 385.9303385842553,
+    "bbox_h": 339.6,
+    "bbox_w": 404.18216919232907,
     "channel_used_gates": false,
-    "crossings": 11,
-    "gap_uniformity_max": 0.8987002180015969,
+    "crossings": 16,
+    "gap_uniformity_max": 0.9426431679363784,
     "max_bends": 4,
-    "overlap_len": 99.66290674603178,
-    "relaxations": 3,
+    "overlap_len": 36.0,
+    "relaxations": 2,
     "reversed_count": 0,
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 28,
-    "symmetry_deviation_max": 5.990726326592648,
-    "symmetry_deviation_sum": 22.083751373690614
+    "symmetry_deviation_max": 6.003317841118047,
+    "symmetry_deviation_sum": 20.120241449749567
   },
   "flat/product.user-auth": {
     "bbox_h": 243.60000000000002,
@@ -577,19 +577,19 @@
   },
   "flat/stress.layout-stress-flat-mesh": {
     "bbox_h": 568.3,
-    "bbox_w": 374.5601000375049,
+    "bbox_w": 376.5601000375049,
     "channel_used_gates": false,
-    "crossings": 23,
+    "crossings": 19,
     "gap_uniformity_max": 0.7185629431118825,
     "max_bends": 4,
-    "overlap_len": 0.0,
-    "relaxations": 1,
+    "overlap_len": 149.66710058433722,
+    "relaxations": 3,
     "reversed_count": 2,
     "ripup_rounds": 1,
     "straightness": 0.0,
-    "sum_bends": 38,
+    "sum_bends": 34,
     "symmetry_deviation_max": 5.815004168229372,
-    "symmetry_deviation_sum": 29.004542359598833
+    "symmetry_deviation_sum": 28.53818941340188
   },
   "flat/stress.layout-stress-wide-layer": {
     "bbox_h": 101.80000000000001,
