@@ -1,10 +1,12 @@
 //! Symmetry helpers shared by the cross-axis objective solver (P4).
 //!
-//! Fan adjacency is **forward real endpoints** on [`RealGraph`] (non-reversed
-//! edges): long edges still count as one hop. Twin pairs (2-cycle) and
-//! unique-min-span primary arms feed soft weights / snap desired in
-//! [`super::symmetry_objective`]. The old SymmetryPlan tables (claimed /
-//! FanPack / RigidColumnClass) were deleted in P4-S4.
+//! Fan adjacency is **real endpoints** on [`RealGraph`]: after P1 the
+//! `reversed` bit is only a direction, so reversed edges count like forward
+//! ones (working source → working target); long edges still count as one
+//! hop. Twin pairs (2-cycle) and unique-min-span primary arms feed soft
+//! weights / snap desired in [`super::symmetry_objective`]. The old
+//! SymmetryPlan tables (claimed / FanPack / RigidColumnClass) were deleted
+//! in P4-S4.
 
 use std::collections::BTreeSet;
 
@@ -12,8 +14,13 @@ use plotgram_algo::orientation::Size;
 
 use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealGraph};
 
-/// Forward (non-reversed) real–real adjacency: long edges count as one hop
-/// between endpoints; dummies do not hide a fan.
+/// Real–real adjacency: long edges count as one hop between endpoints;
+/// dummies do not hide a fan. Reversed edges participate like forward ones
+/// — after P1, `reversed` is only a direction bit (yfiles/01 §1/§3) — but
+/// only when local (adjacent ranks): a long reversed edge's geometry rides
+/// its dummy chain (bound into one variable by R2), and counting the remote
+/// endpoint turns spine heads into hubs / breaks exclusive-spine collinearity
+/// (order-approval `rejected -> submit`).
 pub fn forward_real_adjacency(
     plan: &PlanGraph,
     graph: &RealGraph,
@@ -21,9 +28,6 @@ pub fn forward_real_adjacency(
     let n = plan.elems.len();
     let (mut down, mut up) = (vec![Vec::new(); n], vec![Vec::new(); n]);
     for e in &graph.edges {
-        if e.reversed {
-            continue;
-        }
         let src_id = &graph.ids[e.working_source];
         let tgt_id = &graph.ids[e.working_target];
         let Some(&src) = plan.index_of.get(&ElemKey::Real(src_id.clone())) else {
@@ -32,6 +36,9 @@ pub fn forward_real_adjacency(
         let Some(&tgt) = plan.index_of.get(&ElemKey::Real(tgt_id.clone())) else {
             continue;
         };
+        if e.reversed && plan.elems[tgt].rank != plan.elems[src].rank + 1 {
+            continue;
+        }
         down[src].push(tgt);
         up[tgt].push(src);
     }

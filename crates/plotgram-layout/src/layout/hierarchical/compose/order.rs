@@ -2,6 +2,9 @@
 //!
 //! Objective `J_order` (composition.md §6), flat extension:
 //! `(weighted_crossings, source_moment, total_span, lex_layers)`.
+//! Chain-block sifting (non-grouped) uses a local key
+//! `(crossings, endpoint_inversion, source_moment, total_span)` so a
+//! corridor can park on the endpoint side when crossings stay flat.
 //! `source_moment` = Σ positions of **forward** mid-rank sources (no upward
 //! proper neighbor, has downward, not a FAS-reverse spine head). After
 //! crossing minimization, flat plans also pick the global left/right
@@ -11,8 +14,8 @@
 //!
 //! Median prefers real neighbors over virtuals, then falls back to the
 //! opposite sweep side, then `prev_pos` (composition.md / Graphviz wmedian).
-//! FAS-reversed spines use real-real-scale segment weight so their dummies
-//! do not outrank forward parents.
+//! FAS-reversed segments carry the ordinary 1/2/8 weights — after P1 the
+//! reverse bit is only a direction.
 //!
 //! Group containment is enforced upstream by
 //! [`super::boundary::insert_group_boundaries`] (Left/Right clamps + high-weight
@@ -38,21 +41,12 @@ fn edge_weight(a: &Elem, b: &Elem) -> f64 {
 
 /// Segment weight: both ends boundary clamps (group `gb:` or partition
 /// `pb:`) → `group_boundary_weight`; else base × author weight (vv corridor
-/// stays 8.0, weight does not apply). FAS-reversed spines use the real-real
-/// base (1.0): their long-edge dummies must not outrank forward parents when
-/// parking the left basin (mech e30 was pinning `n23` left of `n25`).
-fn segment_weight(
-    a: &Elem,
-    b: &Elem,
-    weight: f64,
-    group_boundary_weight: f64,
-    reversed: bool,
-) -> f64 {
+/// stays 8.0, weight does not apply). FAS-reversed segments use the same
+/// 1/2/8 recipe as forward ones: after P1, `reversed` is only a direction
+/// bit (yfiles/01 §1/§3); the 1/2/8 recipe is what straightens long edges.
+fn segment_weight(a: &Elem, b: &Elem, weight: f64, group_boundary_weight: f64) -> f64 {
     if a.key.is_boundary() && b.key.is_boundary() {
         return group_boundary_weight;
-    }
-    if reversed {
-        return 1.0 * weight;
     }
     let base = edge_weight(a, b);
     if matches!((a.key.is_virtual(), b.key.is_virtual()), (true, true)) {
@@ -73,7 +67,6 @@ fn build_adjacency(
     plan: &PlanGraph,
     edge_weights: &BTreeMap<String, f64>,
     group_boundary_weight: f64,
-    reversed_edges: &BTreeSet<String>,
 ) -> Adjacency {
     let n = plan.elems.len();
     let mut up = vec![Vec::new(); n];
@@ -84,7 +77,6 @@ fn build_adjacency(
             &plan.elems[s.to],
             edge_weights.get(&s.edge_id).copied().unwrap_or(1.0),
             group_boundary_weight,
-            reversed_edges.contains(&s.edge_id),
         );
         down[s.from].push((s.to, w));
         up[s.to].push((s.from, w));
@@ -147,7 +139,7 @@ pub fn order_layers(
     let grouped = plan.elems.iter().any(|e| e.key.is_group_boundary());
     let empty = BTreeSet::new();
     let reversed = if grouped { &empty } else { reversed_edges };
-    let adj = build_adjacency(plan, edge_weights, group_boundary_weight, reversed);
+    let adj = build_adjacency(plan, edge_weights, group_boundary_weight);
     let xidx = build_crossing_index(plan);
 
     let mut best = plan.layers.clone();
@@ -210,17 +202,22 @@ pub fn order_layers(
             let before_layers = plan.layers.clone();
             let before = order_score(plan, &xidx, true, reversed);
             sift_pass(plan, &xidx, reversed);
+            chain_block_sift_pass(plan, &xidx, reversed);
             for r in 0..plan.layers.len() {
                 restore_partition_clamps(plan, r);
                 restore_group_clamps(plan, r);
             }
             order_branch_source_pocket(plan, &xidx, reversed);
             let after = order_score(plan, &xidx, true, reversed);
-            if after > before {
+            // Chain-block trials may keep crossings flat while trading a
+            // little `total_span` for lower endpoint inversion (notes §12.4).
+            // Revert only when crossings rose; a span-only regression is the
+            // cost of parking the corridor on the endpoint side.
+            if after.crossings > before.crossings {
                 plan.layers = before_layers;
                 break;
             }
-            if after == before {
+            if after == before || plan.layers == before_layers {
                 break;
             }
         }
@@ -889,6 +886,184 @@ fn transpose_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, use_span: bool) {
     }
 }
 
+/// Chain blocks (yfiles/16 §4, Bachmaier 2010): all dummies of one long
+/// edge form ONE ordering unit. Every member sits in a different layer, so
+/// a side switch needs all covered layers to move together — per-layer
+/// local moves each look flat and the local optimum never exits (mech e29:
+/// its corridor must jump to the right of n13/n12 on rank5 AND rank6 at
+/// once).
+fn chain_blocks(plan: &PlanGraph) -> Vec<Vec<usize>> {
+    use crate::layout::hierarchical::model::ElemKey;
+    let mut by_edge: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+    for (e, elem) in plan.elems.iter().enumerate() {
+        if let ElemKey::Virtual { edge_id, .. } = &elem.key {
+            by_edge.entry(edge_id.clone()).or_default().push(e);
+        }
+    }
+    by_edge
+        .into_values()
+        .filter(|c| c.len() >= 2)
+        .map(|mut c| {
+            c.sort_by_key(|&e| (plan.elems[e].rank, e));
+            c
+        })
+        .collect()
+}
+
+/// Real endpoints of a dummy chain (the two `ElemKey::Real` ends of the
+/// chain's `edge_id`). `None` if the chain is malformed.
+fn chain_real_ends(plan: &PlanGraph, chain: &[usize]) -> Option<(usize, usize)> {
+    use crate::layout::hierarchical::model::ElemKey;
+    let ElemKey::Virtual { edge_id, .. } = &plan.elems[chain[0]].key else {
+        return None;
+    };
+    let mut reals = Vec::new();
+    for s in &plan.segments {
+        if s.edge_id != *edge_id {
+            continue;
+        }
+        for end in [s.from, s.to] {
+            if matches!(plan.elems[end].key, ElemKey::Real(_)) {
+                reals.push(end);
+            }
+        }
+    }
+    reals.sort_unstable();
+    reals.dedup();
+    match reals.as_slice() {
+        &[a, b] => Some((a, b)),
+        _ => None,
+    }
+}
+
+/// How many real nodes sit strictly between each dummy and the slot that
+/// matches the two real endpoints' layer-relative positions (lerp by rank).
+/// Lower = corridor parked on the endpoint side. Block-trial only — not
+/// part of global `J_order` (notes §12.4).
+fn chain_endpoint_inversion(plan: &PlanGraph, chain: &[usize]) -> u64 {
+    use crate::layout::hierarchical::model::ElemKey;
+    let Some((src, tgt)) = chain_real_ends(plan, chain) else {
+        return 0;
+    };
+    let pos = plan.layer_positions();
+    let src_r = plan.elems[src].rank as usize;
+    let tgt_r = plan.elems[tgt].rank as usize;
+    let src_len = plan.layers.get(src_r).map(|l| l.len()).unwrap_or(0);
+    let tgt_len = plan.layers.get(tgt_r).map(|l| l.len()).unwrap_or(0);
+    if src_len == 0 || tgt_len == 0 {
+        return 0;
+    }
+    let src_frac = (pos[src] as f64 + 0.5) / src_len as f64;
+    let tgt_frac = (pos[tgt] as f64 + 0.5) / tgt_len as f64;
+    let rs = plan.elems[src].rank as i64;
+    let rt = plan.elems[tgt].rank as i64;
+    let mut inv = 0u64;
+    for &d in chain {
+        let r = plan.elems[d].rank as usize;
+        let layer = &plan.layers[r];
+        let n = layer.len();
+        if n == 0 {
+            continue;
+        }
+        let p = pos[d] as i64;
+        let rd = plan.elems[d].rank as i64;
+        let end_frac = if rs == rt {
+            src_frac
+        } else {
+            let t = (rd - rs) as f64 / (rt - rs) as f64;
+            src_frac + t * (tgt_frac - src_frac)
+        };
+        let target = ((end_frac * n as f64).floor() as i64).clamp(0, n as i64 - 1);
+        let lo = p.min(target);
+        let hi = p.max(target);
+        for (i, &e) in layer.iter().enumerate() {
+            let i = i as i64;
+            if i > lo && i < hi && matches!(plan.elems[e].key, ElemKey::Real(_)) {
+                inv += 1;
+            }
+        }
+    }
+    inv
+}
+
+/// Block-trial lexicographic key. `inversion` is the chain-local secondary
+/// key when crossings tie; `source_moment` / `total_span` stay later
+/// tie-breaks. Not used by barycenter / element sifting.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct ChainBlockScore {
+    crossings: u64,
+    inversion: u64,
+    source_moment: u64,
+    total_span: u64,
+}
+
+/// Block-level sifting: slide each chain block through every layer it
+/// covers simultaneously at the same **relative** slot (quantile `k/max_k`,
+/// not a shared absolute index). A trial is eligible when crossings do not
+/// increase; among eligible trials (including the start) pick by
+/// [`ChainBlockScore`], then lexicographic layer order.
+fn chain_block_sift_pass(
+    plan: &mut PlanGraph,
+    xidx: &CrossingIndex,
+    reversed_edges: &BTreeSet<String>,
+) {
+    for chain in chain_blocks(plan) {
+        let base = order_score(plan, xidx, true, reversed_edges);
+        let start = plan.layers.clone();
+        let mut best_score = ChainBlockScore {
+            crossings: base.crossings,
+            inversion: chain_endpoint_inversion(plan, &chain),
+            source_moment: base.source_moment,
+            total_span: base.total_span,
+        };
+        let mut best_layers = start.clone();
+        // Per member: its rank and the layer minus that member.
+        let without: Vec<(usize, Vec<usize>)> = chain
+            .iter()
+            .map(|&e| {
+                let r = plan.elems[e].rank as usize;
+                let rest = start[r].iter().copied().filter(|&x| x != e).collect();
+                (r, rest)
+            })
+            .collect();
+        let max_k = without
+            .iter()
+            .map(|(_, rest)| rest.len())
+            .max()
+            .unwrap_or(0);
+        for k in 0..=max_k {
+            let mut trial = start.clone();
+            for ((r, rest), &e) in without.iter().zip(&chain) {
+                let n = rest.len();
+                let at = if max_k == 0 { 0 } else { (k * n) / max_k };
+                let mut layer = rest.clone();
+                layer.insert(at.min(n), e);
+                trial[*r] = layer;
+            }
+            plan.layers = trial;
+            for &(r, _) in &without {
+                restore_partition_clamps(plan, r);
+                restore_group_clamps(plan, r);
+            }
+            let score = order_score(plan, xidx, true, reversed_edges);
+            if score.crossings > base.crossings {
+                continue;
+            }
+            let cand = ChainBlockScore {
+                crossings: score.crossings,
+                inversion: chain_endpoint_inversion(plan, &chain),
+                source_moment: score.source_moment,
+                total_span: score.total_span,
+            };
+            if cand < best_score || (cand == best_score && plan.layers < best_layers) {
+                best_score = cand;
+                best_layers = plan.layers.clone();
+            }
+        }
+        plan.layers = best_layers;
+    }
+}
+
 /// Sifting: slide each non-zero-width elem through its layer, keep best `J_order`.
 /// Crosses zero-width dummies that block adjacent transpose.
 fn sift_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, reversed_edges: &BTreeSet<String>) {
@@ -1146,10 +1321,11 @@ mod tests {
         assert_eq!(p.layers[1], vec![2, 3]);
 
         let weights: BTreeMap<String, f64> = [("e0".to_string(), 2.0)].into_iter().collect();
-        let adj = build_adjacency(&plan_of(), &weights, 16.0, &BTreeSet::new());
+        let adj = build_adjacency(&plan_of(), &weights, 16.0);
         let ups: Vec<f64> = adj.up[2].iter().map(|&(_, w)| w).collect();
         assert_eq!(ups, vec![2.0, 1.0], "weighted real-real must weigh 2x");
 
+        let real_a = plain_elem("ra", 0, &[]);
         let virt_a = Elem {
             key: ElemKey::Virtual {
                 edge_id: "va".into(),
@@ -1167,14 +1343,16 @@ mod tests {
             rank: 2,
         };
         assert_eq!(
-            segment_weight(&virt_a, &virt_b, 2.0, 16.0, false),
+            segment_weight(&virt_a, &virt_b, 2.0, 16.0),
             8.0,
             "virtual-virtual corridor weight must not scale"
         );
+        // Reversed segments are ordinary edges after P1: the 1/2/8 recipe
+        // applies, no down-weight (2026-08-12 notes §10 D2).
         assert_eq!(
-            segment_weight(&virt_a, &virt_b, 2.0, 16.0, true),
-            2.0,
-            "FAS-reversed spines use real-real-scale weight"
+            segment_weight(&real_a, &virt_a, 2.0, 16.0),
+            4.0,
+            "real-virtual keeps the 2x base regardless of direction"
         );
     }
 
@@ -1411,6 +1589,258 @@ mod tests {
             "sifting should move n6 left of n23 across a forward dummy: {:?}",
             plan.layers[1]
         );
+    }
+
+    /// mech-e29 shape: a 2-dummy chain sits LEFT of the reals on both
+    /// covered layers. No single-layer move ever beats the base crossing
+    /// count (d1 alone is flat, d2 alone makes it worse), so per-layer
+    /// transpose / element sifting never exit the local optimum — only the
+    /// simultaneous block move reaches the 0-crossing side (2026-08-12
+    /// notes §10.1(a)).
+    fn chain_side_plan() -> PlanGraph {
+        let elems = vec![
+            plain_elem("a", 0, &[]), // 0
+            plain_elem("b", 0, &[]), // 1
+            Elem {
+                key: ElemKey::Virtual {
+                    edge_id: "e_long".into(),
+                    ordinal: 0,
+                },
+                group_path: Vec::new(),
+                rank: 1,
+            }, // 2 = d1
+            plain_elem("x", 1, &[]), // 3
+            Elem {
+                key: ElemKey::Virtual {
+                    edge_id: "e_long".into(),
+                    ordinal: 1,
+                },
+                group_path: Vec::new(),
+                rank: 2,
+            }, // 4 = d2
+            plain_elem("y", 2, &[]), // 5
+            plain_elem("c", 3, &[]), // 6
+            plain_elem("z", 3, &[]), // 7
+        ];
+        let segments = vec![
+            Segment {
+                edge_id: "e_long".into(),
+                ordinal: 0,
+                from: 1,
+                to: 2,
+            }, // b → d1
+            Segment {
+                edge_id: "e_long".into(),
+                ordinal: 1,
+                from: 2,
+                to: 4,
+            }, // d1 → d2
+            Segment {
+                edge_id: "e_long".into(),
+                ordinal: 2,
+                from: 4,
+                to: 6,
+            }, // d2 → c
+            Segment {
+                edge_id: "f".into(),
+                ordinal: 0,
+                from: 0,
+                to: 3,
+            }, // a → x
+            Segment {
+                edge_id: "g".into(),
+                ordinal: 0,
+                from: 3,
+                to: 5,
+            }, // x → y
+            Segment {
+                edge_id: "h".into(),
+                ordinal: 0,
+                from: 5,
+                to: 7,
+            }, // y → z
+            Segment {
+                edge_id: "i".into(),
+                ordinal: 0,
+                from: 4,
+                to: 7,
+            }, // d2 → z
+            Segment {
+                edge_id: "j".into(),
+                ordinal: 0,
+                from: 5,
+                to: 6,
+            }, // y → c
+        ];
+        let layers = vec![vec![0, 1], vec![2, 3], vec![4, 5], vec![6, 7]];
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        PlanGraph {
+            elems,
+            index_of,
+            decl_index: (0..8).collect(),
+            segments,
+            layers,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn chain_block_sift_exits_two_layer_side_optimum() {
+        let mut plan = chain_side_plan();
+        let xidx = build_crossing_index(&plan);
+        assert_eq!(total_crossings(&plan, &xidx), 2);
+        // Single-layer probes never improve: moving d1 alone stays flat,
+        // moving d2 alone increases crossings.
+        let single_move_crossings = |which: usize| {
+            let mut p = chain_side_plan();
+            let r = p.elems[which].rank as usize;
+            let rest: Vec<usize> = p.layers[r]
+                .iter()
+                .copied()
+                .filter(|&e| e != which)
+                .collect();
+            let mut layer = rest;
+            layer.push(which);
+            p.layers[r] = layer;
+            let xi = build_crossing_index(&p);
+            total_crossings(&p, &xi)
+        };
+        assert_eq!(single_move_crossings(2), 2, "d1 alone must be flat");
+        assert!(single_move_crossings(4) > 2, "d2 alone must not improve");
+
+        chain_block_sift_pass(&mut plan, &xidx, &BTreeSet::new());
+
+        let xidx = build_crossing_index(&plan);
+        assert_eq!(
+            total_crossings(&plan, &xidx),
+            1,
+            "block move must reach the lower-crossing side: {:?}",
+            plan.layers
+        );
+        let pos = |r: usize, e: usize| plan.layers[r].iter().position(|&x| x == e).unwrap();
+        assert!(
+            pos(1, 2) > pos(1, 3),
+            "d1 must sit right of x: {:?}",
+            plan.layers[1]
+        );
+        assert!(
+            pos(2, 4) > pos(2, 5),
+            "d2 must sit right of y: {:?}",
+            plan.layers[2]
+        );
+    }
+
+    /// Grouped plans never run chain-block sifting (gated with `sift_pass`);
+    /// block trials on grouped layers must additionally keep group clamps
+    /// well-formed — members between their Left/Right clamps — and the whole
+    /// ordering stays deterministic.
+    #[test]
+    fn grouped_plan_keeps_clamps_and_is_deterministic() {
+        let build = || {
+            let elems = vec![
+                plain_elem("s0", 0, &[]),
+                plain_elem("s1", 0, &[]),
+                plain_elem("g0", 1, &["g"]),
+                plain_elem("g1", 1, &["g"]),
+                Elem {
+                    key: ElemKey::Virtual {
+                        edge_id: "e_long".into(),
+                        ordinal: 0,
+                    },
+                    group_path: Vec::new(),
+                    rank: 1,
+                },
+                plain_elem("t0", 2, &[]),
+            ];
+            let segments = vec![
+                Segment {
+                    edge_id: "e0".into(),
+                    ordinal: 0,
+                    from: 0,
+                    to: 2,
+                },
+                Segment {
+                    edge_id: "e1".into(),
+                    ordinal: 0,
+                    from: 1,
+                    to: 3,
+                },
+                Segment {
+                    edge_id: "e_long".into(),
+                    ordinal: 0,
+                    from: 1,
+                    to: 4,
+                },
+                Segment {
+                    edge_id: "e_long".into(),
+                    ordinal: 1,
+                    from: 4,
+                    to: 5,
+                },
+            ];
+            let layers = vec![vec![0, 1], vec![2, 3, 4], vec![5]];
+            let index_of = elems
+                .iter()
+                .enumerate()
+                .map(|(i, e)| (e.key.clone(), i))
+                .collect();
+            let mut plan = PlanGraph {
+                elems,
+                index_of,
+                decl_index: (0..6).collect(),
+                segments,
+                layers,
+                ..Default::default()
+            };
+            insert_group_boundaries(&mut plan);
+            plan
+        };
+
+        let mut p1 = build();
+        let mut p2 = build();
+        order_layers(&mut p1, &BTreeMap::new(), 16.0, &BTreeSet::new());
+        order_layers(&mut p2, &BTreeMap::new(), 16.0, &BTreeSet::new());
+        assert_eq!(
+            p1.layers, p2.layers,
+            "grouped ordering must be deterministic"
+        );
+
+        let layer1 = &p1.layers[1];
+        let left = layer1
+            .iter()
+            .position(|&e| {
+                matches!(
+                    &p1.elems[e].key,
+                    ElemKey::GroupBoundary { group, side: BoundarySide::Left, .. }
+                    if group == "g"
+                )
+            })
+            .expect("g Left clamp");
+        let right = layer1
+            .iter()
+            .position(|&e| {
+                matches!(
+                    &p1.elems[e].key,
+                    ElemKey::GroupBoundary { group, side: BoundarySide::Right, .. }
+                    if group == "g"
+                )
+            })
+            .expect("g Right clamp");
+        assert!(left < right, "clamps well-formed: {layer1:?}");
+        for id in ["g0", "g1"] {
+            let pos = layer1
+                .iter()
+                .position(|&e| matches!(&p1.elems[e].key, ElemKey::Real(r) if r == id))
+                .unwrap_or_else(|| panic!("{id} present"));
+            assert!(
+                pos > left && pos < right,
+                "{id} must stay inside its clamps: {layer1:?}"
+            );
+        }
     }
 
     #[test]

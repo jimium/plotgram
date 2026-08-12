@@ -76,6 +76,31 @@ impl RoutingStyle {
     }
 }
 
+/// How the cross-axis solver places `x` (notes §12 A0/A1).
+///
+/// `Ipsep` is the main path: unconstrained descent on J, then VPSC
+/// projection of that step's `x` (not median-as-shared-desired).
+/// `Median` is the old desired-packer, kept for A/B.
+/// `BkIdeal` is the A0 diagnostic: project Brandes–Köpf ideal through the
+/// hard constraint set (incl. chain identity) and skip iterate + fan snap.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SymmetryPlace {
+    #[default]
+    Ipsep,
+    Median,
+    BkIdeal,
+}
+
+impl SymmetryPlace {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Ipsep => "ipsep",
+            Self::Median => "median",
+            Self::BkIdeal => "bk",
+        }
+    }
+}
+
 /// Named packs that only replace a subset of [`HierarchicalParams`] defaults.
 ///
 /// Not a diagram profile: does not change group policy / orientation semantics.
@@ -151,8 +176,16 @@ pub struct HierarchicalParams {
     pub twin_spine_boost: f64,
     /// Median/VPSC boost for unique min-span primary arm.
     pub primary_arm_boost: f64,
+    /// J / L2 boost for a long-edge RV segment whose real end is a dangling
+    /// sink (no forward children). Lets n14 leave n12 to sit on e29's
+    /// corridor (notes §12 D). Forward sources and through-nodes stay
+    /// unboosted so a reverse long edge cannot yank a primary spine.
+    pub chain_end_boost: f64,
     /// Fixed iteration budget for symmetry objective solver.
     pub symmetry_iters: u32,
+    /// Cross-axis placer. Default `Median`. `BkIdeal` is the §12 A0
+    /// diagnostic bypass (not a product preset).
+    pub symmetry_place: SymmetryPlace,
     /// Built-in ink style (ignored when layout defers to an independent EdgeRouter).
     pub routing_style: RoutingStyle,
     /// Automatic edge grouping (edge-parameters.md §2.3 / yFiles
@@ -198,7 +231,9 @@ impl Default for HierarchicalParams {
             lambda_sym: 1.0,
             twin_spine_boost: 8.0,
             primary_arm_boost: 4.0,
+            chain_end_boost: 8.0,
             symmetry_iters: 8,
+            symmetry_place: SymmetryPlace::Ipsep,
             routing_style: RoutingStyle::Orthogonal,
             auto_edge_grouping: false,
             min_first_segment: 0.0,
@@ -324,8 +359,24 @@ impl HierarchicalParams {
         {
             params.primary_arm_boost = v.max(0.0);
         }
+        if let Some(v) = binder.get_f64_any(&["chain_end_boost"]).map_err(bind_err)? {
+            params.chain_end_boost = v.max(0.0);
+        }
         if let Some(v) = binder.get_f64_any(&["symmetry_iters"]).map_err(bind_err)? {
             params.symmetry_iters = v.round().max(1.0) as u32;
+        }
+        if let Some(place) = binder
+            .get_enum(
+                "symmetry_place",
+                &[
+                    ("ipsep", SymmetryPlace::Ipsep),
+                    ("median", SymmetryPlace::Median),
+                    ("bk", SymmetryPlace::BkIdeal),
+                ],
+            )
+            .map_err(bind_err)?
+        {
+            params.symmetry_place = place;
         }
 
         if let Some(rs) = binder
@@ -425,7 +476,8 @@ impl HierarchicalParams {
         let canonical = format!(
             "orientation={}|node_gap={:e}|layer_gap={:e}|layer_alignment={:e}|edge_gap={:e}|\
              group_boundary_weight={:e}|lambda_sym={:e}|twin_spine_boost={:e}|\
-             primary_arm_boost={:e}|symmetry_iters={}|\
+             primary_arm_boost={:e}|chain_end_boost={:e}|symmetry_iters={}|\
+             symmetry_place={}|\
              routing_style={}|auto_edge_grouping={}|\
              min_first_segment={:e}|min_last_segment={:e}|port_stub={:e}|\
              route_w_bend={:e}|route_w_len={:e}|route_w_cross={:e}|max_bends_budget={}|\
@@ -439,7 +491,9 @@ impl HierarchicalParams {
             self.lambda_sym,
             self.twin_spine_boost,
             self.primary_arm_boost,
+            self.chain_end_boost,
             self.symmetry_iters,
+            self.symmetry_place.as_str(),
             self.routing_style.as_str(),
             self.auto_edge_grouping,
             self.min_first_segment,
@@ -548,7 +602,19 @@ mod tests {
                 ..a
             },
             HierarchicalParams {
+                symmetry_place: SymmetryPlace::Median,
+                ..a
+            },
+            HierarchicalParams {
+                symmetry_place: SymmetryPlace::BkIdeal,
+                ..a
+            },
+            HierarchicalParams {
                 twin_spine_boost: a.twin_spine_boost + 1.0,
+                ..a
+            },
+            HierarchicalParams {
+                chain_end_boost: a.chain_end_boost + 1.0,
                 ..a
             },
         ];

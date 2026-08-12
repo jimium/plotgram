@@ -41,6 +41,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub use params::{
     BindResult, GroupPolicy, HierarchicalParams, HierarchicalPreset, Orientation, RoutingStyle,
+    SymmetryPlace,
 };
 
 use compose::ports::{EdgePorts, ResolvedPort};

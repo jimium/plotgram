@@ -131,6 +131,7 @@ BK 生成每个 node/dummy 的理想 cross coordinate；VPSC 统一求解硬分�
 ### 5.2 硬约束
 
 - 相邻 order 的 node separation；
+- 链恒等：长边（≥2 颗 dummy）相邻 dummy 双向 0-gap 等式，整链一个变量（yfiles/01 §4.5）；骑降级链前三档，末档丢弃；
 - group 包含成员 + padding/title；
 - sibling group 非重叠；
 - partition band 声明序与 min size；
@@ -140,8 +141,7 @@ BK 生成每个 node/dummy 的理想 cross coordinate；VPSC 统一求解硬分�
 ### 5.3 软目标
 
 - 接近 BK 理想值；
-- port 对齐；
-- 长 dummy chain 竖直；
+- port 对齐（非叶端把邻近链端 dummy 拉向 `port_anchor.x`；悬挂汇点叶跟廊列，不反向拽 dummy；链列唯一决议由链恒等在约束层折中，不在 desired 层叠加两端均值）；
 - group/architecture alignment set；
 - 紧致化。
 

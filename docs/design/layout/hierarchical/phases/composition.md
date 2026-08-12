@@ -113,11 +113,14 @@ initial stable order
 最低规则：
 
 - real-real / real-virtual / virtual-virtual 权重默认 1/2/8；
+- reversed 段不降权：P1 FAS 归一后 `reversed` 只是方向位，段权重与正向段同配方（VV 仍不乘作者权重）；邻接统计只收 span-1 reversed（长 reversed 的几何由 dummy 链承载，远端端点入邻接会污染 hub/spine 判定）；
 - group 与 cross-axis partition band 都投影为连续块约束；
 - fixed order/port endpoint order 是 hard precedence；
 - median 无定义时保留前一轮 order；
 - tie-break tuple 固定为 `(median, previous_order, declaration_index, NodeKey)`；
 - snapshot 比较固定为 `(weighted_crossings, total_span, lexicographic_order)`。
+
+非 grouped plan 的 sift 改进循环额外跑 **chain block sifting**（yfiles/01 §4.3，R1）：一条边的全部 dummy（≥2 颗）作为一个块，从覆盖的各层同时移除，再按同一分位（`k / max_k`，不是跨层同一个绝对下标）整体插回；trial 后先恢复 partition/group clamp。块级词典序为 `(crossings, endpoint_inversion, source_moment, total_span)`：crossings **不增**即可进入候选；交叉持平时次键是各层 dummy 相对两端 real 分位之间夹着的实节点数（降低 = 廊靠到端点一侧）。`endpoint_inversion` 只用于块级 trial，不进全局 `J_order` / barycenter / 逐元素 sift。单颗 dummy 不参与逐元素 sift。
 
 若连续块 precedence 成环：
 

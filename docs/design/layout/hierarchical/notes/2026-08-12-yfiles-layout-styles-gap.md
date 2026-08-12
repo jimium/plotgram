@@ -2,6 +2,8 @@
 
 日期：2026-08-12 · 基准 fixture：`apps/showcase/hierarchical/flat/mech.layout-styles.pgm`（27 节点 / 34 边，拓扑转写自 yFiles `LayoutStyles.graphml`）
 
+yFiles 真值摘录（勿再通读 32KB graphml）：[`mech.layout-styles.yfiles.md`](mech.layout-styles.yfiles.md) / [`mech.layout-styles.yfiles.json`](mech.layout-styles.yfiles.json)。精确 **sum_bends = 44**（不是 ≈50）、0 折 12 条、E/W 端口 0。
+
 > 本文是 notes（分析与提案），**不是契约**。裁定权仍在 [`expectations.md`](../expectations.md) 与 [`phases/`](../phases/)；若采纳需按 §5 同步改契约文档。
 
 ---
@@ -323,76 +325,355 @@ cargo test -p plotgram-compile --test hier_eval
 
 ---
 
-## 10. 第四轮诊断：`J` 漏掉的两种直线（2026-08-12）
+## 10. 第四轮：把「路由需要的结构」上提到 P3/P4（2026-08-12 重写）
 
-用户观察（现行渲染）：
+> 本节替换前一版「加端点直度项 → 视情况动 order」的方案。前一版两条都实现并实测过，**均失败并已回退**，见 §10.3。
+> 新方案按 [`reference/yfiles/01`](../../../../reference/yfiles/01-sugiyama分层布局.md)、[`03`](../../../../reference/yfiles/03-正交边路由.md)、[`08`](../../../../reference/yfiles/08-分组泳道与端口约束.md)、[`16`](../../../../reference/yfiles/16-大图性能与wasm.md) 的相纪律重排。
 
-- **n14 右移** → 回边 `n14→n11`（e29）可成竖直线；
-- **n17 左移到 n21 正下** → 标准扇入，消掉 `e25`/`e13` 交叉。
+### 10.0 结论先行
 
-yFiles 真值：`n14.cx≈389 ≈ n11`（e29 **0 折**）；`n17.cx = n21.cx = 108.2`（e25 **0 折**）。我们：`n14=348` vs `n11=452`；`n17=105` 卡在 `n21=84` 与 `n7=148` 之间。
+用户观察（现行渲染）：**n14 右移** → 回边 `n14→n11`（e29）可成竖直线；**n17 左移到 n21 正下** → 标准扇入，消掉 `e25`/`e13` 交叉。yFiles 真值：`n14.cx≈389 ≈ n11`（e29 **0 折**）；`n17.cx = n21.cx = 108.2`（e25 **0 折**）。
 
-### 10.1 n14：回边竖廊被 order 排到 n12 / n13 左侧
+一个自然的想法是「次轴（P4）应该照顾日后路由的需求」。**参考实现不这么做**：P5 不得推翻 P3 的序与 P4 的坐标（[`01` §0](../../../../reference/yfiles/01-sugiyama分层布局.md)），P4 也不预测路由。它们的做法是把路由会用到的东西**提前物化成上游自由度**：
 
-在 `snap_fan_pack_style` 前后打临时探针（打印 `desired` / `weight` / `placed`）实测：
+| 路由需要的东西 | yFiles 在哪一相物化 |
+|----------------|---------------------|
+| 长边走哪条竖廊、廊在谁左谁右 | **P3**：dummy 链参与定序，且链**作为一个整体**被移动 |
+| 廊的确切列 | **P4**：整条链绑成**一个变量**（linear segment），端口列是对齐目标 |
+| 廊自己占的横向空间 | **ρ**：虚节点有宽（线宽 + 边间距），不是 0 |
+| 层间水平 track 的高度 | **Demand**：track 需求回写 `layer_gap`，唯一合法反向通道 |
+| 端口面 / 绕行 | **组合相**：port dummy 参与定序；P4 对齐端口而非节点中心 |
+
+我们四处偏离了这张表（§10.2），于是 e29 的竖廊被排在错的一侧，而次轴无论怎么加软项都翻不了案。
+
+### 10.1 实测证据（探针，结论仍成立）
+
+**(a) e29 的廊被 order 钉在 n12/n13 左侧**
 
 | 观测 | 值 |
 |------|-----|
 | e29 两颗 dummy 的 desired（端口锚，pass2） | `v#0=352.9`、`v#1=263.4` —— **互相矛盾**，相差 90 |
 | VV 段项等权（w=64）→ 解 | 两颗都落 `303.1`，≈两者折中，谁的端口都不对 |
 | rank6 分离约束 | `n12.left − dummy = 24.0` **恰好取等 → 约束激活**，竖廊右移被 n12 物理挡住 |
-| 两端 | n14 跟着相邻 RV 段落到 `314`；n11 被自己的 hub 轴按在 `418` |
+| 我们的 rank6 order | `n16, n21, n7, v:e29, n12` —— 廊在**左** |
+| yFiles 同图（w=30） | `n13=355.8`、`n12=363.3`、`n11=386.5`、`n14=389.0` —— 廊在**右**（n12 右边界 378，余量仅 11） |
 
-对照 yFiles 同图真值（w=30）：`n13=355.8`、`n12=363.3`、`n11=386.5`、`n14=389.0`。
-**yFiles 把 e29 竖廊排在 n13 / n12 的右侧**（rank6 廊道 ≈389，n12 右边界 378，余量仅 11）；我们排在**左侧**（rank6 order 为 `n16, n21, n7, v:e29, n12`）。
+`desired[v]=352.9` 说明 `J` 本来就想往右：**不是目标函数选错列，是 order 决定的左右关系把可行域切没了**。
 
-所以这不是「目标函数选错列」：`desired[v]=352.9` 说明 `J` 本来就想往右，是**由 order 决定的左右关系把分离约束钉死**。于是原方案的第一项要打问号——只加端点直度项，n14 会被拉向 n11，但竖廊仍卡在 303，**折点只是从 n11 端搬到 n14 端，折数不减、还可能更差**。
-
-探针另外暴露两条真实缺陷：
-
-- **长边 dummy 链没有单一写者**：`apply_port_anchor_desired` 让每颗 dummy 各自锚到就近端点的端口，同一条链因此收到互相矛盾的 desired，再靠等权平均出一个两端都不满足的列。链的列应当由**一个**写者决定。
-- reversed 边在 `forward_real_adjacency` 里被整条跳过（`metric/symmetry.rs:24`），hub / primary / fan 各项从不知道 n14 与 n11 相连。注意**前向**长边不受影响——该函数直接连真实端点、跨过 dummy。
-
-### 10.2 n17：扇入共线写成了「两个绝对拉力」，不是「相对相等」
-
-原先猜的「pack 把父当叶子铺开、把 n17 挤进缝里」**不成立**。探针：
+**(b) n17 的扇入共线写成了两个绝对拉力**
 
 | 观测 | 值 |
 |------|-----|
-| 三父 span 并列 → `unique_min_span_primary` | `None`（三个 up_nb 全部 `primary=false`） |
-| `center_h(n17)` = 父 x 中位数 | `axis = 71.0` = `best[n21]` —— pack **确实**把 n17 对到了中位父那一列 |
-| pack 写入 | `desired[n17]=71 (w=16)`、`desired[n21]=71 (w=8)` —— 两者目标一致 |
+| `center_h(n17)` = 父 x 中位数 | `axis = 71.0` = `best[n21]` —— pack 确实对到了中位父那一列 |
+| pack 写入 | `desired[n17]=71 (w=16)`、`desired[n21]=71 (w=8)` |
 | rank6 分离 | 解出 `n16=−18.2 / n21=45.8 / n7=109.8`，间距**恰好 64 / 64 → 整层取等** |
-| 结果 | n21 被推离 71 到 45.8；n17 权重大留在 71 → **错位 25**，`e25`/`e13` 交叉 |
+| 结果 | n21 被推离到 45.8；n17 权重大留在 71 → **错位 25**，`e25`/`e13` 交叉 |
 
-根因在**表达方式**：共线被写成「各自的绝对 desired」。一层排满时 VPSC 只能整体平移，弱的那个（w=8）被牺牲，而 n17 不会跟着走。现有 `primary` 分支之所以有效，正因为它把 peer 钉到 `axis + delta`，把**相对量**固定住了。
+一层排满时 VPSC 只能整体平移，弱的那个被牺牲，而强的不会跟着走。**共线必须写成相对量**。
 
-所以「并列时取中位父作 primary」确实能接上现有通路——但那条通路本身有缺陷，见 10.3。
+**(c) `n13.x` 有两个写者**：n12（rank6）把 primary `n13` 钉到 `307.4+δ`，n11（rank4）随后按自己的轴写成 `396.9`，末次写入胜出，共线锁形同虚设 —— 直接违反 AGENTS.md §1。
 
-### 10.3 顺带查出的写权冲突：`n13.x` 有两个写者
+### 10.2 真正根因：与参考实现的四处偏离
 
-`primary` 共线用的是**绝对**赋值 `desired[peer] = axis + delta; w = 1e6`，而 hub 按 rank 降序逐个写同一张 `desired`：
+| # | 偏离 | 现状（代码） | 参考 | 后果 |
+|---|------|--------------|------|------|
+| **D1** | **长边链不是排序单元** | `sift_pass` 显式过滤零宽元素（`compose/order.rs`），dummy **永不 sift**；transpose 只做层内相邻对换 | [`16` §4](../../../../reference/yfiles/16-大图性能与wasm.md)：长边链的序应作为**一个整体**处理（块级 sifting, Bachmaier 2010） | 把 e29 的廊挪到 n13/n12 右侧需要 rank5 与 rank6 **同时**换侧；逐层局部动作每一步单看都不划算 → 局部最优出不去 |
+| **D2** | **反转边被当二等公民** | order `segment_weight`：`reversed → 1.0`，绕过 1/2/8 里的 VV=8；`forward_real_adjacency` 整条跳过 reversed；ports 对 reversed 另开 E/W 侧廊策略 | [`01` §1/§3](../../../../reference/yfiles/01-sugiyama分层布局.md)：P1 之后 reversed 只是一个**方向位**，P3/P4/P5 一律按普通边处理；1/2/8 是让长边变直的关键配方 | 回边的廊拿到全场**最弱**的拉直权重，且 hub/fan/primary 完全看不见它的两个端点 |
+| **D3** | **链在 P4 不是一个变量** | 只有落进同一 BK 块的相邻 **VV** 对才加硬等式（`metric/symmetry_objective.rs`），RV 恒软；`apply_port_anchor_desired` 让每颗 dummy 各自锚到就近端口 | [`01` §4.5](../../../../reference/yfiles/01-sugiyama分层布局.md)：linear segment —— 一条长边的**所有 dummy 绑成一个变量**，与层内分离不等式一起交给 VPSC | 同一条链收到互相矛盾的 desired，靠等权平均出一个两端都不满足的列（探针 (a)） |
+| **D4** | **虚节点宽 = 0** | `elem_size`：`Virtual/Boundary/Pad → Size(0,0)`（`hierarchical/mod.rs`） | [`01` §4.6](../../../../reference/yfiles/01-sugiyama分层布局.md)：虚节点宽应 = **线宽 + 边间距**，否则两条长边贴死 | 廊没有自己的空间预算，只能贴 `node_gap` 生存；§9 单独试过加宽无效——因为 D1/D3 没解决时加宽只会撑画布 |
 
-- n12（rank6）把自己的 primary `n13` 钉到 `307.4 + delta`；
-- n11（rank4）随后又按自己的轴把 `n13` 写成 `396.9`；
-- 末次写入胜出：`n13 = 396.9`，n12 反被拖到 `347.1`，两者差 50 —— **共线锁形同虚设**。
+一句话：**我们把「链」当成了 N 个独立的零宽点**——在 P3 它不能整体移动，在 P4 它不是一个变量，在 ρ 它不占地方。次轴再怎么加项，都是在给一个被拆散的对象打补丁。
 
-这是 AGENTS.md §1「每个几何自由度有且只有一个写者」的直接违反：`n13.x` 有两个写者，靠遍历顺序决胜负。把成对共线改成**相对**约束（硬等式 `x_peer − x_h = delta`，或成对代价项）可从构造上消除——多个相对约束能共存并由 VPSC 一起权衡，绝对 1e6 不能。这条同时也是 10.2 的前置：不先改成相对写法，就算给 n17 选出了 primary，也只是多一个会被覆盖的绝对钉子。
+### 10.3 反模式登记（本轮已实现、实测、回退，勿重试）
 
-### 10.4 修正后的落地顺序
+| 试法 | 结果 | 根因 |
+|------|------|------|
+| **端点直度项 `w_end`**：`boost·span·w` 拉 `|(x_s+off_s)−(x_t+off_t)|`，进 `J` 和/或 median desired | 全边 span≥2 + median + boost2 → mech sum 50→44 但 **max_bends 2→4**，多 fixture 涨折/撑画布；仅 reverse → 54（更差）；仅 `J` 或温和权重 → 几何**与基线相同** | order 未放开时，端点项只能把折点从一端搬到另一端（探针 (a) 已预言） |
+| **order 给 reverse dummy 加 `original_target` 列的 bary 偏置** | mech sum 50→**58**、crossings 4→6，e29 仍在左，且打乱 e30 的左盆 | 量纲错（拿跨层 order 下标当同层 bary 目标）＋与 crossing 主目标直接打架；**单元素**偏置也解决不了「整条链要一起换侧」 |
+| 单槽脸滑端口 / 单独给 dummy 量宽 / 让 `J` 在 pack 后无约束翻盘 | 见 §9 | 同上：局部补丁 |
 
-原排序把「端点直度项」放 P0、把 order 放 P1 备选，**优先级是反的**：实测表明 e29 的瓶颈是 order 决定的左右关系，端点直度项在 order 放开前无效。
+### 10.4 新方案：R1–R5
 
-1. **P0 · 扇入中位主臂（已落地）**
-   - flat 上 `up_deg≥2` 且 span **奇数并列**：primary = 层序中位父（偶数并列仍 `None`，保 D3 中点镜像）；
-   - grouped 扇入保持 `unique_min_span`（中位+1e6 锁父会撑破弱 group 画布）；
-   - 共线仍走既有 soft desired（`desired[peer]=axis+δ, w=1e6`），**未**上硬相对等式——硬 primary 等式在全库验证中大面积涨折/撑画布。
-   - 验收：`mech` sum_bends 58→50、crossings 6→4；`hier_eval` 全绿。
-2. **P0′ · 长边 dummy 链单一写者**（本轮未做）  
-   `apply_port_anchor_desired` 按端各自锚定仍会给出矛盾 desired；改中位/择端后需与 order 联动，单独改会涨折。
-3. **P1 · order 让回边链靠柱**（本轮未做）  
-   长 reversed dummy 的 barycenter 偏向 `original_target` 列。试做时与 crossing 目标打架，需单独设计权重/门控。
-4. **暂缓 · 端点直度项 / 硬相对共线**：等 P1 放开 order 后再评估；硬 `x_peer−x_hub=δ` 已证实过刚。
-5. **仍不动**：单槽脸滑端口；盲目加 dummy 宽；让 `J` 在 pack 后无约束翻盘。
+**R1 · P3：长边链块化排序（核心，先做）**
 
-写权不变：扇入主臂由 **SymmetryAxis** 用权重 + snap 表达；左右关系的写者是 **order**。
+- 定义 **chain block** = 一条边的全部 dummy（跨多层的一列元素）。
+- 新增**块级移动**：把整块在它覆盖的每一层同时插到相对位置 `k`，用现有 BJM 增量计数评估 **Δcrossings**；`sift_pass` 的候选集加入 chain block（当前它被 `is_zero_width` 过滤掉了）。
+- 接受判据保守：**Δcrossings < 0 才接受**，平局用 `total_span` / 稳定序 tie-break，仍走 best-snapshot。
+- 同时撤掉 D2 的降权特判，恢复 `reversed` 段的 1/2/8（若 e30 类左盆回归重现，用**块级移动**解决，不要再降权）。
+- 验收：mech rank5/6 允许 `v:e29` 出现在 n13/n12 右侧；`hier_eval` crossings 不升。
+
+**R2 · P4：linear segment（与 R1 同批验收）**
+
+- 一条长边的所有 dummy 合成**一个 VPSC 变量**（或一组恒等约束），不再依赖 BK 块是否碰巧对齐；
+- 两端 real 通过**端口偏移**接入该变量的目标项 `|x_chain − (x_end + off_end)|`（reversed 两端同样计入，因为 D2 撤销后它就是普通边）；
+- 删除 `apply_port_anchor_desired` 的「按端各自锚定」——链的列由这**一个**写者决定（这正是原 P0′ 想做但没做的事，现在有了正确形态）。
+
+**R3 · P4：成对共线改相对量**
+
+- `primary` / `twin` 共线从「绝对 `desired` + 1e6」改成**相对代价项**（高权），消除探针 (c) 的双写者；
+- 硬等式**只**保留链内（R2）与既有 gb/pb —— 全量硬 primary 等式已证过刚（§10.3 上一版记录）。
+
+**R4 · ρ / Demand：给廊空间预算（跟随项，不单独上）**
+
+- 虚节点宽 = `edge_gap`（线宽 + 边间距，[`01` §4.6](../../../../reference/yfiles/01-sugiyama分层布局.md)）；
+- 层间 track 需求继续走 DemandBoard 回写 `layer_gap`，**保持唯一反向通道**；
+- 只在 R1+R2 落地后再评估，否则重演 §9「加宽 = 撑画布」。
+
+**R5 · 端口：撤 reversed 侧廊特判（评估项）**
+
+- 回边与普通长边同构（N/S + 链）；E/W 侧廊只保留给 `span=1` 无 twin 等真正需要的情形；
+- 依赖 R1/R2 先把链摆对，否则撤特判会让回边直接压到别的列上。
+
+### 10.5 顺序、风险与验收
+
+| 步 | 内容 | 风险 | 门禁 |
+|----|------|------|------|
+| 1 | R1 块级 sifting（保守判据）+ 撤 D2 降权 | 改的是 P3 主目标，全库敏感 | `hier_eval` crossings/bends 不升；mech order 出现右侧廊 |
+| 2 | R2 linear segment + 删按端锚定 | 链过刚可能撑画布 | mech e29 折数下降；bbox 护栏 |
+| 3 | R3 相对共线 | n17 类扇入受益，dense 层可能改变 | `order_approval` / `twin_spine` / D2·D3 门禁 |
+| 4 | R4 / R5 | 仅在 1–3 转绿后 | 全库 bbox + 折点 |
+
+失败判据（提前止损）：R1 单独做完若 mech 的 order 仍不出现右侧廊，说明「整体移动」这一假设也不成立，应回到 P3 目标函数本身（是否该把「长边直线率」写进 `J_order`），而不是继续在 P4 加项。
+
+### 10.6 写权表（不变）
+
+| 自由度 | 唯一写者 |
+|--------|----------|
+| 反向位 | P1 Greedy-FAS（之后 reversed 只是方向位） |
+| 层号 | P2 |
+| 层内序（含 **chain block**） | **P3 order** |
+| 链的列 / 节点 x | **P4 SymmetryAxis**（linear segment） |
+| 端口 side / along | Compose ports + PortLane |
+| 折点 | Ink（零新决策） |
+| 层间距 | DemandBoard → P4 之前 |
+
+## 11. 实施记录：D1–D4 落地（R1/R2/R4）
+
+对照 §10.5 的 1/2/4 步顺序（R3/R5 本轮不做）。
+
+### 步 1 · R1 链块化排序 + 撤 D2 降权 ✅
+
+- `segment_weight` 删 reversed 降权分支，恢复 1/2/8 基础权重（VV 仍不乘作者权重）。
+- `forward_real_adjacency` 撤销为**针对性撤销**：span-1 reversed 计入 real-real 邻接，长 reversed 跳过。全撤会把远端端点引入 fan 邻接，把 spine head 变 hub（order-approval `rejected -> submit` 实证），导致 D2 spine 门禁 + 12 fixture 折数回归。
+- `chain_block_sift_pass` 落地（非 grouped plan，与 `sift_pass` 同门控），含表驱动单测（链换侧需两层同时动 fixture + grouped 不动链 case）。
+- 门禁：layout 177 单测、hier_eval 13/13 全绿，全库 crossings/bends 全 +0。
+
+### 步 1 止损点实测（重要）
+
+mech 右侧廊**未出现**，但失败判据的前提（机制不成立）被诊断探针否定：`CHAIN_SIFT_DBG` 实测 e29 链 k=7 右侧候选 crossings=0（与基座持平）、total_span +1 —— 右侧廊在 `J_order` 词典序下**非改善**，保守判据必然拒绝。块级机制本身有效，是目标函数不偏好右侧。经确认后继续步 2（R2 折数收益不依赖廊在哪侧），不回头改 `J_order`。
+
+### 步 2 · R2 linear segment ✅（单写者形态修正）
+
+- 链恒等约束落地：相邻 dummy 双向 0-gap 等式，降级链从 3 档扩为 4 档（链恒等骑前三档，末档丢弃）。
+- **desired 层单写者（两端锚均值写全链）实测否决**：六轮归因（禁链恒等 / 仅两端锚 / 仅写首尾 / 按端各自锚 / N/S-only / 含 E/W）全部产生 fan/spine fixture 回归；链恒等单独完全无害。
+- 最终形态：**链恒等在 VPSC 层实现单写者**（整链一个变量），`apply_port_anchor_desired` 按端锚定保留 —— 两端拉力经恒等等式折中成整链一个加权列。hier_eval 13/13、全 workspace 绿，坐标与基线 bit-identical，mech.layout-styles max_bends=2（目标达成）。
+
+### 步 3 · R4 虚节点宽 = edge_gap ❌（实测否决，已回退）
+
+- `elem_size` 对 Virtual 返回 `Size(edge_gap, 0)`（R1+R2 已落地前提下评估）。
+- 实测：mech crossings 4→8、sum_bends +6、yfiles-pipeline 等多个 fixture 折数回归、geometry invariants 破。与 §9 结论一致：**加宽在现行 order/track 预算下 = 撑画布 + 涨折**。代码已回退，勿重试；再议前置是 track 需求/走廊预算体系先行。
+
+### 基线与契约
+
+- `hier_eval_baseline.json` 刷新：全库指标除两处可接受漂移外全 +0 —— `group-weak/product.microservices` 净改善（crossings 5→4、sum_bends 18→16）；`group-weak/demo.plotgram-core-mod-deps` crossings 81→83（bbox_w 与 symmetry_deviation 同时改善）。insta 快照零变更。
+- 契约已同步：`composition.md` §6（reversed 不降权 + chain block sifting）、`symmetry-axis.md` §3/§4（链恒等 + 约束层单写者）、`coordinate-and-demand.md` §5.2/§5.3。
+
+### mech 对照 §10.0 yFiles 真值
+
+| 指标 | yFiles（摘录） | 落地前 | 落地后 |
+|------|----------------|--------|--------|
+| crossings | **0** | 4 | 4 |
+| max_bends | 2 | 2 | 2 |
+| sum_bends | **44** | 50 | 50 |
+| 0 折点边 | **12** | 9 | 9 |
+| E/W 端口 | 0 | 0 | 0 |
+
+mech **几何零变化**。R1/R2 的价值是结构性的（链块可整体移动、链恒等防 zig-zag），当前 fixture 上未转化为指标。e29/e30 仍各 2 折（yFiles 0 折），合起来就是 50−44 差额里的 4 折；其余 +2 来自 e0/e3/e5/e15/e21/e23/e27 等单槽脸微错位（我们另有 6 条边比 yFiles 更直，但是错列换来的，见审核）。
+
+---
+
+## 12. 宏观能力：P4 要求解边直度，不是把 median 当 desired 去挤（2026-08-13）
+
+> mech 只是检验标准。本节回答：要对齐 yFiles Hierarchical 那一档**一类图**的观感，算法上缺的是哪项能力。不是再给 e29 加一项。
+
+### 12.1 一句话
+
+我们的次轴求解器名义上最小化 `J(x)`（边直 + 扇心），**实际在最小化「到 median-desired 的 L2 距离」**。VPSC 的 API 是 `min Σ w(x − desired)² s.t. 分离`。当许多节点的 median 撞到同一列，投影就把整层**挤到 `node_gap` 下界**。yFiles / Graphviz dot / ELK `NETWORK_SIMPLEX` 解的是另一道题：
+
+```text
+min  Σ_e Ω(e)·ω(e)·|(x_u + off_u) − (x_v + off_v)|     （或 L2 平方）
+s.t. 同层相邻 x_{i+1} − x_i ≥ ρ
+```
+
+分离是约束，**不是目标的副作用**。不相邻的边把节点拉向不同列时，层内会留下富余 —— 这正是 yFiles 层间距 76/53/30/30、我们整层 24 贴死的原因。
+
+### 12.2 证据（mech 上能看见，但病在所有 dense DAG）
+
+| | yFiles L4 中心 | 相邻净空（cx 差 − 30） |
+|--|----------------|------------------------|
+| n10–n22–n2–n4–n11 | 77.5, 183, 266.5, 326.5, 386.5 | **75, 53, 30, 30** |
+
+我们同层从左到右几乎全是 `node_gap=24` 取等。§9 已经观察到「层被压在下限上整层刚化」，当时猜「dummy 要量宽」或「order 要把链错开」。R4 加宽失败、R1 换侧被 `J_order` 拒绝，都是因为**真正的自由度在 P4 的目标函数被用错了**：刚化不是 ρ 太小，是求解器把所有 slack 吃掉了。
+
+同一机制解释一批「不像 e29」的差距：
+
+- **n19**：yFiles `cx=266.5`（压在 n0/n1 脊上），我们 `119`（收在父 n18 正下）。median+pack 让短边 e11 把 n19 钉死；simplex 会让 n19 的两条下行边（→n0、→n24）把节点拉到扇的中位列，e11 允许 2 折。我们 e11 是 0 折，是**错列换来的假直**。
+- **e3/e5/e0** 等单槽脸：两端差十几 px，脸上没有滑槽，只能挪节点；层刚化后 L1 判定不划算。yFiles 同层有 slack，节点能独立对列。
+- **e29/e30**：链恒等已经把 dummy 焊成一根（R2），但这根被挤在错误的一侧；P4 再直也翻不了 P3 的左右。这是**第二项**能力，见 §12.4，不能代替 §12.3。
+
+### 12.3 能力 A（主突破）· 次轴 = 边直度 LP / IPSEP，desired-packer 降为初值
+
+文献与产品对应（[`01` §4](../../../../reference/yfiles/01-sugiyama分层布局.md)、[`13` 选型](../../../../reference/yfiles/13-实现路线图与选型.md)）：
+
+| 路线 | 目标 | 谁在用 |
+|------|------|--------|
+| B 网络单纯形 | `min Σ Ωw \|x_u−x_v\|` s.t. ρ | Graphviz `position.c`；yFiles **SimplexNodePlacer（Hierarchical 默认）**；ELK `NETWORK_SIMPLEX` |
+| C Brandes–Köpf | 对齐块 + 块间紧致 | ELK 默认；我们已算 `bk_ideal` 却只当 VPSC **初值**，随后被 median 毁掉 |
+| D IPSEP / linear-segment QP | `min Σ w(x_u−x_v)²` s.t. ρ，VPSC 投影 | ELK `LINEAR_SEGMENTS`；Dwyer–Marriott |
+
+我们现在是路线 A 的变体（Sugiyama **Priority / median**）：质量文献明确写「快而糙」。选型表当年写「BK 起步，约束多了换 VPSC」—— VPSC 换对了，**目标没换**：仍在喂 per-node desired。
+
+**正确用法（与现有零件兼容）**：
+
+```text
+硬约束（已有）：层内分离、链恒等、twin/gb/pb 等式
+目标（已有公式，从未被求解器直接最小化）：
+  J(x) = Σ_seg w·|(x+off)_u − (x+off)_v|  +  λ_sym·Σ_hub |x_h − center_h|
+
+迭代（IPSEP 风格，替换「median → desired → VPSC」）：
+  1. 对 J 做无约束下降（L1：邻域加权中位；或改 L2 用梯度）
+  2. VPSC 投影到硬约束 —— 投影的是「这一步的 x」，不是「所有人共用的几个 median 点」
+  3. 以 J 做 snapshot（已经在做）
+snap：只保留无法写进 J 的产品规则（twin/primary 相对 δ），禁止再写「整层按 node_gap 铺叶」这种把 slack 杀光的绝对 desired
+```
+
+关键差：加权中位作为**无约束一步**是合法的（它就是 L1 边代价的最优）；把它写成 VPSC 的 `desired` 就变成「所有人吸向少数几个点再挤开」。无约束中位之后节点仍在不同 x 上，投影会保留边与边之间的缝。
+
+**不做什么**：不上第三套求解器；不把 BK 当终局（组框/端口/链恒等已经证明 BK 不够）；不重试 dummy 量宽、`w_end`、跨层 bary 偏置。
+
+**验收（能力，不是单图）**：
+
+- 代表 dense DAG（mech、yfiles-pipeline、fan-out、order-approval）层内相邻净空的**中位数 > node_gap**（允许局部取等，禁止整层取等）。
+- 单槽脸、两端本应同列的短边，0 折率上升；允许个别边为了占脊而 2 折（yFiles 的 e11 就是）。
+- `hier_eval` 硬不变量绿；bbox 允许变宽（yFiles 也不是最窄装箱）。
+- mech：n19 应落到 n0/n1 一带而不是 n18 正下；e3/e5 类微折应降。e29 侧不作为本步必达（见 B）。
+
+### 12.4 能力 B（配套）· P3 在交叉持平时按端点列安放链块
+
+R1 块级 sift 的机械装置是对的，**词典序错了**。`J_order = (crossings, source_moment, total_span)` 在 crossings 已平的时候用**无向 |Δorder|** 当第二键。长回边的廊换到端点一侧常常 crossings 不变、span 微增（mech e29：右侧候选 span+1）→ 永远拒绝。
+
+yFiles / dot 的 1/2/8 是**交叉权重**，不是 span。长边直不直主要在 P4 用 Ω=8 拉齐；P3 只保证 dummy 链作为整体、且不要为了省一点 span 把廊夹在无关实节点中间。
+
+**改法**（仍是 order 写者，不翻 P4）：
+
+- 块级 trial 的接受：`crossings` 不增即可进入候选（不是必须降）。
+- 交叉持平时的次键改为 **endpoint inversion**：链在各层相对「工作头 / 两端 real 的层内位」有多少实节点夹在中间。降低 inversion = 廊靠到端点那一侧。`total_span` 降为更后的 tie-break。
+- 插入用**相对位**（相对某层的 head 分位，或各层独立对齐到同一分位），不要用跨层同一个绝对下标 `k`。
+
+这是一类图的能力：任意 span≥2 的边（含 FAS 回边）在交叉不恶化时，廊出现在端点列那一侧，P4 的 linear segment 才有正确的可行域。
+
+**验收**：mech e29 dummy 出现在 n13/n12 右侧、e30 链与 n21/n5 同侧；全库 crossings 不升。本步**在 A 之后或并行**，单独做只能换侧、层仍可能刚化。
+
+### 12.5 能力 C（跟随，A 之后才评估）
+
+| 项 | 何时 |
+|----|------|
+| R3 相对共线（primary/twin 进 J 的成对项，去掉绝对 1e6 双写） | A 把 snap 从「铺叶装箱」里解放之后；否则相对项仍被 pack 挤掉 |
+| 虚节点宽 = edge_gap | A 让层有 slack 之后再试；现在加宽 = 撑画布（R4 已否决） |
+| snap 瘦身 | A 落地后：叶槽 pitch 改为「J 已分开的列」，不再按 `node_gap` 强制铺 |
+
+### 12.6 落地顺序
+
+| 步 | 内容 | 风险 |
+|----|------|------|
+| **A0** | 旁路：关掉 median-desired 循环，直接 `bk_ideal` + 链恒等 VPSC，看层 slack / mech n19 / 折点（诊断，不留主路径） | 组框/twin 可能松 |
+
+**A0 实测（2026-08-13）**：选项 `symmetry_place: bk`。mech 上：
+
+| | median | A0 `bk` | yFiles |
+|--|--------|---------|--------|
+| n19.cx | 119（n18 正下） | **242**（靠近 n0/n1 脊） | 266.5 |
+| 实节点相邻净空 中位数 | ≈24（几乎全取等） | **27**（19 缝里 9 条仍取等） | 明显更大（L4: 76/53/30/30） |
+| sum_bends / 0 折 / crossings | 50 / 9 / 4 | 52 / 8 / 4 | 44 / 12 / 0 |
+| e29 廊 | n12 左，2 折 | 仍在左，2 折 | n12 右，0 折 |
+
+结论：**median-desired 确实是把 n19 收到父列、把层挤死的主因**（A0 一关，n19 自己跑到脊上）。BK 紧致化仍会局部取等，且不管 P3 的廊侧，所以折点没有变好。A0 不留主路径；A1 要的是「对 J 下降 + 投影」，不是把 BK 当终局。
+
+| **A1** | 主路径：IPSEP 迭代（对 J 下降 + VPSC 投影）；J 继续当 snapshot；snap 叶槽先不动，但 IPSEP 不再 1e6 锁 primary/twin | dense 图变宽；折点可能先升 |
+
+**A1 实测（2026-08-13）**：默认 `symmetry_place: ipsep`。无约束步 = 邻域 L2 重心（不是 median 列），VPSC 用基础权重投影这一步的 `x`。snap 仍铺叶，但两趟都不把 twin/primary 写成 1e6 绝对 desired（否则 n19 又被钉回 n18；`order-approval` 主臂门禁仍绿）。
+
+| | median | A0 `bk` | **A1 `ipsep`** | yFiles |
+|--|--------|---------|----------------|--------|
+| n19.cx | 119（n18 正下） | 242 | **336**（n0=304 / n1=325 脊上；e11 改为 2 折） | 266.5 |
+| 实节点相邻净空 中位数 | ≈24 | 27 | **47**（19 缝里 7 条仍取等） | L4: 76/53/30/30 |
+| yfiles-pipeline 净空中位 | — | — | **48**（14 缝里 6 条取等） | — |
+| sum_bends / max / 0 折 / crossings | 50 / 2 / 9 / 4 | 52 / 2 / 8 / 4 | 60 / 4 / 5 / 8 | 44 / 2 / 12 / 0 |
+| e29 廊 | n12 左，2 折 | 仍左 | 仍左（dummy cx=400，n13=444），4 折 | n12 右，0 折 |
+
+失败判据未触发：dense 层净空中位已明显高于 `node_gap`。n19 离开父列。e3/e5 微折还在（脸上无槽，属 A2/C 把叶槽从 `node_gap` 铺开改成 J 已分开的列）。e29 侧仍是 B。`hier_eval` D2/D3 / 主臂门禁绿；几何硬不变量绿；bend 回归门与两处 canvas-bloat（>10%）红——bbox 变宽是 A1 预期，基线未刷。
+
+| **A2** | 把 twin/primary/exclusive 脊从绝对 desired 改成 J 的相对项（fan-hub 子不加 primary）；snap 叶槽仍按 J 缝铺，1e6 只留 median 档 | 门禁敏感 |
+
+**A2 实测（2026-08-13）**：`J` / L2 步对 twin（×8）、eligible primary 与 exclusive 1:1（×4）加权；两端都是扇 hub 的 min-span 对（mech n18–n19）不加。snap 仍铺叶 + hub 扇心 + exclusive 跟列，IPSEP 两趟都不 1e6。
+
+| | A1 | **A2** | yFiles |
+|--|----|--------|--------|
+| n19.cx | 336（脊上） | **354**（n0=319 / n1=326 脊上；e11 仍 2 折） | 266.5 |
+| 实节点净空中位 | 47 | **47**（7/19 取等） | L4 更大 |
+| sum_bends / max / 0 折 / crossings | 60 / 4 / 5 / 8 | 60 / 4 / 5 / 6 | 44 / 2 / 12 / 0 |
+| e3/e5 微折 | 仍 2 折 | 仍 2 折（dx 4 / 13） | 0 折 |
+| D2 / D3 / 主臂 / twin / ticket-triage | 绿 | **绿** | — |
+
+D2 / D3 / 主臂门禁绿。叶槽孤叶装箱见 **C**；e29 侧见 **B**。
+
+| **C** | snap 瘦身：孤叶保持 J 列，不再 `axis±node_gap` 强铺；≥2 叶仍 FanPack（D3） | 门禁敏感 |
+
+**C 实测（2026-08-13）**：IPSEP 下每个 hub 的**恰好 1 个自由叶**不再被拽到 `node_gap` 步长；多叶扇仍按层内序等距（否则 `fan_spine_chain` / D3 红）。
+
+| | A2 | **C** | yFiles |
+|--|----|--------|--------|
+| n19.cx | 354 脊上 | **354** 脊上 | 266.5 |
+| 净空中位 / 取等 | 47 / 7/19 | **46** / 7/19 | L4 更大 |
+| sum_bends / max / 0 折 / crossings | 60 / 4 / 5 / 6 | **58 / 2** / 5 / 8 | 44 / 2 / 12 / 0 |
+| e3/e5 | dx 4 / 13，2 折 | 仍 2 折（dx 5 / 13） | 0 折 |
+| e29 | 左，4 折 | 左，**2 折** | 右，0 折 |
+| D2 / D3 / 主臂 | 绿 | **绿** | — |
+
+孤叶不再被装箱，mech `max_bends` 回到 2。e3/e5 的几像素差来自近脊节点中心没对齐（单槽脸 = 中心即端口），不是孤叶 pitch。多叶等距仍会局部取等。
+
+| **B** | `J_order` 交叉持平 → endpoint inversion；块插入改相对位 | 改 P3 主目标，全库 crossings 门禁 |
+
+**B 实测（2026-08-13）**：块级 trial 接受 crossings 不增；交叉持平时次键 = 各层 dummy 相对两端 real 分位之间夹着的实节点数；插入按 `k/max_k` 分位而不是跨层同一个绝对下标。外层 sift 循环只在 crossings 上升时回滚（否则 span+1 的换侧会被 `J_order` 立刻撤掉）。inversion 不进全局 `J_order` / barycenter / 逐元素 sift。
+
+| | C | **B** | yFiles |
+|--|---|--------|--------|
+| n19.cx | 354 脊上 | **355** 脊上 | 266.5 |
+| 净空中位 / 取等 | 46 / 7/19 | **48** / 8/19 | L4 更大 |
+| sum_bends / max / 0 折 / crossings | 58 / 2 / 5 / 8 | **58 / 4** / 6 / 9 | 44 / 2 / 12 / 0 |
+| e29 | n12 **左**，2 折 | n13/n12 **右**，仍 2 折（n14=311 / 廊=415 / n11=458） | 右，0 折 |
+| e30 | 与 n21/n5 同侧，2 折 | 仍同侧（L3–L5 左盆），**4 折**（n21=108 / 廊=156 / n5=208） | 同侧，0 折 |
+| 实节点层内序 | 与 yFiles 一致 | **仍一致** | — |
+| D2 / D3 / 主臂 | 绿 | **绿** | — |
+
+e29 换侧是 B 的能力验收：P3 把廊放到端点那一侧，P4 才有正确可行域。n14 还没被拉上廊、e30 变成三列 Z，都是 P4 还没把端点焊到链上，不是 order 写错侧。`hier_eval` 几何硬不变量绿；bend 回归门与 canvas-bloat 仍红（基线未刷）。layout 178 单测绿。
+
+| **D** | P4 悬挂汇点跟长边廊；廊跟非叶端 port | 主臂/D2 敏感 |
+
+**D 实测（2026-08-13）**：`chain_end_boost`（默认 8）进 J/L2，对象是「无正向子、恰一个 span-1 父、且父不是 span-1 扇 hub」的悬挂汇点（mech n14）。exclusive 脊与 snap 走链在该叶处停。port-anchor：非叶端仍把 dummy 拉向自己的 port；叶不反向拽廊，而是被拉到 dummy 列。扇叶（order-approval `rejected`）和 DAG 源（`submit`）不加，否则 D2 主臂散。
+
+| | B | **D** | yFiles |
+|--|---|--------|--------|
+| n14.cx / e29 廊 / n11 | 311 / 415 / 458 | **448 / 448 / 458** | 389 / 396.5 / 386.5 |
+| e29 | 右，2 折（dx≈107） | 右，2 折（**dx=10**，n11 多槽脸） | 右，0 折 |
+| e28 n12→n14 | 0 折（假直，钉在 n12） | **2 折**（与 yFiles 同形态） | 2 折 |
+| e30 | 同侧，4 折 | 仍 4 折（两端都不是悬挂汇点） | 0 折 |
+| sum_bends / max / 0 折 / crossings | 58 / 4 / 6 / 9 | **60 / 4** / 5 / 9 | 44 / 2 / 12 / 0 |
+| n19 | 脊上 | 脊上 | 266.5 |
+| D2 / D3 / 主臂 | 绿 | **绿** | — |
+
+n14 离开 n12 跟廊，是 D 的能力验收。e29 剩 10px 是 n11 多槽脸的端口偏移（共线说的是端口），不是 100px 错列。e30 两端都是扇/贯通点，不在本步范围。`hier_eval` 几何硬不变量绿；bend / canvas-bloat 仍红（基线未刷）。layout 178 单测绿。
+
+失败判据：A1 之后若 dense 层仍整层 `node_gap` 取等，说明投影仍在吃 slack（desired 仍在塌缩）——不要加宽 dummy，先查下降步是不是又把所有人映射到少数几个 x。
+
+写权不变：P3 写左右，P4 写 x，P5 展开。变的是 **P4 真正最小化的那个函数**。
