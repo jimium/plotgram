@@ -15,6 +15,16 @@
 **写什么**：每个 plan elem 的 **次轴中心**（TB 下为 `x`）。  
 **不写**：端口 `side`、脸内 along、轨坐标 —— 那些分别属 Compose / PortLane / TrackOrder。Compose 已定的 ports 只被消费：把链端 dummy 的 soft desired 拉到 `port_anchor.x`。
 
+**共线说的是端口，不是中心**。一条边直不直，取决于两端 `port_anchor.x` 是否相等；节点若在一张脸上挂了好几个端口，就得用自己的中心去付这个偏移。于是段的代价项是
+
+```text
+J_edge = Σ_seg w · |(x_from + off_from) − (x_to + off_to)|
+```
+
+`off` = 该边在该端的槽位相对中心的偏移 `((order+1)/(count+1) − 1/2) · width`；虚元与 E/W 端口取 0（E/W 边横着走，x 上没有可对的列）。同一条纪律进 `snap_fan_pack_style` 的共线语句：主臂 / twin / 脊链上的 `desired[peer] = axis` 改成 `axis + (off_hub − off_peer)`，链上逐跳累加。
+
+因此 **「主臂占脊」的门禁断言的是边的两个端口列，不是两个节点中心**（`order_approval` 门禁已按此改写）。
+
 ## 2. 写者边界
 
 | 自由度 | 写者 | 不得 |

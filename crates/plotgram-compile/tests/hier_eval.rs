@@ -67,7 +67,7 @@ use plotgram_compile::{
 use plotgram_layout::{group_penetration_violations, GROUP_FRAME_GAP, PARTITION_EMPTY_BAND_MIN};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::graph::{Edge as ModelEdge, Group as ModelGroup};
-use plotgram_model::port::{AlongSpec, Side};
+use plotgram_model::port::Side;
 use plotgram_model::result::LayoutResult;
 use serde_json::{json, Value};
 
@@ -1442,26 +1442,29 @@ fn fan_out_four_cross_rails_nest_outer_inner() {
     let source = fs::read_to_string(&path).expect("fan-out-four fixture");
     let result = build_layout(&source, &BuildOptions::default()).expect("layout");
 
-    let mut fan: Vec<(u32, u32, String, f64, Vec<Point>)> = Vec::new();
+    // Nesting is read off the face itself — the port column each edge leaves
+    // from — not off the `Ordered` slot, which PortLane resolves to an absolute
+    // offset once the frames are known.
+    let mut fan: Vec<(f64, String, f64, Vec<Point>)> = Vec::new();
     for e in &result.edges {
         if e.source != "hub" {
             continue;
         }
-        let Some(fp) = e.from_port.as_ref() else {
-            panic!("hub→{} missing from_port", e.target);
-        };
-        let AlongSpec::Ordered { order, count } = fp.along else {
-            panic!("hub→{} expected Ordered along, got {:?}", e.target, fp.along);
-        };
-        assert!(count >= 2, "hub→{} Ordered.count={count}", e.target);
-        let nest = order.min(count - 1 - order);
         let samples = e.path.samples();
         let y = primary_horiz_y(&samples).unwrap_or_else(|| {
             panic!("hub→{}: no horizontal segment", e.target);
         });
-        fan.push((nest, order, e.target.clone(), y, samples));
+        fan.push((samples[0].x, e.target.clone(), y, samples));
     }
     assert_eq!(fan.len(), 4, "expected 4 hub fan-out edges");
+    fan.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+
+    let n = fan.len();
+    let fan: Vec<(u32, u32, String, f64, Vec<Point>)> = fan
+        .into_iter()
+        .enumerate()
+        .map(|(i, (_, tgt, y, s))| ((i.min(n - 1 - i)) as u32, i as u32, tgt, y, s))
+        .collect();
 
     let mut by_nest: BTreeMap<u32, Vec<(String, f64)>> = BTreeMap::new();
     for (nest, _, tgt, y, _) in &fan {
@@ -1588,11 +1591,20 @@ fn order_approval_primary_arm_on_spine_approved_left() {
         n.frame.x + n.frame.width / 2.0
     };
     let check_x = cx("check");
-    let finance_x = cx("finance");
     let approved_x = cx("approved");
+    // "On the spine" is a statement about the arm, not about the two centers:
+    // when `check` carries several ports the node center pays the offset, and
+    // what must stay collinear is the edge's own pair of ports.
+    let primary = result
+        .edges
+        .iter()
+        .find(|e| e.source == "check" && e.target == "finance")
+        .expect("check→finance");
+    let arm = primary.path.samples();
+    let (arm_from, arm_to) = (arm[0].x, arm[arm.len() - 1].x);
     assert!(
-        (finance_x - check_x).abs() < 1.0,
-        "finance (short primary) must sit on check spine: finance={finance_x:.3} check={check_x:.3}"
+        (arm_to - arm_from).abs() < 1.0,
+        "finance (short primary) must sit on check spine: port x {arm_from:.3} → {arm_to:.3}"
     );
     assert!(
         approved_x < check_x - 1.0,

@@ -42,7 +42,9 @@ pub fn solve_symmetry_objective(
     }
 
     let bk = bk::bk_ideal(plan, size_of, params.node_gap);
-    let nbs = segment_neighbors(plan, graph);
+    let seg_offs = segment_port_offsets(plan, graph, ports, size_of);
+    let deltas = AlignDeltas::build(plan, &seg_offs);
+    let nbs = segment_neighbors(plan, graph, &seg_offs);
     let (down_nbs, up_nbs) = forward_real_adjacency(plan, graph);
     let down_deg = degrees_of(&down_nbs);
     let up_deg = degrees_of(&up_nbs);
@@ -127,40 +129,33 @@ pub fn solve_symmetry_objective(
     // Feasible start: raw BK ideal may violate separation, so its J is not
     // comparable to post-VPSC iterates (would permanently win the snapshot).
     let mut x = solve_once(n, &bk.ideal, &weights, hard)?;
+    let score = |x: &[f64]| {
+        objective_j(
+            plan,
+            x,
+            &seg_offs,
+            &hubs,
+            &down_nbs,
+            &up_nbs,
+            &down_deg,
+            &up_deg,
+            params.lambda_sym,
+        )
+    };
     let mut best = x.clone();
-    let mut best_j = objective_j(
-        plan,
-        &x,
-        &hubs,
-        &down_nbs,
-        &up_nbs,
-        &down_deg,
-        &up_deg,
-        params.lambda_sym,
-    );
+    let mut best_j = score(&x);
 
-    let k = params.symmetry_iters.max(1);
-    for _ in 0..k {
+    for _ in 0..params.symmetry_iters.max(1) {
         let mut desired = vec![0.0; n];
-        for e in 0..n {
-            desired[e] = weighted_median_desired(
-                e,
-                &x,
-                &nbs,
-                &twins,
-                &primary,
-                params,
-                &layer_pos,
-                plan,
-            );
+        for (e, slot) in desired.iter_mut().enumerate() {
+            *slot =
+                weighted_median_desired(e, &x, &nbs, &twins, &primary, params, &layer_pos, plan);
         }
         let alpha = params.lambda_sym / (1.0 + params.lambda_sym);
+        let mut iter_weights = weights.clone();
         for &h in &hubs {
             let c = center_h(&x, h, &down_nbs, &up_nbs, &down_deg, &up_deg);
             desired[h] = desired[h] * (1.0 - alpha) + c * alpha;
-        }
-        let mut iter_weights = weights.clone();
-        for &h in &hubs {
             iter_weights[h] = REAL_WEIGHT * (1.0 + params.lambda_sym);
         }
         let owner_x = desired.clone();
@@ -177,16 +172,7 @@ pub fn solve_symmetry_objective(
         );
 
         x = solve_once(n, &desired, &iter_weights, hard)?;
-        let j = objective_j(
-            plan,
-            &x,
-            &hubs,
-            &down_nbs,
-            &up_nbs,
-            &down_deg,
-            &up_deg,
-            params.lambda_sym,
-        );
+        let j = score(&x);
         if j < best_j - 1e-9 {
             best_j = j;
             best.clone_from(&x);
@@ -204,6 +190,7 @@ pub fn solve_symmetry_objective(
         &weights,
         hard,
         hard_fallback,
+        &deltas,
         &hubs,
         &down_nbs,
         &up_nbs,
@@ -297,6 +284,7 @@ fn snap_fan_pack_style(
     weights: &[f64],
     hard: &[Constraint],
     hard_fallback: &[Constraint],
+    deltas: &AlignDeltas,
     hubs: &[usize],
     down_nbs: &[Vec<usize>],
     up_nbs: &[Vec<usize>],
@@ -309,12 +297,7 @@ fn snap_fan_pack_style(
 ) -> Result<Vec<f64>, VpscError> {
     let n = plan.elems.len();
     let mut hub_order: Vec<usize> = hubs.to_vec();
-    hub_order.sort_by(|&a, &b| {
-        plan.elems[b]
-            .rank
-            .cmp(&plan.elems[a].rank)
-            .then(a.cmp(&b))
-    });
+    hub_order.sort_by(|&a, &b| plan.elems[b].rank.cmp(&plan.elems[a].rank).then(a.cmp(&b)));
 
     let mut desired = best.to_vec();
     let mut iter_weights = weights.to_vec();
@@ -323,7 +306,16 @@ fn snap_fan_pack_style(
         desired[h] = axis;
         iter_weights[h] = REAL_WEIGHT * (1.0 + params.lambda_sym) * 8.0;
         pull_spine_to_axis(
-            h, axis, plan, down_nbs, up_nbs, down_deg, up_deg, &mut desired, &mut iter_weights,
+            h,
+            axis,
+            plan,
+            deltas,
+            down_nbs,
+            up_nbs,
+            down_deg,
+            up_deg,
+            &mut desired,
+            &mut iter_weights,
         );
         for side in [
             (down_deg[h] >= 2).then_some(&down_nbs[h]),
@@ -364,7 +356,7 @@ fn snap_fan_pack_style(
         }
         for &peer in down_nbs[h].iter().chain(up_nbs[h].iter()) {
             if twins.contains(&undirected(h, peer)) || primary.contains(&undirected(h, peer)) {
-                desired[peer] = axis;
+                desired[peer] = axis + deltas.get(h, peer);
                 iter_weights[peer] = iter_weights[peer].max(1.0e6);
             }
         }
@@ -393,10 +385,9 @@ fn snap_fan_pack_style(
                         continue;
                     }
                     if (desired[leaf] - axis).abs() < 1.0 {
-                        let pitch = (params.node_gap
-                            + size_of(h).width / 2.0
-                            + size_of(leaf).width / 2.0)
-                            .max(params.node_gap);
+                        let pitch =
+                            (params.node_gap + size_of(h).width / 2.0 + size_of(leaf).width / 2.0)
+                                .max(params.node_gap);
                         desired[leaf] = axis - pitch; // long "no" prefers left
                         iter_weights[leaf] = iter_weights[leaf].max(REAL_WEIGHT * 16.0);
                     }
@@ -406,14 +397,28 @@ fn snap_fan_pack_style(
     }
     let owner_x = desired.clone();
     apply_port_anchor_desired(
-        plan, graph, ports, size_of, main, &owner_x, segs_by_edge, &mut desired, &mut iter_weights,
+        plan,
+        graph,
+        ports,
+        size_of,
+        main,
+        &owner_x,
+        segs_by_edge,
+        &mut desired,
+        &mut iter_weights,
     );
     for layer in &plan.layers {
         for &e in layer {
             if plan.elems[e].key.is_virtual() {
-                desired[e] = crate::layout::hierarchical::metric::cross_axis::exteriorize_dummy_desired(
-                    plan, size_of, params.node_gap, &desired, e, desired[e],
-                );
+                desired[e] =
+                    crate::layout::hierarchical::metric::cross_axis::exteriorize_dummy_desired(
+                        plan,
+                        size_of,
+                        params.node_gap,
+                        &desired,
+                        e,
+                        desired[e],
+                    );
             }
         }
     }
@@ -427,7 +432,16 @@ fn snap_fan_pack_style(
         desired[h] = axis;
         iter_weights[h] = REAL_WEIGHT * (1.0 + params.lambda_sym) * 8.0;
         pull_spine_to_axis(
-            h, axis, plan, down_nbs, up_nbs, down_deg, up_deg, &mut desired, &mut iter_weights,
+            h,
+            axis,
+            plan,
+            deltas,
+            down_nbs,
+            up_nbs,
+            down_deg,
+            up_deg,
+            &mut desired,
+            &mut iter_weights,
         );
         for side in [
             (down_deg[h] >= 2).then_some(&down_nbs[h]),
@@ -449,22 +463,31 @@ fn snap_fan_pack_style(
                     continue;
                 }
                 if side_has_primary && (desired[leaf] - axis).abs() < 1.0 {
-                    let pitch = (params.node_gap
-                        + size_of(h).width / 2.0
-                        + size_of(leaf).width / 2.0)
-                        .max(params.node_gap);
+                    let pitch =
+                        (params.node_gap + size_of(h).width / 2.0 + size_of(leaf).width / 2.0)
+                            .max(params.node_gap);
                     desired[leaf] = axis - pitch;
                 }
                 iter_weights[leaf] = iter_weights[leaf].max(REAL_WEIGHT * 8.0);
                 let toward_up = up_nbs[leaf].contains(&h);
                 pull_exclusive_chain(
-                    leaf, !toward_up, desired[leaf], plan, down_nbs, up_nbs, down_deg, up_deg,
-                    &mut desired, &mut iter_weights, &skip,
+                    leaf,
+                    !toward_up,
+                    desired[leaf],
+                    plan,
+                    deltas,
+                    down_nbs,
+                    up_nbs,
+                    down_deg,
+                    up_deg,
+                    &mut desired,
+                    &mut iter_weights,
+                    &skip,
                 );
             }
             for &peer in side.iter() {
                 if twins.contains(&undirected(h, peer)) || primary.contains(&undirected(h, peer)) {
-                    desired[peer] = axis;
+                    desired[peer] = axis + deltas.get(h, peer);
                     iter_weights[peer] = iter_weights[peer].max(1.0e6);
                 }
             }
@@ -472,19 +495,42 @@ fn snap_fan_pack_style(
     }
     for &h in &hub_order {
         pull_spine_to_axis(
-            h, desired[h], plan, down_nbs, up_nbs, down_deg, up_deg, &mut desired, &mut iter_weights,
+            h,
+            desired[h],
+            plan,
+            deltas,
+            down_nbs,
+            up_nbs,
+            down_deg,
+            up_deg,
+            &mut desired,
+            &mut iter_weights,
         );
     }
     let owner_x = desired.clone();
     apply_port_anchor_desired(
-        plan, graph, ports, size_of, main, &owner_x, segs_by_edge, &mut desired, &mut iter_weights,
+        plan,
+        graph,
+        ports,
+        size_of,
+        main,
+        &owner_x,
+        segs_by_edge,
+        &mut desired,
+        &mut iter_weights,
     );
     for layer in &plan.layers {
         for &e in layer {
             if plan.elems[e].key.is_virtual() {
-                desired[e] = crate::layout::hierarchical::metric::cross_axis::exteriorize_dummy_desired(
-                    plan, size_of, params.node_gap, &desired, e, desired[e],
-                );
+                desired[e] =
+                    crate::layout::hierarchical::metric::cross_axis::exteriorize_dummy_desired(
+                        plan,
+                        size_of,
+                        params.node_gap,
+                        &desired,
+                        e,
+                        desired[e],
+                    );
             }
         }
     }
@@ -701,10 +747,7 @@ fn close_slack_one_sibling_set(
                 }
             }
             if top.is_finite() {
-                y_band.insert(
-                    g.clone(),
-                    (top - GROUP_LABEL_TOP_PAD, bottom + GROUP_PAD),
-                );
+                y_band.insert(g.clone(), (top - GROUP_LABEL_TOP_PAD, bottom + GROUP_PAD));
             }
         }
     }
@@ -743,18 +786,19 @@ fn close_slack_one_sibling_set(
             // hard set reserves GROUP_FRAME_GAP, and this pass never pushes.
             let adjust = left - target;
             if adjust > 1e-6 {
-                let shift_groups: BTreeSet<String> =
-                    frames[i..].iter().map(|(name, _, _)| name.clone()).collect();
+                let shift_groups: BTreeSet<String> = frames[i..]
+                    .iter()
+                    .map(|(name, _, _)| name.clone())
+                    .collect();
                 let virt_gate = left;
                 let move_it: Vec<bool> = plan
                     .elems
                     .iter()
                     .enumerate()
                     .map(|(e_idx, elem)| match &elem.key {
-                        ElemKey::Real(_) => elem
-                            .group_path
-                            .iter()
-                            .any(|gg| shift_groups.contains(gg)),
+                        ElemKey::Real(_) => {
+                            elem.group_path.iter().any(|gg| shift_groups.contains(gg))
+                        }
                         ElemKey::GroupBoundary { group, .. } => shift_groups.contains(group),
                         // Partition clamps never join a group-frame slide;
                         // the post-solve partition snap re-seats them on
@@ -783,10 +827,7 @@ fn close_slack_one_sibling_set(
                     }
                     let rank = elem.rank;
                     // The one shifting-set group this mover belongs to.
-                    let mover_group = elem
-                        .group_path
-                        .iter()
-                        .find(|gg| shift_groups.contains(*gg));
+                    let mover_group = elem.group_path.iter().find(|gg| shift_groups.contains(*gg));
                     // Mover surface: left edge of its (moving) frame on this
                     // rank, else its own left edge.
                     let mut e_surface = cross[e_idx] - size_of(e_idx).width / 2.0;
@@ -796,7 +837,14 @@ fn close_slack_one_sibling_set(
                             continue;
                         }
                         if let Some(lo) = group_rank_edge(
-                            gg, false, rank, group_path, group_members, plan, size_of, cross,
+                            gg,
+                            false,
+                            rank,
+                            group_path,
+                            group_members,
+                            plan,
+                            size_of,
+                            cross,
                         ) {
                             e_surface = e_surface.min(lo);
                             e_framed = true;
@@ -867,7 +915,14 @@ fn close_slack_one_sibling_set(
                                 continue;
                             }
                             if let Some(hi) = group_rank_edge(
-                                gg, true, rank, group_path, group_members, plan, size_of, cross,
+                                gg,
+                                true,
+                                rank,
+                                group_path,
+                                group_members,
+                                plan,
+                                size_of,
+                                cross,
                             ) {
                                 o_surface = o_surface.max(hi);
                                 o_framed = true;
@@ -901,9 +956,10 @@ fn close_slack_one_sibling_set(
                     // descendants travel rigidly with the movers, so later
                     // clamps must see the new edges.
                     for (g, (lo, hi)) in drawn.iter_mut() {
-                        if group_path.get(g.as_str()).is_some_and(|p| {
-                            p.iter().any(|gg| shift_groups.contains(gg))
-                        }) {
+                        if group_path
+                            .get(g.as_str())
+                            .is_some_and(|p| p.iter().any(|gg| shift_groups.contains(gg)))
+                        {
                             *lo -= max_ok;
                             *hi -= max_ok;
                         }
@@ -968,7 +1024,14 @@ fn group_rank_edge(
             continue;
         }
         if let Some(child_edge) = group_rank_edge(
-            child, side_right, rank, group_path, group_members, plan, size_of, cross,
+            child,
+            side_right,
+            rank,
+            group_path,
+            group_members,
+            plan,
+            size_of,
+            cross,
         ) {
             let padded = if side_right {
                 child_edge + GROUP_PAD
@@ -1005,7 +1068,9 @@ fn solve_or_fallback(
 ) -> Result<Vec<f64>, VpscError> {
     match solve_once(n, desired, weights, hard) {
         Ok(v) => Ok(v),
-        Err(VpscError::Infeasible { .. }) if !std::ptr::eq(hard.as_ptr(), hard_fallback.as_ptr()) => {
+        Err(VpscError::Infeasible { .. })
+            if !std::ptr::eq(hard.as_ptr(), hard_fallback.as_ptr()) =>
+        {
             solve_once(n, desired, weights, hard_fallback)
         }
         Err(e) => Err(e),
@@ -1023,7 +1088,9 @@ fn vpsc_weights(plan: &PlanGraph, graph: &RealGraph) -> Vec<f64> {
             ElemKey::Virtual { edge_id, .. } => {
                 VIRTUAL_WEIGHT * weights.get(edge_id.as_str()).copied().unwrap_or(1.0)
             }
-            ElemKey::GroupBoundary { .. } | ElemKey::PartitionBoundary { .. } | ElemKey::OrderPad { .. } => 4.0,
+            ElemKey::GroupBoundary { .. }
+            | ElemKey::PartitionBoundary { .. }
+            | ElemKey::OrderPad { .. } => 4.0,
             ElemKey::Real(_) => REAL_WEIGHT,
         })
         .collect()
@@ -1101,12 +1168,10 @@ fn hard_constraints(
         // minimum strip for its title.
         for rank in 0..plan.layers.len() {
             for pair in bands.columns.windows(2) {
-                let Some(r) = bands.clamp(plan, &pair[0], rank as u32, BoundarySide::Right)
-                else {
+                let Some(r) = bands.clamp(plan, &pair[0], rank as u32, BoundarySide::Right) else {
                     continue;
                 };
-                let Some(l) = bands.clamp(plan, &pair[1], rank as u32, BoundarySide::Left)
-                else {
+                let Some(l) = bands.clamp(plan, &pair[1], rank as u32, BoundarySide::Left) else {
                     continue;
                 };
                 constraints.push(Constraint::new(r, l, bands.gap));
@@ -1157,10 +1222,110 @@ fn boundary_related(a: &Elem, b: &Elem) -> bool {
     is_prefix(&a.group_path, &b.group_path) || is_prefix(&b.group_path, &a.group_path)
 }
 
-/// Neighbor list entry: (neighbor, base edge weight 1/2/8, author weight).
-type Nb = (usize, f64, f64);
+/// Cross-axis distance from an element center to the port an edge uses on it.
+///
+/// A segment is straight when the two **ports** share x, not when the two node
+/// centers do — a node carrying several ports on one face must pay the offset
+/// with its own center. Only N/S faces shift x; an E/W port leaves sideways, so
+/// there is no x to straighten and the offset stays 0.
+fn port_offsets(
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    ports: &BTreeMap<String, EdgePorts>,
+    size_of: &dyn Fn(usize) -> Size,
+) -> BTreeMap<(String, usize), f64> {
+    use plotgram_algo::orientation::Side;
+    use plotgram_model::port::AlongSpec;
 
-fn segment_neighbors(plan: &PlanGraph, graph: &RealGraph) -> Vec<Vec<Nb>> {
+    let mut out = BTreeMap::new();
+    for e in &graph.edges {
+        let Some(rp) = ports.get(&e.edge_id) else {
+            continue;
+        };
+        for (real_idx, port) in [
+            (e.original_source, rp.source),
+            (e.original_target, rp.target),
+        ] {
+            if !matches!(port.side, Side::North | Side::South) {
+                continue;
+            }
+            let AlongSpec::Ordered { order, count } = port.along else {
+                continue;
+            };
+            let Some(&elem) = plan
+                .index_of
+                .get(&ElemKey::Real(graph.ids[real_idx].clone()))
+            else {
+                continue;
+            };
+            let t = (order as f64 + 1.0) / (count as f64 + 1.0);
+            out.insert((e.edge_id.clone(), elem), (t - 0.5) * size_of(elem).width);
+        }
+    }
+    out
+}
+
+/// Per-segment `(from, to)` port offsets, parallel to `plan.segments`.
+fn segment_port_offsets(
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    ports: &BTreeMap<String, EdgePorts>,
+    size_of: &dyn Fn(usize) -> Size,
+) -> Vec<(f64, f64)> {
+    let ends = port_offsets(plan, graph, ports, size_of);
+    plan.segments
+        .iter()
+        .map(|s| {
+            let at = |elem: usize| ends.get(&(s.edge_id.clone(), elem)).copied().unwrap_or(0.0);
+            (at(s.from), at(s.to))
+        })
+        .collect()
+}
+
+/// Cross-axis shift that makes a segment's two **ports** collinear:
+/// `x_to = x_from + get(from, to)`.
+///
+/// Pairs joined by several segments (twin corridors) have no single answer and
+/// stay 0 — PortLane owns those faces.
+pub(crate) struct AlignDeltas(BTreeMap<(usize, usize), f64>);
+
+impl AlignDeltas {
+    fn build(plan: &PlanGraph, seg_offs: &[(f64, f64)]) -> Self {
+        let mut count: BTreeMap<(usize, usize), usize> = BTreeMap::new();
+        let mut delta: BTreeMap<(usize, usize), f64> = BTreeMap::new();
+        for (i, s) in plan.segments.iter().enumerate() {
+            if s.edge_id.starts_with("gb:") || s.edge_id.starts_with("pb:") {
+                continue;
+            }
+            let key = undirected(s.from, s.to);
+            *count.entry(key).or_insert(0) += 1;
+            let (off_from, off_to) = seg_offs[i];
+            let low_to_high = if s.from <= s.to {
+                off_from - off_to
+            } else {
+                off_to - off_from
+            };
+            delta.insert(key, low_to_high);
+        }
+        delta.retain(|k, v| count[k] == 1 && v.abs() > 1e-9);
+        Self(delta)
+    }
+
+    fn get(&self, from: usize, to: usize) -> f64 {
+        let v = self.0.get(&undirected(from, to)).copied().unwrap_or(0.0);
+        if from <= to {
+            v
+        } else {
+            -v
+        }
+    }
+}
+
+/// Neighbor list entry: (neighbor, base edge weight 1/2/8, author weight,
+/// `delta` = the shift this element needs so both ports of the segment align).
+type Nb = (usize, f64, f64, f64);
+
+fn segment_neighbors(plan: &PlanGraph, graph: &RealGraph, seg_offs: &[(f64, f64)]) -> Vec<Vec<Nb>> {
     let weights: BTreeMap<&str, f64> = graph
         .edges
         .iter()
@@ -1168,14 +1333,15 @@ fn segment_neighbors(plan: &PlanGraph, graph: &RealGraph) -> Vec<Vec<Nb>> {
         .collect();
     let n = plan.elems.len();
     let mut out = vec![Vec::new(); n];
-    for s in &plan.segments {
+    for (i, s) in plan.segments.iter().enumerate() {
         if s.edge_id.starts_with("gb:") || s.edge_id.starts_with("pb:") {
             continue;
         }
         let base = edge_weight_base(&plan.elems[s.from], &plan.elems[s.to]);
         let w = weights.get(s.edge_id.as_str()).copied().unwrap_or(1.0);
-        out[s.from].push((s.to, base, w));
-        out[s.to].push((s.from, base, w));
+        let (off_from, off_to) = seg_offs[i];
+        out[s.from].push((s.to, base, w, off_to - off_from));
+        out[s.to].push((s.from, base, w, off_from - off_to));
     }
     out
 }
@@ -1256,9 +1422,9 @@ fn weighted_median_desired(
     plan: &PlanGraph,
 ) -> f64 {
     let mut weighted: Vec<(f64, f64, usize)> = Vec::new();
-    for &(nb, base, w) in &nbs[e] {
+    for &(nb, base, w, delta) in &nbs[e] {
         let dw = desired_weight(e, nb, base, w, twins, primary, params);
-        weighted.push((x[nb], dw, nb));
+        weighted.push((x[nb] + delta, dw, nb));
     }
     if weighted.is_empty() {
         return x[e];
@@ -1307,9 +1473,11 @@ fn center_h(
     parts.iter().sum::<f64>() / parts.len() as f64
 }
 
+#[allow(clippy::too_many_arguments)]
 fn objective_j(
     plan: &PlanGraph,
     x: &[f64],
+    seg_offs: &[(f64, f64)],
     hubs: &[usize],
     down_nbs: &[Vec<usize>],
     up_nbs: &[Vec<usize>],
@@ -1318,12 +1486,13 @@ fn objective_j(
     lambda_sym: f64,
 ) -> f64 {
     let mut j = 0.0;
-    for s in &plan.segments {
+    for (i, s) in plan.segments.iter().enumerate() {
         if s.edge_id.starts_with("gb:") || s.edge_id.starts_with("pb:") {
             continue;
         }
         let w = edge_weight_base(&plan.elems[s.from], &plan.elems[s.to]);
-        j += w * (x[s.from] - x[s.to]).abs();
+        let (off_from, off_to) = seg_offs[i];
+        j += w * ((x[s.from] + off_from) - (x[s.to] + off_to)).abs();
     }
     for &h in hubs {
         let c = center_h(x, h, down_nbs, up_nbs, down_deg, up_deg);
@@ -1333,11 +1502,13 @@ fn objective_j(
 }
 
 /// Pull exclusive 1:1 real spines onto `axis` (replaces RigidColumnClass walk).
+#[allow(clippy::too_many_arguments)]
 fn pull_exclusive_chain(
     start: usize,
     toward_up: bool,
     axis: f64,
     plan: &PlanGraph,
+    deltas: &AlignDeltas,
     down_nbs: &[Vec<usize>],
     up_nbs: &[Vec<usize>],
     down_deg: &[usize],
@@ -1347,6 +1518,9 @@ fn pull_exclusive_chain(
     skip: &BTreeSet<usize>,
 ) {
     let mut cur = start;
+    // The axis is a port column, not a center column: each hop shifts it by the
+    // two ports' offsets so the spine stays straight through multi-port faces.
+    let mut axis = axis;
     loop {
         let nbs = if toward_up {
             &up_nbs[cur]
@@ -1366,7 +1540,7 @@ fn pull_exclusive_chain(
         if down_deg[next] >= 2 || up_deg[next] >= 2 {
             // Absorb unique parent fan hub (ticket-triage handle above resolve_gate).
             if toward_up && up_nbs[cur].len() == 1 && down_deg[next] == 1 {
-                desired[next] = axis;
+                desired[next] = axis + deltas.get(cur, next);
                 weights[next] = weights[next].max(REAL_WEIGHT * 32.0);
             }
             break;
@@ -1375,16 +1549,19 @@ fn pull_exclusive_chain(
         if deg > 2 {
             break;
         }
+        axis += deltas.get(cur, next);
         desired[next] = axis;
         weights[next] = weights[next].max(REAL_WEIGHT * 8.0);
         cur = next;
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn pull_spine_to_axis(
     hub: usize,
     axis: f64,
     plan: &PlanGraph,
+    deltas: &AlignDeltas,
     down_nbs: &[Vec<usize>],
     up_nbs: &[Vec<usize>],
     down_deg: &[usize],
@@ -1395,17 +1572,8 @@ fn pull_spine_to_axis(
     let skip = BTreeSet::new();
     for toward_up in [true, false] {
         pull_exclusive_chain(
-            hub,
-            toward_up,
-            axis,
-            plan,
-            down_nbs,
-            up_nbs,
-            down_deg,
-            up_deg,
-            desired,
-            weights,
-            &skip,
+            hub, toward_up, axis, plan, deltas, down_nbs, up_nbs, down_deg, up_deg, desired,
+            weights, &skip,
         );
     }
 }
@@ -1456,7 +1624,6 @@ fn apply_port_anchor_desired(
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -1611,7 +1778,14 @@ mod tests {
         // (mirrors `elem_size`), so the layer-separation chain does not
         // invent width-based extras on top of the band constraints.
         let size_of = |i: usize| {
-            Size::new(if plan.elems[i].key.is_zero_width() { 0.0 } else { 10.0 }, 10.0)
+            Size::new(
+                if plan.elems[i].key.is_zero_width() {
+                    0.0
+                } else {
+                    10.0
+                },
+                10.0,
+            )
         };
         let constraints = hard_constraints(
             &plan,

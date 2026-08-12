@@ -3,7 +3,7 @@
 > 父页：[architecture](../architecture.md) §7 · 视觉裁定：[expectations §6.2](../expectations.md)  
 > 上游：节点 frames（cross + main prelim）· Compose `Ordered`  
 > 下游：TrackOrder / Ink（只读展开后的 `AlongSpec`）  
-> 状态：**一期已落地**（双胞胎 N/S 走廊对齐 + 触及脸级绝对 along；无全局 grid）
+> 状态：**二期已落地**（一期双胞胎走廊 + §7 共享脸端口对齐；无全局 grid）
 
 ## 1. 要解决什么
 
@@ -73,3 +73,40 @@ Compose Ordered（相对序）
 | 开关 | 无（双胞胎走廊默认开） | 产品级 gridSpacing |
 | 范围 | 对齐列 + 触及脸绝对 along | 节点参考点 + 端口贴网 |
 | yFiles 对照 | PortAlignmentIds | ON_GRID / ON_SUBGRID |
+
+## 7. 二期 · 共享脸的端口对齐
+
+一期只处理双胞胎走廊。但同样的错位出现在任何**共享脸**上：cross 轴解完之后，两端各自的槽位是按脸宽均分的，与伙伴那一端落在哪一列无关，于是差个十几像素就要在两端各补一折。yFiles 的端口恒在均分槽（导出的 `Ratio` 是 `(2k+1)/2n`），它靠挪节点消掉这段差；我们的层常被压在 `node_gap` 下限上，节点挪不动，只能由脸来吸收。
+
+**写权不变**：Compose 仍独占 side 与相对序，本步只重排**绝对偏移**——它本来就是 PortLane 的自由度。
+
+### 7.1 单元是槽，不是端
+
+同一 `Ordered` 槽上的多个端共用一个 port point（`auto_edge_grouping` 的总线），必须整体移动。投影按槽做，槽内取成员目标的中位数。
+
+### 7.2 只动已经共享的脸
+
+**单槽脸不动**。那一个端口的列就是节点自己的列，属 cross 轴写者；为省一折把它滑到框角，换来的是箭头扎在盒子角上（`smoke.fan-out-four` 上可复现）。只有已经被多个槽瓜分的脸——槽位本就是任意的——才归 PortLane 重排。
+
+### 7.3 目标与投影
+
+每个槽的目标：
+
+```text
+长边端 → 自己 dummy 主干的列（已定，Fixed）
+短边端 → 与伙伴端的中点（Peer；伙伴若在冻结脸上则直接取伙伴列）
+无伙伴 → 保持当前均分槽
+```
+
+投影 = 把目标序列压回「Compose 序 + 槽距 ≥ port_pitch + 落在脸内」，用 PAVA。**池化值取中位数而非均值**：同脸两端不能同时到位时，最小二乘各让一半，两条边都留下亚像素抖动、各自还是两折；中位数至少让其中一条精确对齐。
+
+脸之间通过边耦合，所以单趟不是不动点；扫到收敛（位移 < 1e-9）。
+
+### 7.4 二期验收
+
+- `flat/mech.layout-styles`：`sum_bends 66 → 58`、`max_bends 4 → 2`；
+- 全 showcase：`Σsum_bends −283`、`Σcrossings −49`，无单点回归；
+- `auto_edge_grouping` 总线仍共享一个 port point；
+- `smoke.fan-out-four` 的嵌套横杠不塌。
+
+**仍未闭合**：两端都是单槽脸、中心差十几像素的短边（`mech` 里 e3 / e9 一类）。脸上没有可动的自由度，只能靠节点列——而那要求层不被压在 `node_gap` 下限上。归 cross 轴，见 [coordinate-and-demand §8.1](coordinate-and-demand.md)。

@@ -15,9 +15,15 @@ use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::port::AlongSpec;
 
 use crate::layout::hierarchical::compose::ports::EdgePorts;
-use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealGraph};
+use crate::layout::hierarchical::metric::anchor::port_anchor;
+use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealEdge, RealGraph};
 
 const PORT_MARGIN: f64 = 0.0;
+
+/// Fixed-point budget for the N/S port alignment sweep, and the movement below
+/// which the sweep is considered settled.
+const PORT_ALIGN_ROUNDS: usize = 512;
+const PORT_ALIGN_EPS: f64 = 1e-9;
 
 #[derive(Clone, Debug)]
 struct FaceEnd {
@@ -150,8 +156,273 @@ pub fn apply_port_lanes(
             }
         }
     }
+
+    align_ns_ports(plan, graph, ports, frames, port_pitch, &touched);
 }
 
+/// Slide every Ordered N/S port inside its own face toward the column its
+/// partner end already occupies.
+///
+/// Node centers are owned by the cross-axis solve and are frozen by the time we
+/// get here; what is left is a sub-node-width misalignment that costs a jog at
+/// each end. The face has the room to absorb it — a port only has to stay in
+/// Compose order and keep `pitch` from its neighbors, both hard here. An end
+/// with nothing to align to keeps its canonical even slot.
+///
+/// Faces the twin-corridor pass already wrote are skipped whole: a shared lane
+/// is a stronger statement than per-edge alignment, and re-projecting the face
+/// would let a neighbouring end push the twin columns apart again.
+fn align_ns_ports(
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    ports: &mut BTreeMap<String, EdgePorts>,
+    frames: &[Rect],
+    pitch: f64,
+    corridor_faces: &BTreeSet<(usize, Side)>,
+) {
+    let all_faces: BTreeMap<(usize, Side), Vec<FaceEnd>> = build_face_ends(plan, graph, ports)
+        .into_iter()
+        .filter(|(face, _)| is_ns(face.1))
+        .collect();
+    // Corridor faces still contribute their columns as fixed targets — a twin
+    // lane is exactly the kind of settled column a free end wants to meet.
+    //
+    // A face carrying a single end is left alone: that port's column *is* the
+    // node's column, which belongs to the cross-axis solve. Sliding it would
+    // put the arrow head in a corner of the box to save a bend. Only a face
+    // that is already shared — where the slots are arbitrary to begin with —
+    // is PortLane's to redistribute.
+    //
+    // The unit is the Compose slot, not the end: a bundled fan shares one
+    // `Ordered` slot and therefore one port point, and must move as one.
+    let faces: BTreeMap<(usize, Side), Vec<Vec<FaceEnd>>> = all_faces
+        .iter()
+        .filter(|(face, _)| !corridor_faces.contains(face))
+        .map(|(face, ends)| (*face, slot_groups(ends)))
+        .filter(|(_, slots)| slots.len() >= 2)
+        .collect();
+    if faces.is_empty() {
+        return;
+    }
+
+    let frozen: BTreeSet<(String, bool)> = all_faces
+        .iter()
+        .filter(|(face, _)| !faces.contains_key(face))
+        .flat_map(|(_, ends)| ends.iter().map(|e| (e.edge_id.clone(), e.is_source)))
+        .collect();
+
+    let anchors = partner_anchors(plan, graph, ports, frames);
+    let mut at: BTreeMap<(String, bool), f64> = BTreeMap::new();
+    for (&(elem, _), ends) in &all_faces {
+        for end in ends {
+            let Some(ep) = ports.get(&end.edge_id) else {
+                continue;
+            };
+            let port = if end.is_source { ep.source } else { ep.target };
+            at.insert(
+                (end.edge_id.clone(), end.is_source),
+                port_anchor(frames[elem], port).x,
+            );
+        }
+    }
+
+    // One projection is not a fixed point: faces couple through their edges, so
+    // a face that moves re-targets its neighbours. Each round is a contraction;
+    // run to a fixed point, because a residue of even half a pixel still costs
+    // the edge two bends.
+    for _ in 0..PORT_ALIGN_ROUNDS {
+        let prev = at.clone();
+        for (&(elem, _), slots) in &faces {
+            let frame = &frames[elem];
+            let targets: Vec<f64> = slots
+                .iter()
+                .map(|slot| {
+                    let wants: Vec<f64> = slot
+                        .iter()
+                        .map(|end| {
+                            let key = (end.edge_id.clone(), end.is_source);
+                            let here = prev[&key];
+                            match anchors.get(&key) {
+                                Some(PartnerAnchor::Fixed(x)) => *x,
+                                Some(PartnerAnchor::Peer(peer)) => match prev.get(peer) {
+                                    // A frozen peer will not come to meet us, so
+                                    // go all the way; otherwise both ends aim at
+                                    // the midpoint — chasing the partner's last
+                                    // position just swaps them.
+                                    Some(&x) if frozen.contains(peer) => x,
+                                    Some(&x) => 0.5 * (here + x),
+                                    None => here,
+                                },
+                                None => here,
+                            }
+                        })
+                        .collect();
+                    median(&wants)
+                })
+                .collect();
+            let placed = project_ordered(&targets, pitch, frame.x, frame.right());
+            for (slot, x) in slots.iter().zip(placed) {
+                for end in slot {
+                    at.insert((end.edge_id.clone(), end.is_source), x);
+                }
+            }
+        }
+        let moved = at
+            .iter()
+            .map(|(k, x)| (x - prev[k]).abs())
+            .fold(0.0f64, f64::max);
+        if moved < PORT_ALIGN_EPS {
+            break;
+        }
+    }
+
+    for (&(elem, side), slots) in &faces {
+        for end in slots.iter().flatten() {
+            let Some(&x) = at.get(&(end.edge_id.clone(), end.is_source)) else {
+                continue;
+            };
+            let along = local_on_side(&frames[elem], side, x);
+            let Some(ep) = ports.get_mut(&end.edge_id) else {
+                continue;
+            };
+            if end.is_source {
+                ep.source.along = along;
+            } else {
+                ep.target.along = along;
+            }
+        }
+    }
+}
+
+/// Split a face's ends (already in Compose order) into slots: ends sharing an
+/// `Ordered` index share one port point and stay together.
+fn slot_groups(ends: &[FaceEnd]) -> Vec<Vec<FaceEnd>> {
+    let mut out: Vec<Vec<FaceEnd>> = Vec::new();
+    for end in ends {
+        match out.last_mut() {
+            Some(slot) if slot[0].order == end.order => slot.push(end.clone()),
+            _ => out.push(vec![end.clone()]),
+        }
+    }
+    out
+}
+
+/// What an end aligns to: a frozen column (its long edge's dummy trunk) or the
+/// other end of a rank-adjacent edge, which is still moving.
+enum PartnerAnchor {
+    Fixed(f64),
+    Peer((String, bool)),
+}
+
+fn partner_anchors(
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    ports: &BTreeMap<String, EdgePorts>,
+    frames: &[Rect],
+) -> BTreeMap<(String, bool), PartnerAnchor> {
+    let segs_by_edge = plan.segments_by_edge();
+    let mut out = BTreeMap::new();
+    for e in &graph.edges {
+        let Some(ep) = ports.get(&e.edge_id) else {
+            continue;
+        };
+        let Some((src, tgt)) = endpoint_elems_direct(plan, graph, e) else {
+            continue;
+        };
+        if src == tgt {
+            continue;
+        }
+        let Some(segs) = segs_by_edge.get(&e.edge_id) else {
+            continue;
+        };
+        for (elem, is_source, peer_side) in
+            [(src, true, ep.target.side), (tgt, false, ep.source.side)]
+        {
+            // The trunk column wins when the edge has one: it is already placed
+            // and every other end on this face is negotiating against it.
+            let trunk = segs
+                .iter()
+                .map(|&i| &plan.segments[i])
+                .find(|s| s.from == elem || s.to == elem)
+                .map(|s| if s.from == elem { s.to } else { s.from })
+                .filter(|&nb| plan.elems[nb].key.is_virtual())
+                .map(|nb| frames[nb].x + frames[nb].width / 2.0);
+            let anchor = match trunk {
+                Some(x) => PartnerAnchor::Fixed(x),
+                None if is_ns(peer_side) => PartnerAnchor::Peer((e.edge_id.clone(), !is_source)),
+                None => continue,
+            };
+            out.insert((e.edge_id.clone(), is_source), anchor);
+        }
+    }
+    out
+}
+
+fn endpoint_elems_direct(
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    edge: &RealEdge,
+) -> Option<(usize, usize)> {
+    let src = *plan
+        .index_of
+        .get(&ElemKey::Real(graph.ids[edge.original_source].clone()))?;
+    let tgt = *plan
+        .index_of
+        .get(&ElemKey::Real(graph.ids[edge.original_target].clone()))?;
+    Some((src, tgt))
+}
+
+/// L1 projection of `targets` onto `x[i] + pitch ≤ x[i+1]` inside `[lo, hi]` —
+/// pool-adjacent-violators on the pitch-shifted sequence.
+///
+/// The pooled value is the median, not the mean: when two ends of one face
+/// cannot both reach their partner, least squares splits the difference and
+/// leaves *both* edges with a sub-pixel jog, which still costs two bends each.
+/// The median hands one of them exact alignment.
+fn project_ordered(targets: &[f64], pitch: f64, lo: f64, hi: f64) -> Vec<f64> {
+    let n = targets.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    if (n as f64 - 1.0) * pitch > hi - lo {
+        // No room for the pitch: fall back to the canonical even slots.
+        return (0..n)
+            .map(|i| lo + (i as f64 + 1.0) / (n as f64 + 1.0) * (hi - lo))
+            .collect();
+    }
+
+    let mut blocks: Vec<Vec<f64>> = Vec::with_capacity(n);
+    for (i, &t) in targets.iter().enumerate() {
+        blocks.push(vec![t.clamp(lo, hi) - i as f64 * pitch]);
+        while blocks.len() >= 2 {
+            let last = median(&blocks[blocks.len() - 1]);
+            let prev = median(&blocks[blocks.len() - 2]);
+            if prev <= last {
+                break;
+            }
+            let merged = blocks.pop().unwrap();
+            blocks.last_mut().unwrap().extend(merged);
+        }
+    }
+
+    let mut out: Vec<f64> = Vec::with_capacity(n);
+    for block in &blocks {
+        let v = median(block);
+        for _ in 0..block.len() {
+            out.push(v + out.len() as f64 * pitch);
+        }
+    }
+    // The pooled run is rigid, so fitting it inside the face is a plain shift.
+    let shift = (lo - out[0]).max(0.0) + (hi - out[n - 1]).min(0.0);
+    out.iter().map(|x| x + shift).collect()
+}
+
+/// Lower median — deterministic, and it lands on an actual target.
+fn median(values: &[f64]) -> f64 {
+    let mut v = values.to_vec();
+    v.sort_by(f64::total_cmp);
+    v[(v.len() - 1) / 2]
+}
 
 fn pack_face_absolute(
     ends: &[FaceEnd],
@@ -187,7 +458,10 @@ fn pack_face_absolute(
     }
 
     let i_min = *corr_idx.iter().min().unwrap();
-    let block_lo = corr_idx.iter().map(|&i| abs_x[i]).fold(f64::INFINITY, f64::min);
+    let block_lo = corr_idx
+        .iter()
+        .map(|&i| abs_x[i])
+        .fold(f64::INFINITY, f64::min);
     let block_hi = corr_idx
         .iter()
         .map(|&i| abs_x[i])
@@ -307,16 +581,22 @@ fn build_face_ends(
         else {
             continue;
         };
-        faces.entry((src, ep.source.side)).or_default().push(FaceEnd {
-            edge_id: e.edge_id.clone(),
-            is_source: true,
-            order: ordered_order(ep.source.along),
-        });
-        faces.entry((tgt, ep.target.side)).or_default().push(FaceEnd {
-            edge_id: e.edge_id.clone(),
-            is_source: false,
-            order: ordered_order(ep.target.along),
-        });
+        faces
+            .entry((src, ep.source.side))
+            .or_default()
+            .push(FaceEnd {
+                edge_id: e.edge_id.clone(),
+                is_source: true,
+                order: ordered_order(ep.source.along),
+            });
+        faces
+            .entry((tgt, ep.target.side))
+            .or_default()
+            .push(FaceEnd {
+                edge_id: e.edge_id.clone(),
+                is_source: false,
+                order: ordered_order(ep.target.along),
+            });
     }
     for ends in faces.values_mut() {
         ends.sort_by(|a, b| a.order.cmp(&b.order).then(a.edge_id.cmp(&b.edge_id)));
@@ -389,10 +669,7 @@ fn local_on_side(frame: &Rect, side: Side, lane_x: f64) -> AlongSpec {
         Side::South => frame.height,
         Side::West | Side::East => frame.height / 2.0,
     };
-    AlongSpec::LocalOffset(Point {
-        x: x - frame.x,
-        y,
-    })
+    AlongSpec::LocalOffset(Point { x: x - frame.x, y })
 }
 
 #[cfg(test)]
@@ -429,7 +706,7 @@ mod tests {
                 to: 1,
             }],
             layers: vec![vec![0], vec![1]],
-                    ..Default::default()
+            ..Default::default()
         };
         let graph = RealGraph {
             ids: vec!["client".into(), "api".into()],
@@ -554,7 +831,7 @@ mod tests {
             decl_index: vec![0, 1, 2],
             segments: vec![],
             layers: vec![vec![0], vec![1, 2]],
-                    ..Default::default()
+            ..Default::default()
         };
         let graph = RealGraph {
             ids: vec!["hub".into(), "twin".into(), "leaf".into()],
