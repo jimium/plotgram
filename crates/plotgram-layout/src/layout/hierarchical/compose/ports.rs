@@ -11,9 +11,9 @@
 //! - every tier resolves to a canonical `ResolvedPort` whose `along` is
 //!   expanded to pixels only by Metric (`metric/anchor.rs`) — never here.
 //!
-//! Ordered slot order within a (node, side) group: opposite endpoint's
-//! `(neighbor_rank, neighbor_order, EdgeId)` (ports-and-channel.md §2
-//! step 4).
+//! Ordered slot order within a (node, side) group: the adjacent-rank
+//! neighbor's `(layer_order, rank, EdgeId)` — dummy included. Far-real
+//! `layer_order` is incommensurable across ranks (ports-and-channel.md §2).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -398,7 +398,7 @@ struct EndPoint {
     is_source_end: bool,
     node_real: usize,
     side: Side,
-    sort_key: (usize, u32, String), // (far_real_layer_order, far_real_rank, edge_id)
+    sort_key: (usize, u32, String), // (adj_layer_order, adj_rank, edge_id)
 }
 
 /// Author FIXED_SIDE → canonical side. FREE is handled by the caller.
@@ -438,15 +438,6 @@ pub fn assign_ports(
         ] {
             let node_real = real_idx_of(node_id);
             let neighbor = immediate_neighbor(plan, &e.edge_id, node_real);
-            let sort_peer = match &plan.elems[neighbor].key {
-                ElemKey::Real(_) => neighbor,
-                ElemKey::Virtual { edge_id, .. } => {
-                    far_real_endpoint(plan, edge_id, node_real).unwrap_or(neighbor)
-                }
-                ElemKey::GroupBoundary { .. }
-                | ElemKey::PartitionBoundary { .. }
-                | ElemKey::OrderPad { .. } => neighbor,
-            };
             let real_idx = graph.index_of[node_id];
             let shape = graph.shapes[real_idx];
             let policy = policy_for(shape);
@@ -477,10 +468,14 @@ pub fn assign_ports(
                 is_source_end,
                 node_real,
                 side,
-                // Far-real layer order first so long-edge dummies cannot invert fan ports.
+                // Adjacent-rank order, dummy included. Far-real layer_order
+                // parked mech e29 leftmost on n11 (n14 is 1/2 on L7, n13 is
+                // 5/8 on L5); P4 then anchored the backedge corridor to the
+                // left slot and n13 could not sit under n11. Dummy-vs-leaf
+                // inversion on the next rank is P3's to sift, not P7's to lie.
                 sort_key: (
-                    pos.get(sort_peer).copied().unwrap_or(0),
-                    plan.elems[sort_peer].rank,
+                    pos.get(neighbor).copied().unwrap_or(0),
+                    plan.elems[neighbor].rank,
                     e.edge_id.clone(),
                 ),
             });
@@ -1579,12 +1574,12 @@ mod tests {
         assert_eq!(ports["e0"].target.side, Side::North);
     }
 
-    /// Long-edge dummy order must not invert fan Ordered vs far-real leaf order.
+    /// Slot order follows the adjacent rank, dummy included. Far-real
+    /// layer_order is not a substitute: it is incommensurable across ranks.
     #[test]
-    fn fan_ordered_sort_follows_far_real_not_dummy() {
-        // hub → near (adj); hub → far (long). Layer1: [dummy_far, near] so dummy
-        // is left of near; far sits rightmost on rank2. Immediate-neighbor sort
-        // would put far edge left; far-real sort keeps near left of far.
+    fn fan_ordered_sort_follows_adjacent_rank() {
+        // hub → near (adj); hub → far (long). Layer1: [dummy_far, near].
+        // The far edge's first hop is left of near, so its hub port is left.
         let ids: Vec<String> = vec!["hub".into(), "near".into(), "far".into(), "pad".into()];
         let index_of = ids
             .iter()
@@ -1693,8 +1688,8 @@ mod tests {
         let (o_near, _) = ordered(ports["e_near"].source);
         let (o_far, _) = ordered(ports["e_far"].source);
         assert!(
-            o_near < o_far,
-            "near (far-real order 0 on its side of compare) must be left of far; got near={o_near} far={o_far}"
+            o_far < o_near,
+            "dummy_far is left of near on the adjacent rank, so e_far is left; got far={o_far} near={o_near}"
         );
     }
 }

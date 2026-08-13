@@ -42,7 +42,7 @@ Compose 写 `along_spec`；Metric 写导出的 `PortPoint`。
    - 无 twin 短回边 → E/W；FixedSide 尊守。  
    **E/W 极性**（两端同写）：取两 real 端中 rank 更大者为 tip；比较两端在**各自层内非零宽节点**上的归一化左右位置（单节点层视为 0.5），tip 更右 → East，更左 → West，同侧则按 tip 半区（≥0.5 East）。禁止用原始 `order` 跨层宽直接比大小。正向边一律走 rank 方向（N/S），不另开侧廊特判。
 4. 平局按固定 Side 顺序；
-5. 同侧边按对侧**远真实端** `(layer_order, rank, EdgeId)` 排序（immediate neighbor 为 long-edge dummy 时不得用 dummy 的 layer order，避免扇出左右交叉）；
+5. 同侧边按**邻层邻接元** `(layer_order, rank, EdgeId)` 排序（含 long-edge dummy）。远真实端的 `layer_order` 跨层不可比，会把回边槽倒到最左（mech n11 的 e29），P4 再把廊锚在错槽上。邻层 dummy 与短边叶左右反了，是 P3 整链 sift 的事，不在 P7 用远真实端撒谎。
 6. edge_group / port_group 先折叠成一个端口单位，再分 slot；
 7. 映射回 original source/target 后写 Plan。
 

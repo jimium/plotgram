@@ -168,9 +168,8 @@ pub fn apply_port_lanes(
 /// get here; what is left is a sub-node-width misalignment that costs a jog at
 /// each end. Twin faces keep Compose order (expectations §6.2). On other
 /// shared faces the along order follows the partner column — dummy trunk, or
-/// the peer node's center — because Compose's far-real `layer_order` is a
-/// raw index and incommensurable across layers (mech n11: e29 leftmost on a
-/// 2-node rank, reverse vertical then crossed by every left-going out-edge).
+/// the peer node's center — because a residue of Compose/P4 disagreement
+/// still costs a jog. Twin faces keep Compose order (expectations §6.2).
 /// PAVA still enforces pitch and the yFiles inward band in that order. An end with
 /// nothing to align to keeps its canonical even slot.
 ///
@@ -424,9 +423,10 @@ fn endpoint_elems_direct(
     Some((src, tgt))
 }
 
-/// Default inward span: yFiles even-slot extremes `(2k+1)/2n` (two ports →
-/// 1/4 and 3/4). Partner-chasing that overshoots the face used to slam onto
-/// the box corners (`PORT_MARGIN = 0`, mech n18).
+/// Inward span whose extremes are the yFiles even-slot ratios `(2k+1)/2n`
+/// (two ports → 1/4 and 3/4). Partner-chasing must stay inside this band even
+/// when the partner column already overlaps the face: n25/n6 sit on n26's
+/// x-span, and opening the band to them slams the fan onto the corners.
 fn face_inward_band(frame: &Rect, n_slots: usize) -> (f64, f64) {
     let n = n_slots.max(1) as f64;
     let inset = frame.width / (2.0 * n);
@@ -440,20 +440,25 @@ fn face_inward_band(frame: &Rect, n_slots: usize) -> (f64, f64) {
     }
 }
 
-/// Keep the inward band, but open it toward any target that already sits on
-/// this face — those partners can be met without going to a corner (order-
-/// approval `check→finance` primary, 1px off the 1/(2n) extreme).
+/// Open the inward band only toward on-face partners that already sit next to
+/// a `(2k+1)/2n` extreme (order-approval primary, ~1px). Overlapping children
+/// parked on the box edge (mech n26) stay outside that slack and do not pull
+/// the fan onto the corners.
 fn face_align_band(frame: &Rect, n_slots: usize, targets: &[f64]) -> (f64, f64) {
-    let (mut lo, mut hi) = face_inward_band(frame, n_slots);
-    let left = frame.x;
-    let right = frame.right();
+    let (in_lo, in_hi) = face_inward_band(frame, n_slots);
+    let inset = (in_lo - frame.x).max(0.0);
+    let slack = inset * 0.5;
+    let mut lo = in_lo;
+    let mut hi = in_hi;
     for &t in targets {
-        if t >= left && t <= right {
+        if t < in_lo && in_lo - t <= slack && t >= frame.x {
             lo = lo.min(t);
+        }
+        if t > in_hi && t - in_hi <= slack && t <= frame.right() {
             hi = hi.max(t);
         }
     }
-    (lo.clamp(left, right), hi.clamp(left, right))
+    (lo, hi)
 }
 
 /// L1 projection of `targets` onto `x[i] + pitch ≤ x[i+1]` inside `[lo, hi]` —
