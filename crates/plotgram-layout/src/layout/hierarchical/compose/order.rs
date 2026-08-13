@@ -10,7 +10,8 @@
 //! crossing minimization, flat plans also pick the global left/right
 //! orientation that minimizes `source_moment` (crossings are flip-invariant)
 //! and order the branch-source pocket so forward sources precede reverse
-//! heads — yFiles Layout Styles left basin. Grouped plans zero span/moment.
+//! heads — expectations: forward branch sources sit toward the reading-start
+//! side of the cross axis. Grouped plans zero span/moment.
 //!
 //! Median prefers real neighbors over virtuals, then falls back to the
 //! opposite sweep side, then `prev_pos` (composition.md / Graphviz wmedian).
@@ -189,7 +190,7 @@ pub fn order_layers(
     }
     if !grouped {
         // Crossing-minimal orders are flip-invariant; pick the side that
-        // parks mid-rank branch sources left (yFiles Layout Styles bias).
+        // parks forward branch sources toward the reading-start (left in TB).
         choose_layer_orientation(plan, &xidx, reversed);
         order_branch_source_pocket(plan, &xidx, reversed);
     }
@@ -210,7 +211,7 @@ pub fn order_layers(
             order_branch_source_pocket(plan, &xidx, reversed);
             let after = order_score(plan, &xidx, true, reversed);
             // Chain-block trials may keep crossings flat while trading a
-            // little `total_span` for lower endpoint inversion (notes §12.4).
+            // little `total_span` for lower endpoint inversion.
             // Revert only when crossings rose; a span-only regression is the
             // cost of parking the corridor on the endpoint side.
             if after.crossings > before.crossings {
@@ -232,8 +233,8 @@ struct OrderScore {
     crossings: u64,
     /// Σ positions of **forward** branch sources (empty up, non-empty down,
     /// and not the working head of a FAS-reversed edge). Reverse-spine heads
-    /// like mech `n5` (e30) are excluded so they do not outrank pure sources
-    /// (`n26`) for the left column. Zeroed when `use_span` is false.
+    /// are excluded so they do not outrank pure sources for the reading-start
+    /// column. Zeroed when `use_span` is false.
     source_moment: u64,
     /// Σ |layer_pos(u) − layer_pos(v)| over proper segments (straightness).
     /// Zeroed when `use_span` is false (grouped plans).
@@ -303,7 +304,7 @@ fn source_moment(plan: &PlanGraph, xidx: &CrossingIndex, reversed_edges: &BTreeS
 /// Within each layer's branch-source positions, put forward sources before
 /// FAS-reverse heads (stable within each class). Does not move sources
 /// across non-sources — preserves global orientation while preferring
-/// `n26 ≺ n5` inside the left basin.
+/// forward sources ahead of reverse-spine heads inside the source pocket.
 fn order_branch_source_pocket(
     plan: &mut PlanGraph,
     xidx: &CrossingIndex,
@@ -889,9 +890,7 @@ fn transpose_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, use_span: bool) {
 /// Chain blocks (yfiles/16 §4, Bachmaier 2010): all dummies of one long
 /// edge form ONE ordering unit. Every member sits in a different layer, so
 /// a side switch needs all covered layers to move together — per-layer
-/// local moves each look flat and the local optimum never exits (mech e29:
-/// its corridor must jump to the right of n13/n12 on rank5 AND rank6 at
-/// once).
+/// local moves each look flat and the local optimum never exits.
 fn chain_blocks(plan: &PlanGraph) -> Vec<Vec<usize>> {
     use crate::layout::hierarchical::model::ElemKey;
     let mut by_edge: BTreeMap<String, Vec<usize>> = BTreeMap::new();
@@ -939,7 +938,7 @@ fn chain_real_ends(plan: &PlanGraph, chain: &[usize]) -> Option<(usize, usize)> 
 /// How many real nodes sit strictly between each dummy and the slot that
 /// matches the two real endpoints' layer-relative positions (lerp by rank).
 /// Lower = corridor parked on the endpoint side. Block-trial only — not
-/// part of global `J_order` (notes §12.4).
+/// part of global `J_order`.
 fn chain_endpoint_inversion(plan: &PlanGraph, chain: &[usize]) -> u64 {
     use crate::layout::hierarchical::model::ElemKey;
     let Some((src, tgt)) = chain_real_ends(plan, chain) else {
@@ -1524,10 +1523,10 @@ mod tests {
     #[test]
     fn sifting_clears_crossing_across_dummy() {
         let elems = vec![
-            plain_elem("n26", 0, &[]),
-            plain_elem("n5", 0, &[]),
-            plain_elem("n25", 1, &[]),
-            plain_elem("n23", 1, &[]),
+            plain_elem("src_a", 0, &[]),
+            plain_elem("src_b", 0, &[]),
+            plain_elem("leaf_a", 1, &[]),
+            plain_elem("leaf_b", 1, &[]),
             Elem {
                 key: ElemKey::Virtual {
                     edge_id: "e_fwd".into(),
@@ -1536,9 +1535,10 @@ mod tests {
                 group_path: Vec::new(),
                 rank: 1,
             },
-            plain_elem("n6", 1, &[]),
+            plain_elem("leaf_c", 1, &[]),
         ];
-        // n26→n25, n26→n6, n5→n23, n5→n6 — with order [n25,n23,virt,n6] one crossing.
+        // src_a→leaf_a, src_a→leaf_c, src_b→leaf_b, src_b→leaf_c —
+        // with order [leaf_a, leaf_b, virt, leaf_c] one crossing.
         let segments = vec![
             Segment {
                 edge_id: "a".into(),

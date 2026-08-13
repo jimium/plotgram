@@ -20,7 +20,7 @@ use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealGraph};
 /// only when local (adjacent ranks): a long reversed edge's geometry rides
 /// its dummy chain (bound into one variable by R2), and counting the remote
 /// endpoint turns spine heads into hubs / breaks exclusive-spine collinearity
-/// (order-approval `rejected -> submit`).
+/// (a long reverse whose far real is counted as a local neighbor).
 pub fn forward_real_adjacency(
     plan: &PlanGraph,
     graph: &RealGraph,

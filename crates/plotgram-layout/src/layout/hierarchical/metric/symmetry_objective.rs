@@ -1,7 +1,7 @@
 //! P4 symmetry objective: minimize edge straightness + hub-to-fan-center,
 //! subject only to layer separation and VV dummy-chain equalities.
 //!
-//! Main path (notes §12 A1): IPSEP-style iterate — unconstrained descent on
+//! Main path (symmetry-axis.md): IPSEP-style iterate — unconstrained descent on
 //! J, then VPSC projection of that step's `x`. The old median-as-desired
 //! packer is `symmetry_place: median`.
 
@@ -247,6 +247,7 @@ pub fn solve_symmetry_objective(
                     &segs_by_edge,
                     &chain_end_leaves,
                     &hubs,
+                    &down_deg,
                     &mut desired,
                     &mut iter_weights,
                 );
@@ -463,19 +464,20 @@ fn snap_fan_pack_style(
         .flat_map(|s| [s.from, s.to])
         .filter(|&e| matches!(plan.elems[e].key, ElemKey::Real(_)))
         .collect();
+    // Snap expands J: dummy-chain hubs and 1:1-stem fan-out hubs already
+    // have a column from the iterate. Re-centering them onto child/parent
+    // centroids undoes the linear segment / stem.
+    let keep_j: BTreeSet<usize> = hub_order
+        .iter()
+        .copied()
+        .filter(|&h| {
+            long_edge_hubs.contains(&h)
+                || (down_deg[h] >= 2 && up_nbs[h].len() == 1 && down_nbs[up_nbs[h][0]].len() == 1)
+        })
+        .collect();
 
     for &h in &hub_order {
-        // IPSEP already placed a long-edge hub by minimizing J. Re-snapping
-        // it onto the child centroid undoes the linear segment (mech n5 sits
-        // on e30 in the iterate, then snap yanks it onto n6/n23). A fan-out
-        // hub on a 1:1 stem (n10 under n6) must keep J too — child centroid
-        // is n15/n20 after stem weld, which parks n10 away from n6.
-        // Pure fans still snap to center_h (fan_spine_chain).
-        let stem_fan_out =
-            down_deg[h] >= 2 && up_nbs[h].len() == 1 && down_nbs[up_nbs[h][0]].len() == 1;
-        let axis = if params.symmetry_place == SymmetryPlace::Ipsep
-            && (long_edge_hubs.contains(&h) || stem_fan_out)
-        {
+        let axis = if params.symmetry_place == SymmetryPlace::Ipsep && keep_j.contains(&h) {
             best[h]
         } else {
             center_h(best, h, down_nbs, up_nbs, down_deg, up_deg)
@@ -497,8 +499,8 @@ fn snap_fan_pack_style(
         );
         // Fan-out: pack children around the hub. Fan-in: the hub already
         // sits on `center_h` of its parents — packing the parents would
-        // yank 1:1 columns off (mech n15–n16, n20–n21) and leave the sink
-        // looking glued to the median parent (n17 under n21).
+        // yank 1:1 columns off and leave the sink looking glued to the
+        // median parent.
         for side in [(down_deg[h] >= 2).then_some(&down_nbs[h])]
             .into_iter()
             .flatten()
@@ -551,14 +553,17 @@ fn snap_fan_pack_style(
             }
         }
         for &peer in down_nbs[h].iter().chain(up_nbs[h].iter()) {
-            if twins.contains(&undirected(h, peer)) || primary.contains(&undirected(h, peer)) {
-                // A2: relative collinearity lives in J. The 1e6 absolute lock
-                // is the median-packer (n19 glued under n18); IPSEP skips it.
-                if params.symmetry_place == SymmetryPlace::Median {
-                    desired[peer] = axis + deltas.get(h, peer);
-                    iter_weights[peer] = iter_weights[peer].max(1.0e6);
-                }
-            }
+            snap_spine_peer(
+                h,
+                peer,
+                axis,
+                deltas,
+                twins,
+                primary,
+                params,
+                &mut desired,
+                &mut iter_weights,
+            );
         }
         // Primary occupies axis → remaining leaf must leave the axis.
         if down_deg[h] >= 2
@@ -601,7 +606,7 @@ fn snap_fan_pack_style(
         up_nbs,
         down_deg,
         up_deg,
-        &long_edge_hubs,
+        &keep_j,
         params.lambda_sym,
         &mut desired,
         &mut iter_weights,
@@ -617,6 +622,7 @@ fn snap_fan_pack_style(
         segs_by_edge,
         chain_end_leaves,
         hubs,
+        down_deg,
         &mut desired,
         &mut iter_weights,
     );
@@ -698,13 +704,17 @@ fn snap_fan_pack_style(
                 );
             }
             for &peer in side.iter() {
-                if twins.contains(&undirected(h, peer)) || primary.contains(&undirected(h, peer)) {
-                    // A2: same as first pass — relative terms are in J.
-                    if params.symmetry_place == SymmetryPlace::Median {
-                        desired[peer] = axis + deltas.get(h, peer);
-                        iter_weights[peer] = iter_weights[peer].max(1.0e6);
-                    }
-                }
+                snap_spine_peer(
+                    h,
+                    peer,
+                    axis,
+                    deltas,
+                    twins,
+                    primary,
+                    params,
+                    &mut desired,
+                    &mut iter_weights,
+                );
             }
         }
     }
@@ -740,7 +750,7 @@ fn snap_fan_pack_style(
         up_nbs,
         down_deg,
         up_deg,
-        &long_edge_hubs,
+        &keep_j,
         params.lambda_sym,
         &mut desired,
         &mut iter_weights,
@@ -756,6 +766,7 @@ fn snap_fan_pack_style(
         segs_by_edge,
         chain_end_leaves,
         hubs,
+        down_deg,
         &mut desired,
         &mut iter_weights,
     );
@@ -1627,8 +1638,8 @@ fn undirected(a: usize, b: usize) -> (usize, usize) {
 
 /// Dangling sinks whose only span-1 parent is itself not a fan hub
 /// (span-1 degree; long-edge hops do not count). They may leave that 1:1
-/// parent to sit on a long corridor (mech n14 / e29). Forward sources,
-/// through-nodes, and fan-hub children (order-approval `rejected`) stay.
+/// parent to sit on a long corridor. Forward sources, through-nodes, and
+/// fan-hub children stay on the stem.
 fn chain_end_leaves(
     plan: &PlanGraph,
     down_deg: &[usize],
@@ -1762,6 +1773,16 @@ fn exclusive_spine_pairs(
                     if toward_up && up_nbs[cur].len() == 1 && down_deg[next] == 1 {
                         out.insert(undirected(cur, next));
                     }
+                    // Unique span-1 child into a fan-in hub: the hop is still
+                    // a port-column spine, even if the hub has other long-edge
+                    // parents.
+                    if !toward_up
+                        && down_nbs[cur].len() == 1
+                        && up_deg[next] >= 2
+                        && down_deg[next] < 2
+                    {
+                        out.insert(undirected(cur, next));
+                    }
                     break;
                 }
                 if down_deg[next] + up_deg[next] > 2 {
@@ -1776,7 +1797,7 @@ fn exclusive_spine_pairs(
 }
 
 /// Primary + exclusive pairs that may enter J. Skip a min-span child that is
-/// itself a fan hub (mech n19 under n18) — that glue is the 1e6 packer.
+/// itself a fan hub — that glue is the old 1e6 packer.
 fn spine_align_pairs(
     primary: &BTreeSet<(usize, usize)>,
     exclusive: &BTreeSet<(usize, usize)>,
@@ -1841,7 +1862,7 @@ fn desired_weight(
 /// Jacobi step of `min Σ w((x+off)_u − (x+off)_v)² + λ Σ (x_h − center_h)²`
 /// with neighbors frozen. Twin / eligible-primary / exclusive-spine pairs
 /// carry their boost in `w` (A2 relative collinearity). Fan-hub min-span
-/// children are not in `spine`, so n19 is not glued onto n18.
+/// children are not in `spine`, so a fan hub is not glued onto its parent.
 fn unconstrained_l2_step(
     x: &[f64],
     nbs: &[Vec<Nb>],
@@ -1986,14 +2007,14 @@ fn objective_j(
 }
 
 /// Unique down-neighbor of parent *and* unique up-neighbor of child: a stem
-/// that should be one port column (yFiles 0-bend n15–n16 / n20–n21). Exclusive
-/// chain stops at hubs, so the continuation of a packed leaf (n15→n16) was
-/// never rewritten. Parent writes, child follows.
+/// that should be one port column. Exclusive chain stops at hubs, so the
+/// continuation of a packed leaf was never rewritten. Parent writes, child
+/// follows.
 ///
-/// Skip when the child is itself a fan-out hub (n6→n10): pulling that hub
-/// onto the parent yanks its packed leaves, and pulling the parent onto the
-/// child hits same-layer sep (n6 vs n25). Those stems keep J on the child
-/// instead (see snap axis). Chain-end leaves stay on the corridor (D).
+/// Skip when the child is itself a fan-out hub: pulling that hub onto the
+/// parent yanks its packed leaves, and pulling the parent onto the child
+/// hits same-layer sep. Those stems keep J on the child instead (see snap
+/// axis). Chain-end leaves stay on the corridor.
 #[allow(clippy::too_many_arguments)]
 fn weld_unique_stems(
     plan: &PlanGraph,
@@ -2059,8 +2080,8 @@ fn adsorb_near_collinear(
     node_gap: f64,
 ) -> Result<Vec<f64>, VpscError> {
     let eps = (node_gap * 0.25).max(1.0);
-    // A move can expose a new sub-ε shelf on a neighbor hop (mech e15 after
-    // n1–n2). Same writer, at most a couple of projections.
+    // A move can expose a new sub-ε shelf on a neighbor hop. Same writer,
+    // at most a couple of projections.
     for _ in 0..3 {
         let pairs = near_collinear_pairs(plan, deltas, chain_end_leaves, &placed, eps);
         if pairs.is_empty() {
@@ -2120,8 +2141,8 @@ fn near_collinear_pairs(
 }
 
 /// Pure fan-in sink (no fan-out) sits on `center_h` of current parents.
-/// Runs after stem weld so the span is the straightened parent columns
-/// (mech n17 under n16/n21/n7). Long-edge hubs keep J (F).
+/// Runs after stem weld so the span is the straightened parent columns.
+/// Hubs whose column J already kept are not rewritten.
 #[allow(clippy::too_many_arguments)]
 fn recenter_fan_in_sinks(
     plan: &PlanGraph,
@@ -2130,7 +2151,7 @@ fn recenter_fan_in_sinks(
     up_nbs: &[Vec<usize>],
     down_deg: &[usize],
     up_deg: &[usize],
-    long_edge_hubs: &BTreeSet<usize>,
+    keep_j: &BTreeSet<usize>,
     lambda_sym: f64,
     desired: &mut [f64],
     weights: &mut [f64],
@@ -2138,7 +2159,7 @@ fn recenter_fan_in_sinks(
     let mut hs = hubs.to_vec();
     hs.sort_unstable();
     for h in hs {
-        if down_deg[h] >= 2 || up_deg[h] < 2 || long_edge_hubs.contains(&h) {
+        if down_deg[h] >= 2 || up_deg[h] < 2 || keep_j.contains(&h) {
             continue;
         }
         if plan.elems[h].key.is_virtual() || plan.elems[h].key.is_zero_width() {
@@ -2147,6 +2168,36 @@ fn recenter_fan_in_sinks(
         let axis = center_h(desired, h, down_nbs, up_nbs, down_deg, up_deg);
         desired[h] = axis;
         weights[h] = weights[h].max(REAL_WEIGHT * (1.0 + lambda_sym) * 16.0);
+    }
+}
+
+fn snap_spine_peer(
+    hub: usize,
+    peer: usize,
+    axis: f64,
+    deltas: &AlignDeltas,
+    twins: &BTreeSet<(usize, usize)>,
+    primary: &BTreeSet<(usize, usize)>,
+    params: &HierarchicalParams,
+    desired: &mut [f64],
+    weights: &mut [f64],
+) {
+    let p = undirected(hub, peer);
+    let is_twin = twins.contains(&p);
+    let is_primary = primary.contains(&p);
+    if !is_twin && !is_primary {
+        return;
+    }
+    desired[peer] = axis + deltas.get(hub, peer);
+    if params.symmetry_place == SymmetryPlace::Median {
+        weights[peer] = weights[peer].max(1.0e6);
+        return;
+    }
+    // IPSEP: expand J's relative term. Twin stays in J only — a hard lock
+    // glued a fan hub onto its parent. Primary gets a typed boost so the
+    // min-span child tracks the hub's port column.
+    if is_primary {
+        weights[peer] = weights[peer].max(REAL_WEIGHT * 8.0 * params.primary_arm_boost);
     }
 }
 
@@ -2241,24 +2292,21 @@ fn pull_spine_to_axis(
 }
 
 /// Per-end port anchoring, with a **single writer** for the chain column
-/// when a midpoint 4-bend Z would otherwise appear (yfiles/01 §4.5 + notes §12 E).
+/// when a midpoint 4-bend Z would otherwise appear (yfiles/01 §4.5).
 ///
 /// Chain identity binds ≥2 dummies into one VPSC variable. Equal-weight
-/// writes from both non-leaf ends park that variable at the midpoint
-/// (mech e30; also e18, whose dummy then packed L2 and shoved n26/n5 ~90px
-/// right of the yFiles left basin). A single writer is used when at least
-/// one non-leaf end is a fan hub and the chain has ≥2 dummies:
+/// writes from both non-leaf ends park that variable at the midpoint.
+/// A single writer is used when at least one non-leaf end is a fan hub
+/// and the chain has ≥2 dummies:
 ///
 /// - exactly one hub → the **non-hub** writes (fan dummies track the child)
-/// - both hubs → the end more peripheral on its own layer writes (e18's
-///   n25 is leftmost on a wide rank; n18 is the only node on L0). Hub
-///   writes-corridor was tried and collapsed fan dummies onto the parent.
+/// - both hubs, exactly one fan-out → the **fan-out** writes
+/// - both fan-out (or neither) → the end more peripheral on its own layer
 ///
 /// Neither hub, or a single dummy: keep per-end writes. Closer-to-x on
-/// neither-hub long reverses (order-approval `rejected→submit`) drifted D2.
+/// neither-hub long reverses drifted D2.
 ///
-/// Chain-end leaves (notes §12 D) still do **not** yank the dummy: they
-/// are pulled onto the anchored column afterwards.
+/// Chain-end leaves follow the dummy column afterwards.
 fn apply_port_anchor_desired(
     plan: &PlanGraph,
     graph: &RealGraph,
@@ -2269,6 +2317,7 @@ fn apply_port_anchor_desired(
     segs_by_edge: &BTreeMap<String, Vec<usize>>,
     chain_end_leaves: &BTreeSet<usize>,
     hubs: &[usize],
+    down_deg: &[usize],
     desired: &mut [f64],
     weights: &mut [f64],
 ) {
@@ -2328,7 +2377,7 @@ fn apply_port_anchor_desired(
             _ => false,
         };
         if single_writer {
-            if let Some((real_elem, port)) = pick_chain_anchor(&ends, &hub_set, plan) {
+            if let Some((real_elem, port)) = pick_chain_anchor(&ends, &hub_set, down_deg, plan) {
                 let ax = port_anchor(frame_of(real_elem), port).x;
                 for &d in &dummies {
                     desired[d] = ax;
@@ -2351,6 +2400,7 @@ fn apply_port_anchor_desired(
 fn pick_chain_anchor(
     ends: &[(usize, ResolvedPort)],
     hubs: &BTreeSet<usize>,
+    down_deg: &[usize],
     plan: &PlanGraph,
 ) -> Option<(usize, ResolvedPort)> {
     match ends {
@@ -2361,6 +2411,11 @@ fn pick_chain_anchor(
             let hb = hubs.contains(&b.0);
             if ha != hb {
                 return Some(if ha { b } else { a });
+            }
+            let fa = down_deg[a.0] >= 2;
+            let fb = down_deg[b.0] >= 2;
+            if fa != fb {
+                return Some(if fa { a } else { b });
             }
             Some(more_peripheral_end(a, b, plan))
         }
@@ -2375,7 +2430,7 @@ fn pick_chain_anchor(
 /// |layer_frac − 0.5|: a node alone on its rank scores 0; the leftmost or
 /// rightmost real on a populated rank scores 0.5. Used when both chain ends
 /// are hubs so the corridor parks on the side that already has an exterior
-/// column (mech e18 → n25, not the n18/n25 midpoint that packed L2).
+/// column, not the midpoint that packs the intervening layer.
 fn layer_peripheral(elem: usize, plan: &PlanGraph) -> f64 {
     (layer_frac(elem, plan) - 0.5).abs()
 }

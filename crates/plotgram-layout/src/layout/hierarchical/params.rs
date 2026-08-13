@@ -76,7 +76,7 @@ impl RoutingStyle {
     }
 }
 
-/// How the cross-axis solver places `x` (notes §12 A0/A1).
+/// How the cross-axis solver places `x` (symmetry-axis.md).
 ///
 /// `Ipsep` is the main path: unconstrained descent on J, then VPSC
 /// projection of that step's `x` (not median-as-shared-desired).
@@ -177,13 +177,14 @@ pub struct HierarchicalParams {
     /// Median/VPSC boost for unique min-span primary arm.
     pub primary_arm_boost: f64,
     /// J / L2 boost for a long-edge RV segment whose real end is a dangling
-    /// sink (no forward children). Lets n14 leave n12 to sit on e29's
-    /// corridor (notes §12 D). Forward sources and through-nodes stay
-    /// unboosted so a reverse long edge cannot yank a primary spine.
+    /// sink (no forward children). The hanging sink follows the dummy
+    /// corridor (expectations: long same-column back-edges use the dummy
+    /// column). Forward sources and through-nodes stay unboosted so a
+    /// reverse long edge cannot yank a primary spine.
     pub chain_end_boost: f64,
     /// Fixed iteration budget for symmetry objective solver.
     pub symmetry_iters: u32,
-    /// Cross-axis placer. Default `Median`. `BkIdeal` is the §12 A0
+    /// Cross-axis placer. Default `Median`. `BkIdeal` is a
     /// diagnostic bypass (not a product preset).
     pub symmetry_place: SymmetryPlace,
     /// Built-in ink style (ignored when layout defers to an independent EdgeRouter).

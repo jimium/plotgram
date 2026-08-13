@@ -272,7 +272,7 @@ fn align_ns_ports(
                     median(&wants)
                 })
                 .collect();
-            let (lo, hi) = face_align_band(frame, slots.len(), &targets);
+            let (lo, hi) = face_align_band(frame, slots.len(), &targets, pitch);
             let placed = project_ordered(&targets, pitch, lo, hi);
             for (slot, x) in slots.iter().zip(placed) {
                 for end in slot {
@@ -423,10 +423,10 @@ fn endpoint_elems_direct(
     Some((src, tgt))
 }
 
-/// Inward span whose extremes are the yFiles even-slot ratios `(2k+1)/2n`
-/// (two ports → 1/4 and 3/4). Partner-chasing must stay inside this band even
-/// when the partner column already overlaps the face: n25/n6 sit on n26's
-/// x-span, and opening the band to them slams the fan onto the corners.
+/// Inward span whose extremes are the even-slot ratios `(2k+1)/2n`
+/// (two ports → 1/4 and 3/4). Partner-chasing stays inside this band even
+/// when the partner column already overlaps the face — opening to the box
+/// edge slams a shared-face fan onto the corners.
 fn face_inward_band(frame: &Rect, n_slots: usize) -> (f64, f64) {
     let n = n_slots.max(1) as f64;
     let inset = frame.width / (2.0 * n);
@@ -440,14 +440,14 @@ fn face_inward_band(frame: &Rect, n_slots: usize) -> (f64, f64) {
     }
 }
 
-/// Open the inward band only toward on-face partners that already sit next to
-/// a `(2k+1)/2n` extreme (order-approval primary, ~1px). Overlapping children
-/// parked on the box edge (mech n26) stay outside that slack and do not pull
-/// the fan onto the corners.
-fn face_align_band(frame: &Rect, n_slots: usize, targets: &[f64]) -> (f64, f64) {
+/// Open the inward band only toward on-face partners already next to an
+/// even-slot extreme. Slack is `min(half inset, half port_pitch)`: enough
+/// for a sub-pitch primary-arm chase, not enough to pull a fan onto the
+/// box edge when the partner sits on the overlapping child's column.
+fn face_align_band(frame: &Rect, n_slots: usize, targets: &[f64], pitch: f64) -> (f64, f64) {
     let (in_lo, in_hi) = face_inward_band(frame, n_slots);
     let inset = (in_lo - frame.x).max(0.0);
-    let slack = inset * 0.5;
+    let slack = (inset * 0.5).min((pitch * 0.5).max(0.0));
     let mut lo = in_lo;
     let mut hi = in_hi;
     for &t in targets {

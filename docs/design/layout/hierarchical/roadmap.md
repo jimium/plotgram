@@ -37,7 +37,7 @@ FAS(+环 reroot) → rank / properify / order（含 chain-block sift）
 | `channel-group-fallback` 触发数 | fallback 后等同无组 | 上条 |
 | PartitionGrid 消费（泳道 / 矩阵） | 声明了 grid 仍不排带 | [partition-grid](phases/partition-grid.md) |
 | `group_anchor` 仍当普通节点分层 | 贴框语义不纯 | 组专项（ADR-004） |
-| 次轴：n13/n12 贴父左半等列位 | 检验图相对 yFiles 仍偏左 | P4 `J` / 权重，见 [anti-patterns §4](notes/anti-patterns.md) |
+| 次轴：扇出主臂下短链贴父槽 | 检验图相对 yFiles 仍偏左 | P4 `J` / 权重，见 [anti-patterns §4](notes/anti-patterns.md) |
 | strong-port projection；label / loop reserve | 端口序不进列位；标签空间未建模 | 余项 |
 | GroupMinWidth / title；`close_sibling` 并进 J | D₂ 刻意推迟 | Weak 框余项 |
 | architecture profile 默认 strong | 须显式 `group_policy` | 语料够了再评估 |

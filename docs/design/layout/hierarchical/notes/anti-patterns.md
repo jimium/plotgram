@@ -40,7 +40,7 @@ v1 源码仍在 `crates/v1/plotgram-core/src/layout/atlas/`（只读）。可借
 | 端点直度项 `w_end` 拉跨层两端 | 折从一端搬到另一端；max_bends 升 | P3 先让链能整块换侧；P4 不要用端点项掩盖错列 |
 | order 给 reverse dummy 加远真实端 bary 偏置 | 量纲错（跨层 order 下标）；crossings 升 | 链块级 sift；不要单元素偏置 |
 | Compose 槽序用远真实端 `layer_order` | 跨层不可比；e29 倒在 n11 最左，P4 把廊锚错槽，e6×e29 交叉 | 邻层邻接元（含 dummy）；dummy 与叶左右反了是 P3 的事 |
-| 内分带外扩到脸上重叠的对端 | n26 两路扇贴圆角 0.05/0.97 | yFiles `[1/(2n), 1−1/(2n)]`；只允许半个 inset 内的 1px 级微调 |
+| 内分带外扩到脸上重叠的对端 | 共享脸扇贴圆角 | 内分带 `[1/(2n), 1−1/(2n)]`；追逐不超过 `min(半 inset, 半 port_pitch)` |
 | 单槽脸滑端口省折 | 箭头扎在盒子角上 | 单槽列 = 节点列，属 cross 轴 |
 | `forward_gutter_side` 掩盖错列 | e18 走到与 yFiles 相反的一侧 | 改 P4 列，不在下游加第三趟侧别 |
 
@@ -66,6 +66,6 @@ v1 源码仍在 `crates/v1/plotgram-core/src/layout/atlas/`（只读）。可借
 
 这些是**当前缺口**，不是可以再试一遍的补丁：
 
-- **n13/n12 贴 n11 左半**（yFiles Δcx≈25–30px，我们仍约 110px）：P3 廊已在 n12 右；再对调 n11 南口、再让 n12 扇入居中，会打主臂 / D2。下一步只许改 P4 的 `J` / 权重。
+- **扇出主臂下的短链贴父槽**（检验图 Δcx 仍大于 yFiles 约 30px；主臂叶已收到端口列展开，Δ 约减半）：P3 廊已在短链右侧。再对调父脸槽序、再让带 dummy 的扇入汇点 `center_h`、再在单 dummy 链上拉扇入端跟廊，会打主臂 / D3 / 上游轴继承。下一步只许继续改 P4 的 `J` / 权重。
 - **dense 层整层 `node_gap` 取等**：投影在吃 slack。不要加宽 dummy，先查下降步。
 - **PartitionGrid 引擎消费、穿组构造清零、label/loop reserve**：见 [roadmap](../roadmap.md)，不是再开一张 claimed 表。

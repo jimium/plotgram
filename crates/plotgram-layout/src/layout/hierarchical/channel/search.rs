@@ -173,8 +173,7 @@ pub fn end_candidates(
                 // west rim corridor `og` and this endpoint. The old
                 // `(og+1)..=order` missed the leftmost sibling (order `og`)
                 // and wrongly included the endpoint itself — AtPortNormal
-                // then drew a same-band horizontal through that sibling
-                // (mech e29 → n17 when L7 is `n17 ≺ n14`).
+                // then drew a same-band horizontal through that sibling.
                 let pierced = (og..order).any(|o| blocked_west.contains(&o));
                 let rim = og == 0;
                 if !pierced && rim {

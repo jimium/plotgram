@@ -118,7 +118,7 @@ initial stable order
 - fixed order/port endpoint order 是 hard precedence；
 - median 无定义时保留前一轮 order；
 - tie-break tuple 固定为 `(median, previous_order, declaration_index, NodeKey)`；
-- snapshot 比较固定为 `(weighted_crossings, total_span, lexicographic_order)`。
+- snapshot 比较固定为 `(weighted_crossings, source_moment, total_span, lexicographic_order)`。flat 的 `source_moment` 是交叉轴阅读方向：Σ 正向分叉源的层内下标，交叉持平时取更小者（整图可左右翻转，交叉与 span 不变）。组连续块清零 span/moment。同一层分叉源口袋内，正向源稳定排在 FAS 回边头之前，不把源点挪过非源点。
 
 非 grouped plan 的 sift 改进循环额外跑 **chain block sifting**（yfiles/01 §4.3，R1）：一条边的全部 dummy（≥2 颗）作为一个块，从覆盖的各层同时移除，再按同一分位（`k / max_k`，不是跨层同一个绝对下标）整体插回；trial 后先恢复 partition/group clamp。块级词典序为 `(crossings, endpoint_inversion, source_moment, total_span)`：crossings **不增**即可进入候选；交叉持平时次键是各层 dummy 相对两端 real 分位之间夹着的实节点数（降低 = 廊靠到端点一侧）。`endpoint_inversion` 只用于块级 trial，不进全局 `J_order` / barycenter / 逐元素 sift。单颗 dummy 不参与逐元素 sift。
 

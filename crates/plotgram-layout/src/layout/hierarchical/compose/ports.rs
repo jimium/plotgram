@@ -168,9 +168,9 @@ fn free_side(
 /// Shared E/W face for a side corridor: tip is the higher-rank real end;
 /// polarity compares **within-layer rightness** among non-zero-width elems
 /// (`order_among_reals / (n_reals−1)`), not raw order indices — those are
-/// not comparable across layers of different widths (mech e29: tip n14
-/// order 1/2 vs n11 order 4/5 both sit on the right, but raw `1 < 4`
-/// wrongly picked West and forced a full-width U).
+/// not comparable across layers of different widths (a right-side tip on a
+/// 2-node layer vs a right-side peer on an 8-node layer both sit on the
+/// right, but raw `1 < 4` wrongly picks West and forces a full-width U).
 fn side_corridor_polarity(plan: &PlanGraph, pos: &[usize], a: usize, b: usize) -> Side {
     let (tip, other) = match plan.elems[a].rank.cmp(&plan.elems[b].rank) {
         std::cmp::Ordering::Greater => (a, b),
@@ -224,7 +224,7 @@ fn layer_rightness(plan: &PlanGraph, pos: &[usize], elem: usize) -> f64 {
 ///
 /// - Twin short (span=1): flow spine (`rank_dir`) — parallel aesthetics.
 /// - Long reverse (span≥3) near-column **same group**: flow spine — dummy
-///   chain is the private corridor (mech e29/e30).
+///   chain is the private corridor.
 /// - Cross-group long reverse, span=2 feedback, or divergent columns: side
 ///   corridor (ticket-triage / order-approval / strong-macro swimlanes).
 /// - Short without twin (span=1): side corridor (workflow feedback).
@@ -469,9 +469,8 @@ pub fn assign_ports(
                 node_real,
                 side,
                 // Adjacent-rank order, dummy included. Far-real layer_order
-                // parked mech e29 leftmost on n11 (n14 is 1/2 on L7, n13 is
-                // 5/8 on L5); P4 then anchored the backedge corridor to the
-                // left slot and n13 could not sit under n11. Dummy-vs-leaf
+                // is not comparable across layers of different widths and
+                // parks a long back-edge in the leftmost slot. Dummy-vs-leaf
                 // inversion on the next rank is P3's to sift, not P7's to lie.
                 sort_key: (
                     pos.get(neighbor).copied().unwrap_or(0),
