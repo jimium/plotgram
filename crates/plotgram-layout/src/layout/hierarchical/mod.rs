@@ -6,9 +6,7 @@
 //! The core (`compose` / `metric` / `ink`) runs entirely in canonical
 //! top-to-bottom space; this module is the only place that converts to/from
 //! the physical orientation (`orient.rs`, [`plotgram_algo::orientation`]).
-//! See `docs/design/layout/hierarchical/architecture.md` for the target
-//! contract and `docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md`
-//! for this implementation's scope decisions relative to it.
+//! See `docs/design/layout/hierarchical/architecture.md` for the contract.
 
 mod channel;
 mod compose;

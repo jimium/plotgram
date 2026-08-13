@@ -1,10 +1,9 @@
 # Hierarchical · D₁ Channel 分阶段契约
 
-> 父页：[architecture](../architecture.md) §6 · [roadmap](../roadmap.md) §5 D₁  
+> 父页：[architecture](../architecture.md) §6 · [roadmap](../roadmap.md)  
 > 相级总览：[ports-and-channel](ports-and-channel.md) · [coordinate-and-demand](coordinate-and-demand.md) · [ink-and-verification](ink-and-verification.md)  
 > 写权尺子：[write-authority](../../write-authority.md)  
-> Atlas 形状参考（非 schema 真源）：[atlas-reference/channel-substrate](../atlas-reference/channel-substrate.md) · [channel-search](../atlas-reference/channel-search.md)  
-> 状态：可执行设计契约；不记录实现进度
+> 状态：**已交付**（D1.0–D1.3 主路径）；余量见 roadmap。契约冲突以 [architecture.md](../architecture.md) 为准。
 
 本文把 roadmap **D₁ · Channel 正交**切成三个可串行交付的子里程碑，钉死写权、IR、管线序、Bus 边界与验收。发生冲突时以 [architecture.md](../architecture.md) 为准。
 
@@ -243,7 +242,7 @@ Substrate 全图、Gate、ScopeMask、rip-up、多 rank 回边外侧走廊、`mi
 - 布尔 `backloop_routing` 开关
 - 图种分支第二布局器（ADR-001）
 - StrongMacro / PartitionGrid（阶段 E / 另册）
-- 复制 Atlas 源码进重建 crate；只引用 `atlas-reference/`
+- 复制 v1 Atlas 源码进重建 crate
 
 ---
 

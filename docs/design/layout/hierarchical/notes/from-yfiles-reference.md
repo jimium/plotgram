@@ -6,7 +6,8 @@
 > 相关：[architecture.md](../architecture.md) · [scope.md](../scope.md) · [写权纪律](../../write-authority.md) · [reference 13 选型与路线图](../../../../reference/yfiles/13-实现路线图与选型.md)
 
 本文是一次对照阅读的纪要，方便慢慢消化。算法细节仍以 reference 各篇为准；实现进度不写在这里。  
-**现行目标架构以 [architecture.md](../architecture.md) 为准**；本文不替代之。
+**现行架构以 [architecture.md](../architecture.md) 为准**；本文不替代之。  
+否决路线：[anti-patterns.md](anti-patterns.md)。
 
 
 ---

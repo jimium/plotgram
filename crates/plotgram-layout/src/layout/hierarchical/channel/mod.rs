@@ -1,7 +1,6 @@
 //! D1.2 Channel: group-cut Substrate + ScopeMask search + bounded rip-up.
 //!
-//! Atlas shape reference:
-//! `docs/design/layout/hierarchical/atlas-reference/channel-*.md`.
+//! Contract: `docs/design/layout/hierarchical/phases/channel-d1.md`.
 
 mod derive;
 mod graph;

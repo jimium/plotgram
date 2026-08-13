@@ -1,7 +1,7 @@
 # Hierarchical · 相级设计索引
 
 > 父页：[architecture.md](../architecture.md)  
-> 状态：目标契约的细化；不记录实现进度
+> 状态：现行契约；不记录实现进度
 
 本目录展开 `architecture.md` 已决定的契约。发生冲突时以父页的写权、IR 与失败语义为准；相级文档不得另造第二套 Plan 或修改 Writer 归属。
 
@@ -16,9 +16,9 @@
 | [symmetry-axis](symmetry-axis.md) | 次轴对称目标函数 J(x)（主链共线 ∩ 扇出对称；P4） |
 | [port-lanes](port-lanes.md) | 双胞胎 N/S 走廊端口绝对列（无 grid；对照 yFiles PortAlignment） |
 | [ink-and-verification](ink-and-verification.md) | Ink 纯展开、规范化与分相 verifier |
-| [strong-macro](strong-macro.md) | **StrongMacro 实现方案**（阶段 E；与 Weak/D₂ 边界 + SM-0..4） |
-| [group-frame-d2](group-frame-d2.md) | **D₂ Weak 组框写权**（D₂.0–D₂.2，**已关闭**；余项见该文 §12） |
-| [partition-grid](partition-grid.md) | **PartitionGrid 引擎消费**（PG-0–PG-4；泳道/矩阵；model/DSL 已备） |
+| [strong-macro](strong-macro.md) | StrongMacro：MacroBlockWriter 写框；与 Weak 同一 Plan |
+| [group-frame-d2](group-frame-d2.md) | Weak 组框：Metric 真源；finalize 透传 |
+| [partition-grid](partition-grid.md) | PartitionGrid 引擎消费（PG-0–PG-4；model/DSL 已备） |
 
 ## 共同格式
 

@@ -372,7 +372,7 @@ plotgram render <file.pgm> -o out.svg --emit-trace out.trace.json
 
 1. Overlay 由 Rust 还是前端按 Trace 绘制？→ 首期前端或单一 overlay SVG；插件化后可混用。  
 2. Router 独立调试是否共用信封？→ 可另设 `RouterDebugTrace` 或 `extension.kind` 外的并列文件；**不**塞进 layout extension 假装是布局决策。  
-3. 信封类型何时上提 `plotgram-model` / engine-api？→ T4：第二个核消费之后（与 mvp-scope §0.1 不改 trait 的纪律一致）。
+3. 信封类型何时上提 `plotgram-model` / engine-api？→ T4：第二个核消费之后（不改现有 layout trait）。
 
 ---
 

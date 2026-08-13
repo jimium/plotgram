@@ -96,8 +96,8 @@ pub struct GroupCommonDebug {
     pub group_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent: Option<String>,
-    /// Group frames are written by finalize (post-layout bbox), never by the
-    /// layout kernel — honestly absent here (parent §5.2, mvp-scope §0.1).
+    /// Weak: Metric group-frame writer. Strong: MacroBlockWriter.
+    /// finalize only forwards (`owns_group_frames`).
     pub frame: Option<Rect>,
     pub frame_source: &'static str,
 }

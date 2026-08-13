@@ -1,9 +1,8 @@
 # Hierarchical · D1.3 Corridor Allocator 执行方案
 
-> 父页：[roadmap](../roadmap.md) §5 D₁ · [phases/channel-d1.md](channel-d1.md)  
+> 父页：[roadmap](../roadmap.md) · [phases/channel-d1.md](channel-d1.md)  
 > 写权尺子：[write-authority](../../write-authority.md) · [architecture](../architecture.md)  
-> 状态：**可执行计划**（未实现进度日记）  
-> 日期：2026-08-06
+> 状态：**已交付**（D1.3 主路径）
 
 目标：把 Channel 从「空闲边界轨上的词典序 Dijkstra」升格为 **端点诱导的层间走廊分配器**，朝 yFiles Hierarchical 的层间资源池语义靠拢。  
 验收盯 **flat 全量 + stress 系统性指标**，不盯单图特判；`product.refund-process` 等冲顶样例只作连带观测。

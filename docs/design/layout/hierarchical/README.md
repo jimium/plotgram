@@ -1,10 +1,9 @@
 # HierarchicalLayout
 
-> 状态：现行设计档（重建中；v1 Atlas 为功能参考真源）  
+> 状态：现行  
 > 引擎注册名：`hierarchical`  
 > 代码：`crates/plotgram-layout/src/layout/hierarchical/`  
-> 参考实现：`crates/v1/plotgram-core/src/layout/atlas/` + `layout/kernel/layered/`  
-> **目标架构真源**：[architecture.md](architecture.md)
+> **架构真源**：[architecture.md](architecture.md)
 
 ## 签名
 
@@ -12,8 +11,8 @@
 
 ## 基本逻辑
 
-Sugiyama 骨架 + Atlas 三相写权（组合 → 度量 → Ink）。  
-完整管线、算法选型、Channel、参数与里程碑见 **[architecture.md](architecture.md)**。
+Sugiyama 骨架 + 三相写权（组合 → 度量 → Ink）。  
+完整管线见 **[architecture.md](architecture.md)**。
 
 ```text
 ① 拓扑    rank / order / 反转边
@@ -55,12 +54,13 @@ Sugiyama 骨架 + Atlas 三相写权（组合 → 度量 → Ink）。
 
 | 文档 | 用途 |
 |------|------|
-| **[architecture.md](architecture.md)** | **目标架构真源**：IR、算法表、Channel、组/分区、参数、里程碑 |
+| **[architecture.md](architecture.md)** | **现行架构**：IR、写者、Channel、组/分区、参数 |
 | **[expectations.md](expectations.md)** | **视觉期待**：用户看见什么 × 写者 × 冲突裁定 |
-| **[roadmap.md](roadmap.md)** | MVP 之后的**阶段路线与方向**（A 拉直 → B 端口 → C 诊断 → D Channel/组框） |
+| **[roadmap.md](roadmap.md)** | 现在能做什么 + 下一步缺口 |
+| [notes/anti-patterns.md](notes/anti-patterns.md) | 已否决路线 |
 | [debug-profile.md](debug-profile.md) | Hier 的 DebugTrace **扩展剖面**（rank/dummy/…） |
 | [../debug-inspector.md](../debug-inspector.md) | **跨核**调试检视器信封 + UI 壳 |
-| [phases/](phases/README.md) | 跨 crate 契约与各相可执行细节 |
+| [phases/](phases/README.md) | 各相契约 |
 | [from-yfiles-reference.md](notes/from-yfiles-reference.md) | yFiles 参考文库启发纪要 |
 | [edge-parameters.md](edge-parameters.md) | 边参数支持研究（对照 yFiles Edges 分组）+ 分批实施路线 |
 | [01 Sugiyama](../../../reference/yfiles/01-sugiyama分层布局.md) | P1–P5 算法证据 |
@@ -82,4 +82,5 @@ Sugiyama 骨架 + Atlas 三相写权（组合 → 度量 → Ink）。
 - [symmetry-axis](phases/symmetry-axis.md) — 次轴对称目标函数 J(x)（主链共线 ∩ 扇出对称）
 - [port-lanes](phases/port-lanes.md) — 双胞胎走廊端口绝对列（无 grid）
 - [ink-and-verification](phases/ink-and-verification.md) — Ink 纯展开与分相 verifier
-- [strong-macro](phases/strong-macro.md) — **StrongMacro 实现方案**（阶段 E）
+- [strong-macro](phases/strong-macro.md) — StrongMacro（MacroBlockWriter）
+- [group-frame-d2](phases/group-frame-d2.md) — Weak 组框（Metric 真源）

@@ -33,7 +33,7 @@
 
 禁止让后续 Metric/Ink 根据 policy 选择两套字段。
 
-实现方案与推进步骤：[strong-macro.md](strong-macro.md)。
+实现方案：[strong-macro.md](strong-macro.md)。
 
 ## 3. Cycle removal
 

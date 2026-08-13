@@ -67,9 +67,9 @@ boost_uv = twin_spine_boost | chain_end_boost | primary_arm_boost
 | `lambda_sym` | `1.0` | hub 贴扇心强度 |
 | `twin_spine_boost` | `8.0` | 2-cycle 对端占脊（进 J / L2，不再靠 1e6 desired） |
 | `primary_arm_boost` | `4.0` | 最短跨主臂与 exclusive 1:1 脊进 J；两端都是扇 hub 则不加 |
-| `chain_end_boost` | `8.0` | 悬挂汇点跟长边廊（父非 span-1 扇 hub）；snap：叶跟廊；恰好一端是扇 hub 时非 hub 写整链（§12 E） |
+| `chain_end_boost` | `8.0` | 悬挂汇点跟长边廊（父非 span-1 扇 hub）；snap：叶跟廊；恰好一端是扇 hub 时非 hub 写整链 |
 | `symmetry_iters` | `8` | IPSEP / 中位迭代轮数 |
-| `symmetry_place` | `ipsep` | 主路径 = 对 J 的 L2 无约束步 + VPSC 投影（§12 A1）。`median` = 旧 desired-packer；`bk` = A0 诊断（BK ideal + 硬约束，跳过迭代与 fan snap）。后两档**不是产品档**。 |
+| `symmetry_place` | `ipsep` | 主路径 = 对 J 的 L2 无约束步 + VPSC 投影。`median` = 旧 desired-packer；`bk` = 诊断（BK ideal + 硬约束，跳过迭代与 fan snap）。后两档**不是产品档**。 |
 | `layer_alignment` | `0.5` | 主轴：实节点在层带内对齐；**零高 elem 钉层带顶边**（避免中心走廊穿同层节点） |
 
 边权基：`real–real=1` / `real–virt=2` / `virt–virt=8`（作者 `weight` 乘基；`critical: true` 糖 = `2.0`）。  
@@ -84,12 +84,12 @@ boost_uv = twin_spine_boost | chain_end_boost | primary_arm_boost
 1. hub → `center_h`（纯扇）；IPSEP 下**连着 dummy 链的 hub**、以及**1:1 茎上的扇出 hub**（n10 在 n6 下）保持 J 的列，不拽回子心；  
 2. **只铺扇出叶**（`down_deg ≥ 2`）：≥2 自由叶 `axis + slot_multipliers · pitch`（FanPack / D3）；扇入只动汇点，不 FanPack 父节点（否则 1:1 茎被拽开，汇点看起来贴在 median 父下）；  
 3. 恰 1 自由叶：IPSEP **保持 J 的列**（`node_gap` 只当分离下限）；median 档仍 `axis ± pitch`；  
-4. twin / 主臂 peer → 轴（**仅 `symmetry_place: median`** 仍 1e6 锁；IPSEP 主路径把相对共线写进 J，见 §12 A2）；  
+4. twin / 主臂 peer → 轴（**仅 `symmetry_place: median`** 仍 1e6 锁；IPSEP 主路径把相对共线写进 J）；  
 5. exclusive 1:1 spine / follower 跟列；  
 6. **1:1 茎焊列**：父的唯一向下邻居 = 子的唯一向上邻居、且子不是扇出 hub 时，子跟父的端口列（悬挂汇点叶除外）。两端都是 hub 的茎（n6–n10）层内分离可能禁掉共列，不焊。这是小折（n15–n16）与扇入汇点偏轴的同一写者；  
 7. **纯扇入汇点**（`up_deg ≥ 2` 且无扇出、非长边 hub）再贴 `center_h`（焊茎后的父母跨度）；  
 8. port-anchor 覆盖链端 dummy，再 `exteriorize` 同层 dummy；  
-9. **共线吸附**（notes §4.2(d)）：终局 VPSC 之后，实–实相邻层边若端口列差 `< node_gap/4`，加 `x_to = x_from + δ` 硬等式再投影一次（两端都可动，消 n1–n2 这类 2–5px 残差）。有意的扇出横折大于 ε，不吸。等式不可行则保持吸附前的 x。
+9. **共线吸附**：终局 VPSC 之后，实–实相邻层边若端口列差 `< node_gap/4`，加 `x_to = x_from + δ` 硬等式再投影一次（两端都可动，消 2–5px 残差）。有意的扇出横折大于 ε，不吸。等式不可行则保持吸附前的 x。
 
 链列单写者（yfiles/01 §4.5）分两层：约束层用链恒等把 ≥2 颗 dummy 焊成一个 VPSC 变量；desired 层只在写者无歧义时把**整条链**钉到一端的 `port_anchor.x`——恰好一个非叶端，或两端都非叶且至少一端是扇 hub、≥2 颗 dummy。恰好一端是 hub → **非 hub**写廊；两端都是 hub → **本层更靠边缘**的那端写廊（mech e18 的 n25，避免折中列把 L2 整层顶开）。两端都不是 hub、或只有一颗 dummy，仍逐端写入。悬挂汇点叶不反向拽廊，而是被拉到该 dummy 列。两端等权折中会把焊死的变量停在中间列；把「离链更近」的那端当单写者会漂 D2 脊；把 port-anchor 放进 IPSEP 迭代会让整图无界左漂。
 
@@ -104,7 +104,7 @@ boost_uv = twin_spine_boost | chain_end_boost | primary_arm_boost
 | 扩展 | 再加谓词 / continue | 改 `J` / 权重 / snap |
 | 代码 | ~1300 行 `symmetry.rs` 表逻辑 | helpers + `symmetry_objective.rs` |
 
-历史动机与熔断预警见 [notes/2026-08-08-hier-review.md](../notes/2026-08-08-hier-review.md) §2.3 / §4.3、[improvement-plan P4](../notes/2026-08-08-hier-improvement-plan.md)。
+历史动机与熔断预警见 [anti-patterns](../notes/anti-patterns.md)（声明表、1e6 锁、链折中列）。
 
 ## 6. 验收门禁
 

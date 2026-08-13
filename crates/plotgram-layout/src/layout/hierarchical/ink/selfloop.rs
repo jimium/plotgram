@@ -3,7 +3,7 @@
 //! fact). Not modeled in the channel/dummy-chain machinery at all: a small
 //! fixed loop bump off the node's canonical East side, matching v1's
 //! documented simplification (no multi-loop collision proof — see
-//! `docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md` §2.5).
+//! `docs/design/layout/hierarchical/phases/ink-and-verification.md`).
 
 use std::collections::BTreeMap;
 

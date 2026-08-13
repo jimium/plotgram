@@ -132,7 +132,7 @@ PartitionBandDebug {           # 已消费列带（partition-grid.md PG-2）
 }
 ```
 
-MVP：`channels = null` 或 `{ status: "absent", reason: "…" }`，与 [mvp-scope](notes/2026-08-02-mvp-scope.md) 一致。
+Channel 未跑或失败时：`channels = null` 或 `{ status: "absent", reason: "…" }`。
 
 组框：若仍由 finalize bbox 反推，`common.groups[].frame_source = "finalize-bbox"`。
 
@@ -181,5 +181,4 @@ Common 层 `product` / `groups` 由壳提供，本核不重复注册。
 ## 6. 参考
 
 - 父契约：[../debug-inspector.md](../debug-inspector.md)  
-- [architecture.md](architecture.md) · [mvp-scope](notes/2026-08-02-mvp-scope.md)  
-- Atlas Plan：[atlas-reference/plan-ir-diff-fingerprint.md](atlas-reference/plan-ir-diff-fingerprint.md)
+- [architecture.md](architecture.md)

@@ -1,14 +1,13 @@
-# Hierarchical · 目标架构设计
+# Hierarchical · 架构
 
-> 状态：**现行目标架构 v1**（驱动重建；非当前能力声明）  
-> 日期：2026-08-01  
-> 引擎注册名：`hierarchical`  
-> 代码落点：`crates/plotgram-layout/src/layout/hierarchical/`  
-> 约束入口：[写权纪律](../write-authority.md) · [AGENTS.md](../../../../AGENTS.md) §1  
-> 证据与启发：[from-yfiles-reference](nodes/from-yfiles-reference.md) · [`docs/reference/yfiles/`](../../../reference/yfiles/00-索引与阅读指南.md) · v1 Atlas（功能真源，非目录真源）
+> 状态：**现行架构**（与代码同步；缺口见 [roadmap](roadmap.md)）
+> 引擎注册名：`hierarchical`
+> 代码落点：`crates/plotgram-layout/src/layout/hierarchical/`
+> 约束入口：[写权纪律](../write-authority.md) · [AGENTS.md](../../../../AGENTS.md) §1
+> 证据：[from-yfiles-reference](notes/from-yfiles-reference.md) · [`docs/reference/yfiles/`](../../../reference/yfiles/00-索引与阅读指南.md)
+> 否决路线：[notes/anti-patterns.md](notes/anti-patterns.md)
 
-本文钉死 Hier 的**目标形态与跨相契约**：管线、IR、算法选型、通道路由、组/分区、参数、Stage、验真与落地顺序。  
-相级细节见 [`phases/`](phases/README.md)；实现进度不进本文，当前实现能力以代码与里程碑验收为准。
+本文钉死 Hier 的**管线、IR、写者与跨相契约**。相级细节见 [`phases/`](phases/README.md)；下一步缺口见 [roadmap](roadmap.md)。
 
 姊妹页：[README](README.md) · [expectations](expectations.md)（视觉期待） · [scope](scope.md) · [shared/partition](../shared/partition.md) · [debug-profile](debug-profile.md)（hier Trace 扩展；壳见 [../debug-inspector.md](../debug-inspector.md)）
 
@@ -124,15 +123,18 @@ LayoutAlgorithm
 ```text
 plotgram-layout/src/layout/hierarchical/
   params.rs          # HierarchicalParams / Preset / bind（入口一次）
-  compose/           # contraction · ranking · ordering · ports · channel
-  plan/              # Plan IR（稳定字段；禁止 HashMap 序）
-  metric/            # coordinate · track publish · group frames
+  model.rs           # PlanGraph / RealGraph / ElemKey（稳定序）
+  compose/           # cycle · rank · properify · order · ports
+  channel/           # Substrate · search · TrackOrder · corridor
+  metric/            # BK · J(x)+VPSC · PortLane · track · group frames
   ink/               # routing_style 展开 · verify
-  demand.rs          # DemandBoard 汇总（或提至 engine 共享）
-  stages/            # Orientation 等（可先与 facade 共用）
-  diagnostics.rs     # warning / relaxation / invariant report
+  demand.rs          # DemandBoard
+  orient.rs          # 唯一 TB ↔ 物理变换
+  strong_macro/      # group_policy: strong-macro
+  group_frame.rs     # pad / 组壳契约
+  debug.rs           # LayoutDebugTrace extension
 
-plotgram-algo/       # VPSC · FAS · crossing count · orientation 变换 · ortho normalize
+plotgram-algo/       # VPSC · FAS · crossing count · orientation · ortho normalize
 ```
 
 `LayoutContract` **保持** `AlgorithmRef { name, options: AttrMap }`；Hier 入口 `HierarchicalParams::bind` 一次，之后各相只读 typed params（见已实现 `params.rs`）。
@@ -398,7 +400,7 @@ PortPlan {
 | P5 / Ink | 端口只读 |
 | MetricBudget | 同侧独立端口数 × pitch → 节点最小尺寸 |
 
-FREE 默认算法：按对侧端点的 `(layer, order, EdgeId)` 稳定排序，在 shape policy 允许的 side 上分配 order；不得读取尚未产生的像素 x/y。
+FREE 默认算法：按**邻层邻接元**（含 long-edge dummy）的 `(layer_order, rank, EdgeId)` 稳定排序，在 shape policy 允许的 side 上分配 order；不得读取尚未产生的像素 x/y。远真实端 `layer_order` 跨层不可比，见 [anti-patterns](notes/anti-patterns.md)。
 
 详见 [ports-and-channel](phases/ports-and-channel.md)。
 
@@ -429,8 +431,7 @@ FREE 默认算法：按对侧端点的 `(layer, order, EdgeId)` 稳定排序，�
 
 目标：`contract → rank/order → expand` 同一套 Plan 类型；差异只在收缩策略与后续约束松紧。
 
-现行实现方案（推进步骤 SM-0..4、与 Weak/D₂ 边界）：[phases/strong-macro.md](phases/strong-macro.md)。  
-Atlas 四步形状（只读）：[atlas-reference/strong-macro-expansion.md](atlas-reference/strong-macro-expansion.md)。
+现行方案：[phases/strong-macro.md](phases/strong-macro.md)。Weak 框写者：[phases/group-frame-d2.md](phases/group-frame-d2.md)。
 
 组树与跨 scope 边的最低不变量：
 
@@ -492,7 +493,7 @@ HierarchicalLayoutData {
 | Group | `group_policy` / `group_sizing` / `group_align` | Weak / Fit / Center |
 | Preset | `preset` | default → compact/spacious 只改 gaps |
 
-`hub_client_align: bool` 没有 hub/client 的 typed 选择器，不能形成可验证语义；目标架构删除该布尔开关，以 `alignment_sets` + priority 表达。无向后兼容层。
+`hub_client_align: bool` 没有 hub/client 的 typed 选择器，不能形成可验证语义；已删除该布尔开关，以 `alignment_sets` + priority 表达。无向后兼容层。
 
 后续按需扩展（仍进同一 struct，不按图种分表）：
 
@@ -564,21 +565,17 @@ Stage 只写自己拥有的变换自由度：核心写 component-local 坐标，
 
 ---
 
-## 12. 落地顺序（设计里程碑，非日记）
+## 12. 已交付 / 未交付
 
-按依赖与 ROI（对齐 reference 13，收敛为重建口径）：
+主路径（M0–M4 骨架）已交付：FAS → NS → order → ports → `J(x)`+VPSC → Channel → Ink；Weak 框进 Metric；StrongMacro 同一 Plan。细节与余项见 [roadmap](roadmap.md)。
 
-| 里程碑 | 交付 | 验收要点 |
-|--------|------|----------|
-| **M0** | LayoutOutput/RouteInput/Diagnostics 目标契约 · typed Writer · Demand epoch · VPSC · Orientation Stage | warning 可观测；组框可由 Layout 输出；四向变换 round-trip；确定性 |
-| **M1** | EdgePlan/FAS · NS · properify · median(+权+snapshot) · BK · Plan/Metric verifier | 无重叠；反向边语义保持；长边更直 |
-| **M2** | 边侧 Port IR · strong-port projection · FREE finalize · label/loop reserve | 端口序一致；无 Ink fallback |
-| **M3** | Channel topology · track order · demand · 有界 rip-up · InkVerifier | 不穿节点；无非法重合 |
-| **M4** | 组 scope/gate · 连续块统一壳 · 组框进 VPSC · Weak/Strong 同 Plan | 不穿组；一组 Plan schema；finalize 不重算组框 |
-| **M5** | PartitionGrid 引擎消费 + Orientation 映射 | cell 落带；全局层跨泳道一致；四向轴语义正确 |
-| **后置** | octilinear/curved · 真 MCF · from-sketch · 完整 integrated labeling | 不挡主路径闭环 |
+| | |
+|--|--|
+| **已交付** | 契约 I/O · VPSC · 四向 Orientation · Channel + TrackOrder + rip-up · PortLane · `J(x)` 次轴 · Weak/Strong 单写者框 · 穿组 verifier |
+| **未交付** | PartitionGrid **引擎消费**（M5）· strong-port projection / label·loop reserve · 穿组构造清零 · 完整 integrated labeling |
+| **后置** | octilinear / 真 MCF / from-sketch |
 
-**迁移原则**：v1 Atlas 是**功能与坑**真源；重建按相迁拓扑与门禁，**不**整包拷贝三路径 `solve` 壳。
+v1 Atlas 只作反例与形状启发（[anti-patterns](notes/anti-patterns.md)）；**不**拷贝三路径 `solve` 壳。
 
 ---
 
@@ -607,15 +604,16 @@ Stage 只写自己拥有的变换自由度：核心写 component-local 坐标，
 
 | 资产 | 角色 |
 |------|------|
-| **本文** | Hier **目标架构**真源 |
+| **本文** | Hier **现行架构**（写权、IR、相切分） |
+| [roadmap.md](roadmap.md) | 现在 + 下一步 |
 | [scope.md](scope.md) | 能力 / 非目标 / 典型域 |
-| [phases/](phases/README.md) | 本文契约的相级展开；不得改变本文写权 |
-| [from-yfiles-reference.md](nodes/from-yfiles-reference.md) | 阅读启发纪要（不替代本文） |
+| [phases/](phases/README.md) | 相级契约；不得改变本文写权 |
+| [notes/anti-patterns.md](notes/anti-patterns.md) | 已否决路线 |
+| [from-yfiles-reference.md](notes/from-yfiles-reference.md) | 阅读启发纪要 |
 | [write-authority.md](../write-authority.md) | 全布局尺子 |
 | `docs/reference/yfiles/*` | 算法证据 |
-| `docs/archive/atlas/*` | 历史总纲与债（只读） |
-| `hierarchical/params.rs` | 参数 / preset / bind（已落地入口） |
-| stub `rank/place/ports/ink` | **过渡**；须按本文替换，禁止在其上叠特判 |
+| `docs/archive/atlas/*` | 历史总纲（只读） |
+| `hierarchical/params.rs` | 参数 / preset / bind |
 
 ---
 

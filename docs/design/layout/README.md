@@ -64,6 +64,6 @@ state(环形)                             → circular
 ## 阅读建议
 
 1. 先读 [写权纪律](write-authority.md)。
-2. 做 Hier：本目录 [hierarchical/](hierarchical/) → **目标架构** [architecture](hierarchical/architecture.md) → [相级契约](hierarchical/phases/README.md) → 启发纪要 [from-yfiles-reference](hierarchical/nodes/from-yfiles-reference.md) → reference [01](../../reference/yfiles/01-sugiyama分层布局.md) / [13](../../reference/yfiles/13-实现路线图与选型.md)。
+2. 做 Hier：本目录 [hierarchical/](hierarchical/) → **架构** [architecture](hierarchical/architecture.md) → [相级契约](hierarchical/phases/README.md) → [anti-patterns](hierarchical/notes/anti-patterns.md) → 启发纪要 [from-yfiles-reference](hierarchical/nodes/from-yfiles-reference.md) → reference [01](../../reference/yfiles/01-sugiyama分层布局.md) / [13](../../reference/yfiles/13-实现路线图与选型.md)。
 3. 做独立正交路由： [routing/](../routing/) → [orthogonal/](../routing/orthogonal/) → [architecture](../routing/orthogonal/architecture.md) → reference [03](../../reference/yfiles/03-正交边路由.md)。可手写 `RouteScene` 夹具，不经布局核。
 4. 回溯 Atlas 决策动机时再翻 `docs/archive/atlas/`（21 立场 → 22 总纲）。
