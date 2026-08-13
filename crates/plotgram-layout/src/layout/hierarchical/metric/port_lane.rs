@@ -332,10 +332,12 @@ fn slot_partner_column(
 ) -> f64 {
     let xs: Vec<f64> = slot
         .iter()
-        .map(|end| match anchors.get(&(end.edge_id.clone(), end.is_source)) {
-            Some(PartnerAnchor::Fixed(x)) => *x,
-            _ => partner_node_center(end, plan, graph, frames).unwrap_or(0.0),
-        })
+        .map(
+            |end| match anchors.get(&(end.edge_id.clone(), end.is_source)) {
+                Some(PartnerAnchor::Fixed(x)) => *x,
+                _ => partner_node_center(end, plan, graph, frames).unwrap_or(0.0),
+            },
+        )
         .collect();
     median(&xs)
 }
@@ -352,9 +354,7 @@ fn partner_node_center(
     } else {
         e.original_source
     };
-    let elem = *plan
-        .index_of
-        .get(&ElemKey::Real(graph.ids[peer].clone()))?;
+    let elem = *plan.index_of.get(&ElemKey::Real(graph.ids[peer].clone()))?;
     Some(frames[elem].x + frames[elem].width / 2.0)
 }
 

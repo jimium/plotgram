@@ -456,8 +456,25 @@ fn snap_fan_pack_style(
 
     let mut desired = best.to_vec();
     let mut iter_weights = weights.to_vec();
+    let long_edge_hubs: BTreeSet<usize> = plan
+        .segments
+        .iter()
+        .filter(|s| plan.elems[s.from].key.is_virtual() ^ plan.elems[s.to].key.is_virtual())
+        .flat_map(|s| [s.from, s.to])
+        .filter(|&e| matches!(plan.elems[e].key, ElemKey::Real(_)))
+        .collect();
+
     for &h in &hub_order {
-        let axis = center_h(best, h, down_nbs, up_nbs, down_deg, up_deg);
+        // IPSEP already placed a long-edge hub by minimizing J. Re-snapping
+        // it onto the child centroid undoes the linear segment (mech n5 sits
+        // on e30 in the iterate, then snap yanks it onto n6/n23). Pure fans
+        // still snap to center_h (fan_spine_chain). Pack leaves around that
+        // axis either way.
+        let axis = if params.symmetry_place == SymmetryPlace::Ipsep && long_edge_hubs.contains(&h) {
+            best[h]
+        } else {
+            center_h(best, h, down_nbs, up_nbs, down_deg, up_deg)
+        };
         desired[h] = axis;
         iter_weights[h] = REAL_WEIGHT * (1.0 + params.lambda_sym) * 8.0;
         pull_spine_to_axis(
@@ -2018,17 +2035,17 @@ fn pull_spine_to_axis(
 ///
 /// Chain identity binds ≥2 dummies into one VPSC variable. Equal-weight
 /// writes from both non-leaf ends park that variable at the midpoint
-/// (mech e30). A single writer is used only when it is unambiguous:
+/// (mech e30; also e18, whose dummy then packed L2 and shoved n26/n5 ~90px
+/// right of the yFiles left basin). A single writer is used when at least
+/// one non-leaf end is a fan hub and the chain has ≥2 dummies:
 ///
-/// - one non-leaf end → that end writes every dummy (notes §12 D)
-/// - two non-leaf ends, ≥2 dummies, **exactly one** is a fan hub → the
-///   **non-hub** writes (fan dummies track the child; e30's through-node
-///   n21 keeps the left basin). Hub-writes-corridor was tried and
-///   collapsed fan dummies onto the parent column.
+/// - exactly one hub → the **non-hub** writes (fan dummies track the child)
+/// - both hubs → the end more peripheral on its own layer writes (e18's
+///   n25 is leftmost on a wide rank; n18 is the only node on L0). Hub
+///   writes-corridor was tried and collapsed fan dummies onto the parent.
 ///
-/// Both hubs, neither hub, or a single dummy: keep per-end writes.
-/// Applying the closer-to-x single writer to neither-hub long reverses
-/// (order-approval `rejected→submit`) drifted the D2 spine ~2px.
+/// Neither hub, or a single dummy: keep per-end writes. Closer-to-x on
+/// neither-hub long reverses (order-approval `rejected→submit`) drifted D2.
 ///
 /// Chain-end leaves (notes §12 D) still do **not** yank the dummy: they
 /// are pulled onto the anchored column afterwards.
@@ -2094,19 +2111,14 @@ fn apply_port_anchor_desired(
             }
             nonleaf.push((real_elem, port, nb));
         }
-        let ends: Vec<(usize, ResolvedPort)> =
-            nonleaf.iter().map(|&(r, p, _)| (r, p)).collect();
+        let ends: Vec<(usize, ResolvedPort)> = nonleaf.iter().map(|&(r, p, _)| (r, p)).collect();
         let single_writer = match ends.as_slice() {
             [_] => true,
-            &[a, b] if dummies.len() >= 2 => {
-                hub_set.contains(&a.0) != hub_set.contains(&b.0)
-            }
+            &[a, b] if dummies.len() >= 2 => hub_set.contains(&a.0) || hub_set.contains(&b.0),
             _ => false,
         };
         if single_writer {
-            if let Some((real_elem, port)) =
-                pick_chain_anchor(&ends, &hub_set, owner_x, &dummies, &frame_of)
-            {
+            if let Some((real_elem, port)) = pick_chain_anchor(&ends, &hub_set, plan) {
                 let ax = port_anchor(frame_of(real_elem), port).x;
                 for &d in &dummies {
                     desired[d] = ax;
@@ -2129,9 +2141,7 @@ fn apply_port_anchor_desired(
 fn pick_chain_anchor(
     ends: &[(usize, ResolvedPort)],
     hubs: &BTreeSet<usize>,
-    owner_x: &[f64],
-    dummies: &BTreeSet<usize>,
-    frame_of: &dyn Fn(usize) -> Rect,
+    plan: &PlanGraph,
 ) -> Option<(usize, ResolvedPort)> {
     match ends {
         [] => None,
@@ -2142,25 +2152,52 @@ fn pick_chain_anchor(
             if ha != hb {
                 return Some(if ha { b } else { a });
             }
-            let chain_x = dummies.iter().map(|&d| owner_x[d]).sum::<f64>() / dummies.len() as f64;
-            let da = (port_anchor(frame_of(a.0), a.1).x - chain_x).abs();
-            let db = (port_anchor(frame_of(b.0), b.1).x - chain_x).abs();
-            Some(if da.total_cmp(&db).then(a.0.cmp(&b.0)).is_le() {
-                a
-            } else {
-                b
-            })
+            Some(more_peripheral_end(a, b, plan))
         }
-        more => {
-            let chain_x = dummies.iter().map(|&d| owner_x[d]).sum::<f64>() / dummies.len() as f64;
-            more.iter()
-                .copied()
-                .min_by(|a, b| {
-                    let da = (port_anchor(frame_of(a.0), a.1).x - chain_x).abs();
-                    let db = (port_anchor(frame_of(b.0), b.1).x - chain_x).abs();
-                    da.total_cmp(&db).then(a.0.cmp(&b.0))
-                })
-        }
+        more => more.iter().copied().max_by(|a, b| {
+            layer_peripheral(a.0, plan)
+                .total_cmp(&layer_peripheral(b.0, plan))
+                .then(a.0.cmp(&b.0))
+        }),
+    }
+}
+
+/// |layer_frac − 0.5|: a node alone on its rank scores 0; the leftmost or
+/// rightmost real on a populated rank scores 0.5. Used when both chain ends
+/// are hubs so the corridor parks on the side that already has an exterior
+/// column (mech e18 → n25, not the n18/n25 midpoint that packed L2).
+fn layer_peripheral(elem: usize, plan: &PlanGraph) -> f64 {
+    (layer_frac(elem, plan) - 0.5).abs()
+}
+
+fn layer_frac(elem: usize, plan: &PlanGraph) -> f64 {
+    let rank = plan.elems[elem].rank as usize;
+    let Some(layer) = plan.layers.get(rank) else {
+        return 0.5;
+    };
+    let reals: Vec<usize> = layer
+        .iter()
+        .copied()
+        .filter(|&e| matches!(plan.elems[e].key, ElemKey::Real(_)))
+        .collect();
+    if reals.len() <= 1 {
+        return 0.5;
+    }
+    let idx = reals.iter().position(|&e| e == elem).unwrap_or(0);
+    idx as f64 / (reals.len() - 1) as f64
+}
+
+fn more_peripheral_end(
+    a: (usize, ResolvedPort),
+    b: (usize, ResolvedPort),
+    plan: &PlanGraph,
+) -> (usize, ResolvedPort) {
+    let pa = layer_peripheral(a.0, plan);
+    let pb = layer_peripheral(b.0, plan);
+    if pa.total_cmp(&pb).then(a.0.cmp(&b.0)).is_ge() {
+        a
+    } else {
+        b
     }
 }
 
