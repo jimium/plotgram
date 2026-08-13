@@ -171,7 +171,7 @@ pub fn apply_port_lanes(
 /// the peer node's center — because Compose's far-real `layer_order` is a
 /// raw index and incommensurable across layers (mech n11: e29 leftmost on a
 /// 2-node rank, reverse vertical then crossed by every left-going out-edge).
-/// PAVA still enforces pitch and face bounds in that order. An end with
+/// PAVA still enforces pitch and the yFiles inward band in that order. An end with
 /// nothing to align to keeps its canonical even slot.
 ///
 /// Faces the twin-corridor pass already wrote are skipped whole: a shared lane
@@ -273,7 +273,8 @@ fn align_ns_ports(
                     median(&wants)
                 })
                 .collect();
-            let placed = project_ordered(&targets, pitch, frame.x, frame.right());
+            let (lo, hi) = face_align_band(frame, slots.len(), &targets);
+            let placed = project_ordered(&targets, pitch, lo, hi);
             for (slot, x) in slots.iter().zip(placed) {
                 for end in slot {
                     at.insert((end.edge_id.clone(), end.is_source), x);
@@ -421,6 +422,38 @@ fn endpoint_elems_direct(
         .index_of
         .get(&ElemKey::Real(graph.ids[edge.original_target].clone()))?;
     Some((src, tgt))
+}
+
+/// Default inward span: yFiles even-slot extremes `(2k+1)/2n` (two ports →
+/// 1/4 and 3/4). Partner-chasing that overshoots the face used to slam onto
+/// the box corners (`PORT_MARGIN = 0`, mech n18).
+fn face_inward_band(frame: &Rect, n_slots: usize) -> (f64, f64) {
+    let n = n_slots.max(1) as f64;
+    let inset = frame.width / (2.0 * n);
+    let lo = frame.x + inset;
+    let hi = frame.right() - inset;
+    if hi >= lo {
+        (lo, hi)
+    } else {
+        let c = center_x(frame);
+        (c, c)
+    }
+}
+
+/// Keep the inward band, but open it toward any target that already sits on
+/// this face — those partners can be met without going to a corner (order-
+/// approval `check→finance` primary, 1px off the 1/(2n) extreme).
+fn face_align_band(frame: &Rect, n_slots: usize, targets: &[f64]) -> (f64, f64) {
+    let (mut lo, mut hi) = face_inward_band(frame, n_slots);
+    let left = frame.x;
+    let right = frame.right();
+    for &t in targets {
+        if t >= left && t <= right {
+            lo = lo.min(t);
+            hi = hi.max(t);
+        }
+    }
+    (lo.clamp(left, right), hi.clamp(left, right))
 }
 
 /// L1 projection of `targets` onto `x[i] + pitch ≤ x[i+1]` inside `[lo, hi]` —

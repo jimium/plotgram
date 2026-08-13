@@ -246,7 +246,7 @@ P1 单独会让 crossings 短暂上升（探针实测 11→13），这是预期�
 | Virtual `dummy_width` | 拉开 group-frame gap、扰动 strong-macro |
 | BK RV 硬共线 | 长支叶抢脊（order-approval） |
 | 降 port-anchor 权重 | 扇出 dummy 列测试与多 showcase 坐标大挪 |
-| 微偏移 snap | 暂留代码未接线 |
+| 微偏移 snap | **已接线**：终局 VPSC 后端口差 `< node_gap/4` 的实–实 hop 加共线等式（symmetry-axis §4.9） |
 | PortLane 长边吸附 | 暂留 `adsorb_ns_ordered_to_corridors` 未接线 |
 
 mech 当前观测（相对改前 HEAD crossings=26 / max_bends=6）：**crossings≈13，max_bends=4，e29/e30 走 N/S，e18 保持 S→N**。距 yFiles（0 交叉 / max_bends=2 / 9 条 0 折）仍差 P2/P3。
@@ -705,6 +705,21 @@ snap 把长边 hub 钉回 `center_h` 会撤销 J 刚拉上的线性段。IPSEP �
 | D2 / D3 / 主臂 / layout 178 | 绿 | **绿** | — |
 
 e18 让出左盆、e27 共线，是 F 的能力验收。n5 仍不在 e30 上：IPSEP 迭代时 e18 dummy 还在旧列，snapshot 把 n5 停在 176；snap 再钉住长边 hub，腾出的 slack 吸不进去。下一步应让链列进下降步且**有左墙**（不能再无界左漂），而不是再加第三趟特判。`hier_eval` 几何硬不变量绿；bend / canvas-bloat 仍红（基线未刷）。
+
+| **G** | 1:1 茎焊端口列；扇出 hub 在 1:1 茎上保持 J（不贴子心）；纯扇入汇点贴焊茎后的 `center_h`；扇入不 FanPack 父节点 | 主臂 / D3 / n14 廊 |
+
+**G 实测（2026-08-13）**：小折与 n17 偏轴是同一自由度——「唯一向下邻居 = 唯一向上邻居」的茎应共一列。exclusive chain 在 hub 处停，叶被 FanPack 后不带 continuation。两端都是 hub 的茎（n6–n10）不焊：子贴父会拖动整簇、汇点离轴；父贴子会撞层内分离。该子改为保持 J。悬挂汇点叶不焊（D 的 n14 跟廊）。
+
+| | F | **G** | yFiles |
+|--|---|--------|--------|
+| sum_bends / max / 0 折 | 58 / 2 / 5 | **44 / 2 / 12** | 44 / 2 / 12 |
+| n15–n16 / n20–n21 / n21–n17 | 2 折小折 | **0 折** | 0 / 2 / 0（n20–n21 有端口差） |
+| n17 vs 父母 midspan | +12px（贴 n21 右侧） | **−2px** | 0（n17=n21=midspan） |
+| n6–n10 | 11px 折 | ~20px 折（两 hub 茎不焊） | 0 折 |
+| n1–n2 | 2 折 ~5px | **0 折**（共线吸附，§4.2(d)） | 0 折 |
+| D2 / D3 / 主臂 / layout 178 | 绿 | **绿** | — |
+
+焊茎的 soft desired 经 VPSC 仍会剩 2–5px 横折。终局再投影一次：端口差 `< node_gap/4` 的实–实 hop 加 `x_to = x_from + δ` 硬等式（两端都可动）。有意的扇出横折大于 ε，不吸。
 
 失败判据：A1 之后若 dense 层仍整层 `node_gap` 取等，说明投影仍在吃 slack（desired 仍在塌缩）——不要加宽 dummy，先查下降步是不是又把所有人映射到少数几个 x。
 

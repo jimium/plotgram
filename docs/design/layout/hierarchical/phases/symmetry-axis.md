@@ -81,12 +81,15 @@ boost_uv = twin_spine_boost | chain_end_boost | primary_arm_boost
 
 在最佳 `J` 快照上写 soft desired 再 VPSC 一次（必要时二次 spine reclaim）：
 
-1. hub → `center_h`（纯扇）；IPSEP 下**连着 dummy 链的 hub**保持 J 的列，不拽回子心（否则 mech n5 离开 e30）；  
-2. ≥2 自由叶：`axis + slot_multipliers · pitch`（层内序；FanPack / D3）；  
+1. hub → `center_h`（纯扇）；IPSEP 下**连着 dummy 链的 hub**、以及**1:1 茎上的扇出 hub**（n10 在 n6 下）保持 J 的列，不拽回子心；  
+2. **只铺扇出叶**（`down_deg ≥ 2`）：≥2 自由叶 `axis + slot_multipliers · pitch`（FanPack / D3）；扇入只动汇点，不 FanPack 父节点（否则 1:1 茎被拽开，汇点看起来贴在 median 父下）；  
 3. 恰 1 自由叶：IPSEP **保持 J 的列**（`node_gap` 只当分离下限）；median 档仍 `axis ± pitch`；  
 4. twin / 主臂 peer → 轴（**仅 `symmetry_place: median`** 仍 1e6 锁；IPSEP 主路径把相对共线写进 J，见 §12 A2）；  
 5. exclusive 1:1 spine / follower 跟列；  
-6. port-anchor 覆盖链端 dummy，再 `exteriorize` 同层 dummy。
+6. **1:1 茎焊列**：父的唯一向下邻居 = 子的唯一向上邻居、且子不是扇出 hub 时，子跟父的端口列（悬挂汇点叶除外）。两端都是 hub 的茎（n6–n10）层内分离可能禁掉共列，不焊。这是小折（n15–n16）与扇入汇点偏轴的同一写者；  
+7. **纯扇入汇点**（`up_deg ≥ 2` 且无扇出、非长边 hub）再贴 `center_h`（焊茎后的父母跨度）；  
+8. port-anchor 覆盖链端 dummy，再 `exteriorize` 同层 dummy；  
+9. **共线吸附**（notes §4.2(d)）：终局 VPSC 之后，实–实相邻层边若端口列差 `< node_gap/4`，加 `x_to = x_from + δ` 硬等式再投影一次（两端都可动，消 n1–n2 这类 2–5px 残差）。有意的扇出横折大于 ε，不吸。等式不可行则保持吸附前的 x。
 
 链列单写者（yfiles/01 §4.5）分两层：约束层用链恒等把 ≥2 颗 dummy 焊成一个 VPSC 变量；desired 层只在写者无歧义时把**整条链**钉到一端的 `port_anchor.x`——恰好一个非叶端，或两端都非叶且至少一端是扇 hub、≥2 颗 dummy。恰好一端是 hub → **非 hub**写廊；两端都是 hub → **本层更靠边缘**的那端写廊（mech e18 的 n25，避免折中列把 L2 整层顶开）。两端都不是 hub、或只有一颗 dummy，仍逐端写入。悬挂汇点叶不反向拽廊，而是被拉到该 dummy 列。两端等权折中会把焊死的变量停在中间列；把「离链更近」的那端当单写者会漂 D2 脊；把 port-anchor 放进 IPSEP 迭代会让整图无界左漂。
 
@@ -117,7 +120,7 @@ boost_uv = twin_spine_boost | chain_end_boost | primary_arm_boost
 
 - 图名 / profile 特判；  
 - Channel / Ink 回写次轴或 side；  
-- VPSC 中点硬等式 / 第三趟 ad-hoc；  
+- VPSC 中点硬等式 / 第三趟 ad-hoc（共线吸附只焊已经几乎共线的端口，不发明新列）；  
 - 组框进 VPSC（P2-3，组专项）；  
 - 以「恢复 FanPack 声明表」为回退终态。
 

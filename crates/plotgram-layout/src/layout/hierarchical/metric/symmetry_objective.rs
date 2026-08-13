@@ -467,10 +467,15 @@ fn snap_fan_pack_style(
     for &h in &hub_order {
         // IPSEP already placed a long-edge hub by minimizing J. Re-snapping
         // it onto the child centroid undoes the linear segment (mech n5 sits
-        // on e30 in the iterate, then snap yanks it onto n6/n23). Pure fans
-        // still snap to center_h (fan_spine_chain). Pack leaves around that
-        // axis either way.
-        let axis = if params.symmetry_place == SymmetryPlace::Ipsep && long_edge_hubs.contains(&h) {
+        // on e30 in the iterate, then snap yanks it onto n6/n23). A fan-out
+        // hub on a 1:1 stem (n10 under n6) must keep J too — child centroid
+        // is n15/n20 after stem weld, which parks n10 away from n6.
+        // Pure fans still snap to center_h (fan_spine_chain).
+        let stem_fan_out =
+            down_deg[h] >= 2 && up_nbs[h].len() == 1 && down_nbs[up_nbs[h][0]].len() == 1;
+        let axis = if params.symmetry_place == SymmetryPlace::Ipsep
+            && (long_edge_hubs.contains(&h) || stem_fan_out)
+        {
             best[h]
         } else {
             center_h(best, h, down_nbs, up_nbs, down_deg, up_deg)
@@ -490,12 +495,13 @@ fn snap_fan_pack_style(
             &mut desired,
             &mut iter_weights,
         );
-        for side in [
-            (down_deg[h] >= 2).then_some(&down_nbs[h]),
-            (up_deg[h] >= 2).then_some(&up_nbs[h]),
-        ]
-        .into_iter()
-        .flatten()
+        // Fan-out: pack children around the hub. Fan-in: the hub already
+        // sits on `center_h` of its parents — packing the parents would
+        // yank 1:1 columns off (mech n15–n16, n20–n21) and leave the sink
+        // looking glued to the median parent (n17 under n21).
+        for side in [(down_deg[h] >= 2).then_some(&down_nbs[h])]
+            .into_iter()
+            .flatten()
         {
             let mut leaves: Vec<usize> = side
                 .iter()
@@ -555,40 +561,51 @@ fn snap_fan_pack_style(
             }
         }
         // Primary occupies axis → remaining leaf must leave the axis.
-        if [
-            (down_deg[h] >= 2).then_some(&down_nbs[h]),
-            (up_deg[h] >= 2).then_some(&up_nbs[h]),
-        ]
-        .into_iter()
-        .flatten()
-        .any(|side| side.iter().any(|&l| primary.contains(&undirected(h, l))))
+        if down_deg[h] >= 2
+            && down_nbs[h]
+                .iter()
+                .any(|&l| primary.contains(&undirected(h, l)))
         {
-            for side in [
-                (down_deg[h] >= 2).then_some(&down_nbs[h]),
-                (up_deg[h] >= 2).then_some(&up_nbs[h]),
-            ]
-            .into_iter()
-            .flatten()
-            {
-                for &leaf in side.iter() {
-                    if plan.elems[leaf].key.is_virtual()
-                        || plan.elems[leaf].key.is_zero_width()
-                        || twins.contains(&undirected(h, leaf))
-                        || primary.contains(&undirected(h, leaf))
-                    {
-                        continue;
-                    }
-                    if (desired[leaf] - axis).abs() < 1.0 {
-                        let pitch =
-                            (params.node_gap + size_of(h).width / 2.0 + size_of(leaf).width / 2.0)
-                                .max(params.node_gap);
-                        desired[leaf] = axis - pitch; // long "no" prefers left
-                        iter_weights[leaf] = iter_weights[leaf].max(REAL_WEIGHT * 16.0);
-                    }
+            for &leaf in &down_nbs[h] {
+                if plan.elems[leaf].key.is_virtual()
+                    || plan.elems[leaf].key.is_zero_width()
+                    || twins.contains(&undirected(h, leaf))
+                    || primary.contains(&undirected(h, leaf))
+                {
+                    continue;
+                }
+                if (desired[leaf] - axis).abs() < 1.0 {
+                    let pitch =
+                        (params.node_gap + size_of(h).width / 2.0 + size_of(leaf).width / 2.0)
+                            .max(params.node_gap);
+                    desired[leaf] = axis - pitch; // long "no" prefers left
+                    iter_weights[leaf] = iter_weights[leaf].max(REAL_WEIGHT * 16.0);
                 }
             }
         }
     }
+    weld_unique_stems(
+        plan,
+        down_nbs,
+        up_nbs,
+        down_deg,
+        deltas,
+        chain_end_leaves,
+        &mut desired,
+        &mut iter_weights,
+    );
+    recenter_fan_in_sinks(
+        plan,
+        hubs,
+        down_nbs,
+        up_nbs,
+        down_deg,
+        up_deg,
+        &long_edge_hubs,
+        params.lambda_sym,
+        &mut desired,
+        &mut iter_weights,
+    );
     let owner_x = desired.clone();
     apply_port_anchor_desired(
         plan,
@@ -640,12 +657,9 @@ fn snap_fan_pack_style(
             &mut desired,
             &mut iter_weights,
         );
-        for side in [
-            (down_deg[h] >= 2).then_some(&down_nbs[h]),
-            (up_deg[h] >= 2).then_some(&up_nbs[h]),
-        ]
-        .into_iter()
-        .flatten()
+        for side in [(down_deg[h] >= 2).then_some(&down_nbs[h])]
+            .into_iter()
+            .flatten()
         {
             let skip: BTreeSet<usize> = side.iter().copied().collect();
             let side_has_primary = side
@@ -709,6 +723,28 @@ fn snap_fan_pack_style(
             &mut iter_weights,
         );
     }
+    weld_unique_stems(
+        plan,
+        down_nbs,
+        up_nbs,
+        down_deg,
+        deltas,
+        chain_end_leaves,
+        &mut desired,
+        &mut iter_weights,
+    );
+    recenter_fan_in_sinks(
+        plan,
+        hubs,
+        down_nbs,
+        up_nbs,
+        down_deg,
+        up_deg,
+        &long_edge_hubs,
+        params.lambda_sym,
+        &mut desired,
+        &mut iter_weights,
+    );
     let owner_x = desired.clone();
     apply_port_anchor_desired(
         plan,
@@ -738,7 +774,16 @@ fn snap_fan_pack_style(
             }
         }
     }
-    solve_or_fallback(n, &desired, &iter_weights, hard, hard_fallback)
+    let placed = solve_or_fallback(n, &desired, &iter_weights, hard, hard_fallback)?;
+    adsorb_near_collinear(
+        n,
+        placed,
+        plan,
+        deltas,
+        chain_end_leaves,
+        hard,
+        params.node_gap,
+    )
 }
 
 /// Snap each group-boundary clamp to the GLOBAL member-derived frame edge.
@@ -1938,6 +1983,171 @@ fn objective_j(
         j += params.lambda_sym * (x[h] - c).abs();
     }
     j
+}
+
+/// Unique down-neighbor of parent *and* unique up-neighbor of child: a stem
+/// that should be one port column (yFiles 0-bend n15–n16 / n20–n21). Exclusive
+/// chain stops at hubs, so the continuation of a packed leaf (n15→n16) was
+/// never rewritten. Parent writes, child follows.
+///
+/// Skip when the child is itself a fan-out hub (n6→n10): pulling that hub
+/// onto the parent yanks its packed leaves, and pulling the parent onto the
+/// child hits same-layer sep (n6 vs n25). Those stems keep J on the child
+/// instead (see snap axis). Chain-end leaves stay on the corridor (D).
+#[allow(clippy::too_many_arguments)]
+fn weld_unique_stems(
+    plan: &PlanGraph,
+    down_nbs: &[Vec<usize>],
+    up_nbs: &[Vec<usize>],
+    down_deg: &[usize],
+    deltas: &AlignDeltas,
+    chain_end_leaves: &BTreeSet<usize>,
+    desired: &mut [f64],
+    weights: &mut [f64],
+) {
+    let n = plan.elems.len();
+    let mut stems: Vec<(usize, usize)> = Vec::new();
+    for p in 0..n {
+        if plan.elems[p].key.is_virtual() || plan.elems[p].key.is_zero_width() {
+            continue;
+        }
+        if down_nbs[p].len() != 1 {
+            continue;
+        }
+        let c = down_nbs[p][0];
+        if plan.elems[c].key.is_virtual()
+            || plan.elems[c].key.is_zero_width()
+            || chain_end_leaves.contains(&c)
+            || chain_end_leaves.contains(&p)
+        {
+            continue;
+        }
+        if up_nbs[c].len() != 1 || up_nbs[c][0] != p {
+            continue;
+        }
+        if down_deg[c] >= 2 {
+            continue;
+        }
+        stems.push((p, c));
+    }
+    stems.sort_by(|&(a, b), &(c, d)| {
+        plan.elems[a]
+            .rank
+            .cmp(&plan.elems[c].rank)
+            .then(a.cmp(&c))
+            .then(b.cmp(&d))
+    });
+    for (p, c) in stems {
+        desired[c] = desired[p] + deltas.get(p, c);
+        weights[c] = weights[c].max(REAL_WEIGHT * 32.0);
+    }
+}
+
+/// After VPSC, force port-collinear equalities on real–real hops whose ports
+/// already sit within `node_gap/4` (notes §4.2(d)). Stem weld writes a soft
+/// desired; the least-squares projection leaves a 2–5px shelf (mech n1–n2).
+/// Hard `x_to = x_from + δ` lets whichever end has slack move. Intentional
+/// fan shelves (`n6–n10`, `n5–n23`) are larger than ε and stay bent.
+/// Infeasible equalities are dropped — the pre-adsorb placement is kept.
+fn adsorb_near_collinear(
+    n: usize,
+    mut placed: Vec<f64>,
+    plan: &PlanGraph,
+    deltas: &AlignDeltas,
+    chain_end_leaves: &BTreeSet<usize>,
+    hard: &[Constraint],
+    node_gap: f64,
+) -> Result<Vec<f64>, VpscError> {
+    let eps = (node_gap * 0.25).max(1.0);
+    // A move can expose a new sub-ε shelf on a neighbor hop (mech e15 after
+    // n1–n2). Same writer, at most a couple of projections.
+    for _ in 0..3 {
+        let pairs = near_collinear_pairs(plan, deltas, chain_end_leaves, &placed, eps);
+        if pairs.is_empty() {
+            break;
+        }
+        let mut extra = hard.to_vec();
+        extra.reserve(pairs.len() * 2);
+        for &(a, b, d) in &pairs {
+            extra.push(Constraint::new(a, b, d));
+            extra.push(Constraint::new(b, a, -d));
+        }
+        let weights = vec![1.0; n];
+        match solve_once(n, &placed, &weights, &extra) {
+            Ok(v) => placed = v,
+            Err(VpscError::Infeasible { .. }) => break,
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(placed)
+}
+
+fn near_collinear_pairs(
+    plan: &PlanGraph,
+    deltas: &AlignDeltas,
+    chain_end_leaves: &BTreeSet<usize>,
+    x: &[f64],
+    eps: f64,
+) -> Vec<(usize, usize, f64)> {
+    let mut seen: BTreeSet<(usize, usize)> = BTreeSet::new();
+    let mut out = Vec::new();
+    for s in &plan.segments {
+        if s.edge_id.starts_with("gb:") || s.edge_id.starts_with("pb:") {
+            continue;
+        }
+        let (a, b) = (s.from, s.to);
+        if a == b
+            || !matches!(plan.elems[a].key, ElemKey::Real(_))
+            || !matches!(plan.elems[b].key, ElemKey::Real(_))
+            || chain_end_leaves.contains(&a)
+            || chain_end_leaves.contains(&b)
+            || plan.elems[a].rank.abs_diff(plan.elems[b].rank) != 1
+        {
+            continue;
+        }
+        if !seen.insert(undirected(a, b)) {
+            continue;
+        }
+        let d = deltas.get(a, b);
+        let jog = (x[b] - x[a] - d).abs();
+        if jog < 1e-9 || jog >= eps {
+            continue;
+        }
+        out.push((a, b, d));
+    }
+    out.sort_by(|p, q| p.0.cmp(&q.0).then(p.1.cmp(&q.1)));
+    out
+}
+
+/// Pure fan-in sink (no fan-out) sits on `center_h` of current parents.
+/// Runs after stem weld so the span is the straightened parent columns
+/// (mech n17 under n16/n21/n7). Long-edge hubs keep J (F).
+#[allow(clippy::too_many_arguments)]
+fn recenter_fan_in_sinks(
+    plan: &PlanGraph,
+    hubs: &[usize],
+    down_nbs: &[Vec<usize>],
+    up_nbs: &[Vec<usize>],
+    down_deg: &[usize],
+    up_deg: &[usize],
+    long_edge_hubs: &BTreeSet<usize>,
+    lambda_sym: f64,
+    desired: &mut [f64],
+    weights: &mut [f64],
+) {
+    let mut hs = hubs.to_vec();
+    hs.sort_unstable();
+    for h in hs {
+        if down_deg[h] >= 2 || up_deg[h] < 2 || long_edge_hubs.contains(&h) {
+            continue;
+        }
+        if plan.elems[h].key.is_virtual() || plan.elems[h].key.is_zero_width() {
+            continue;
+        }
+        let axis = center_h(desired, h, down_nbs, up_nbs, down_deg, up_deg);
+        desired[h] = axis;
+        weights[h] = weights[h].max(REAL_WEIGHT * (1.0 + lambda_sym) * 16.0);
+    }
 }
 
 /// Pull exclusive 1:1 real spines onto `axis` (replaces RigidColumnClass walk).
