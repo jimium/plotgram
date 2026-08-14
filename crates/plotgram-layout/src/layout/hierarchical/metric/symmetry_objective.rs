@@ -2292,8 +2292,10 @@ fn pull_spine_to_axis(
 /// and the chain has ≥2 dummies:
 ///
 /// - exactly one hub → the **non-hub** writes (fan dummies track the child)
-/// - both hubs, exactly one fan-out → the **fan-out** writes
-/// - both fan-out (or neither) → the end more peripheral on its own layer
+/// - both hubs → the **fan-out** end writes, unless peripheral ownership
+///   splits strongly (|Δperipheral| ≥ 0.5: one end alone on its rank with
+///   nowhere to park vs an end on the rank edge that already owns an
+///   exterior column) — then the peripheral end writes
 ///
 /// Neither hub, or a single dummy: keep per-end writes. Closer-to-x on
 /// neither-hub long reverses drifted D2.
@@ -2403,6 +2405,15 @@ fn pick_chain_anchor(
             let hb = hubs.contains(&b.0);
             if ha != hb {
                 return Some(if ha { b } else { a });
+            }
+            // Peripheral ownership only overrides fan-out on a strong split
+            // (≥0.5): one end alone on its rank (nowhere to park) vs an end
+            // on the rank edge (already owns an exterior column). Mild
+            // differences keep the fan-out writer.
+            let pa = layer_peripheral(a.0, plan);
+            let pb = layer_peripheral(b.0, plan);
+            if (pa - pb).abs() >= 0.5 {
+                return Some(if pa > pb { a } else { b });
             }
             let fa = down_deg[a.0] >= 2;
             let fb = down_deg[b.0] >= 2;
