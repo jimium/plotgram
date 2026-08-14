@@ -3,7 +3,8 @@
 use super::search::{ChannelPath, ScopeMask};
 use super::substrate::Substrate;
 
-/// Every track on the path must be allowed by the edge ScopeMask.
+/// Every track on the path must be allowed by the edge ScopeMask and must
+/// not be a foreign-group through-highway (architecture §6.3).
 pub fn verify_route_scope(
     substrate: &Substrate,
     mask: &ScopeMask,
@@ -17,6 +18,11 @@ pub fn verify_route_scope(
             return Err(format!(
                 "track {tid:?} scope {:?} not in edge ScopeMask",
                 t.scope
+            ));
+        }
+        if super::search::cross_covers_foreign_group(substrate, tid, mask) {
+            return Err(format!(
+                "track {tid:?} is a foreign-group through-highway (architecture §6.3)"
             ));
         }
     }

@@ -9,10 +9,13 @@ use plotgram_model::diagnostics::Relaxation;
 use super::derive::derive_substrate;
 use super::graph::{ChannelGraph, Occupancy};
 use super::search::{
-    end_candidates, path_used_outer_overflow, route_edge, ChannelPath, CostWeights, EndCandidate,
+    cross_covers_foreign_group, end_candidates, main_straddles_foreign_group,
+    path_used_outer_overflow, route_edge, ChannelPath, CostWeights, EndCandidate, EscapeEnd,
     LexCost, RouteHints, ScopeMask, SpanAffinity,
 };
-use super::substrate::{derive_root_substrate, BlueprintIndex, PortSide, Substrate, TrackId};
+use super::substrate::{
+    derive_root_substrate, BlueprintIndex, PortSide, Substrate, TrackId, TrackOrient,
+};
 use crate::layout::hierarchical::compose::bundle::{end_bus_edge_ids, BundlePlan};
 use crate::layout::hierarchical::compose::ports::EdgePorts;
 use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealEdge, RealGraph};
@@ -107,6 +110,8 @@ fn rank_real_sibling_orders(plan: &PlanGraph, layer_pos: &[usize], elem: usize) 
 /// stitching distinct corridors. N/S ends keep their adjacent gap-line host.
 fn edge_end_candidates(
     index: &BlueprintIndex,
+    substrate: &Substrate,
+    mask: &ScopeMask,
     plan: &PlanGraph,
     graph: &RealGraph,
     edge_of: &BTreeMap<String, usize>,
@@ -164,9 +169,13 @@ fn edge_end_candidates(
         index.order_count,
         tgt_toward_higher,
     );
+    drop_straddling_mains(substrate, mask, src_order, src_rank, &mut starts);
+    drop_straddling_mains(substrate, mask, tgt_order, tgt_rank, &mut goals);
 
     // Same-face edges share one Main corridor: keep only corridors on the
-    // normal side of both faces, and couple search per og.
+    // normal side of both faces, and couple search per og. If every shared
+    // corridor straddles a foreign group, keep the uncoupled set so the
+    // around-path can still reach k=r0 / k=r1+1.
     let shared_ogs: Option<std::ops::RangeInclusive<usize>> = match (src_side, tgt_side) {
         (PortSide::CrossHigh, PortSide::CrossHigh) => {
             Some((src_order.max(tgt_order) + 1)..=index.order_count)
@@ -174,15 +183,29 @@ fn edge_end_candidates(
         (PortSide::CrossLow, PortSide::CrossLow) => Some(0..=src_order.min(tgt_order)),
         _ => None,
     };
-    let couple_main_corridor = shared_ogs.is_some();
+    let mut couple_main_corridor = shared_ogs.is_some();
     if let Some(ogs) = shared_ogs {
         let allowed: std::collections::BTreeSet<TrackId> = ogs
             .flat_map(|og| index.main_lines.get(&og))
             .flatten()
             .map(|sg| sg.id)
             .collect();
-        starts.retain(|c| allowed.contains(&c.track));
-        goals.retain(|c| allowed.contains(&c.track));
+        let c_starts: Vec<EndCandidate> = starts
+            .iter()
+            .copied()
+            .filter(|c| allowed.contains(&c.track))
+            .collect();
+        let c_goals: Vec<EndCandidate> = goals
+            .iter()
+            .copied()
+            .filter(|c| allowed.contains(&c.track))
+            .collect();
+        if !c_starts.is_empty() && !c_goals.is_empty() {
+            starts = c_starts;
+            goals = c_goals;
+        } else {
+            couple_main_corridor = false;
+        }
     }
 
     if starts.is_empty() || goals.is_empty() {
@@ -192,6 +215,94 @@ fn edge_end_candidates(
         )));
     }
     Ok((starts, goals, couple_main_corridor))
+}
+
+/// Drop N/S ViaGap extras only when both ends already sit on in-scope Cross
+/// hosts that share a corridor (same track or a common Main neighbor). A
+/// Cross host can be in-scope yet unconnected to the other end: sibling /
+/// nested cuts split the facing line into remnants (multi-ns e15, stress e2).
+/// Keeping ViaGap in that case restores around-path connectivity; dropping
+/// it when the hosts *are* connected still protects the zero-bend vertical
+/// from spike-fold stealing.
+fn drop_redundant_ns_viagap(
+    substrate: &Substrate,
+    index: &BlueprintIndex,
+    mask: &ScopeMask,
+    starts: &mut Vec<EndCandidate>,
+    goals: &mut Vec<EndCandidate>,
+) {
+    let in_scope_cross = |c: &EndCandidate| {
+        matches!(c.escape, EscapeEnd::AtPortNormal)
+            && segment_is_cross(index, c.track)
+            && segment_allowed(index, mask, c.track)
+            && !cross_covers_foreign_group(substrate, c.track, mask)
+    };
+    let start_host = starts.iter().find(|c| in_scope_cross(c)).map(|c| c.track);
+    let goal_host = goals.iter().find(|c| in_scope_cross(c)).map(|c| c.track);
+    let connected = match (start_host, goal_host) {
+        (Some(a), Some(b)) => tracks_share_corridor(substrate, a, b),
+        _ => false,
+    };
+    if connected {
+        starts.retain(|c| !matches!(c.escape, EscapeEnd::ViaGap(_)));
+        goals.retain(|c| !matches!(c.escape, EscapeEnd::ViaGap(_)));
+    }
+}
+
+fn tracks_share_corridor(substrate: &Substrate, a: TrackId, b: TrackId) -> bool {
+    if a == b {
+        return true;
+    }
+    let mut adj_a = BTreeSet::new();
+    let mut adj_b = BTreeSet::new();
+    for &(x, y) in substrate.links() {
+        if x == a {
+            adj_a.insert(y);
+        } else if y == a {
+            adj_a.insert(x);
+        }
+        if x == b {
+            adj_b.insert(y);
+        } else if y == b {
+            adj_b.insert(x);
+        }
+    }
+    adj_a.contains(&b) || adj_a.intersection(&adj_b).next().is_some()
+}
+
+fn drop_straddling_mains(
+    substrate: &Substrate,
+    mask: &ScopeMask,
+    endpoint_order: usize,
+    endpoint_rank: usize,
+    cands: &mut Vec<EndCandidate>,
+) {
+    cands.retain(|c| {
+        let Some(t) = substrate.track(c.track) else {
+            return true;
+        };
+        if t.orient != TrackOrient::Main {
+            return true;
+        }
+        !main_straddles_foreign_group(substrate, mask, endpoint_order, endpoint_rank, t.line)
+    });
+}
+
+fn segment_ref(index: &BlueprintIndex, tid: TrackId) -> Option<&super::substrate::SegmentRef> {
+    index
+        .cross_lines
+        .values()
+        .chain(index.main_lines.values())
+        .flatten()
+        .find(|sg| sg.id == tid)
+}
+
+fn segment_is_cross(index: &BlueprintIndex, tid: TrackId) -> bool {
+    index.cross_lines.values().flatten().any(|sg| sg.id == tid)
+}
+
+fn segment_allowed(index: &BlueprintIndex, mask: &ScopeMask, tid: TrackId) -> bool {
+    segment_ref(index, tid).is_some_and(|sg| mask.allows(sg.scope))
 }
 
 fn port_side_to_algo(side: PortSide) -> plotgram_algo::orientation::Side {
@@ -469,9 +580,11 @@ fn route_on_substrate(
         if bus_edges.contains(&e.edge_id) {
             continue;
         }
-        let (starts, goals, couple_main_corridor) =
-            edge_end_candidates(&index, plan, graph, &edge_of, &layer_pos, ports, &e.edge_id)?;
         let mask = scope_mask_for_edge(&substrate, &index, graph, e);
+        let (mut starts, mut goals, couple_main_corridor) = edge_end_candidates(
+            &index, &substrate, &mask, plan, graph, &edge_of, &layer_pos, ports, &e.edge_id,
+        )?;
+        drop_redundant_ns_viagap(&substrate, &index, &mask, &mut starts, &mut goals);
         let mut hints = hints_for_edge(plan, graph, &layer_pos, params, e, index.order_count);
         hints.couple_main_corridor = couple_main_corridor;
         prepared.push(PreparedEdge {
@@ -695,7 +808,9 @@ fn bounded_ripup(
 #[cfg(test)]
 mod tests {
     use super::super::substrate::{derive_root_substrate, TrackOrient};
-    use super::{compute_route_order, edge_end_candidates, RouteOrderEntry, MAX_RIPUP_ROUNDS};
+    use super::{
+        compute_route_order, edge_end_candidates, RouteOrderEntry, ScopeMask, MAX_RIPUP_ROUNDS,
+    };
     use crate::layout::hierarchical::compose::ports::{EdgePorts, ResolvedPort};
     use crate::layout::hierarchical::model::{Elem, ElemKey, PlanGraph, RealEdge, RealGraph};
     use plotgram_algo::orientation::Side;
@@ -811,6 +926,8 @@ mod tests {
         ports.insert("ew".into(), east_ports());
         let (starts, goals, couple) = edge_end_candidates(
             &idx,
+            &sub,
+            &ScopeMask::unrestricted(),
             &plan,
             &graph,
             &graph.edge_index_map(),
@@ -837,6 +954,8 @@ mod tests {
         ports.insert("ew".into(), west_ports());
         let (starts, goals, couple) = edge_end_candidates(
             &idx,
+            &sub,
+            &ScopeMask::unrestricted(),
             &plan,
             &graph,
             &graph.edge_index_map(),
@@ -909,6 +1028,8 @@ mod tests {
         ports.insert("ew".into(), east_ports());
         let (starts, goals, couple) = edge_end_candidates(
             &idx,
+            &sub,
+            &ScopeMask::unrestricted(),
             &plan,
             &graph,
             &graph.edge_index_map(),

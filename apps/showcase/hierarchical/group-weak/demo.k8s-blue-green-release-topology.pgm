@@ -1,6 +1,5 @@
 // Blue-green deployment topology for a large production service
 // Mermaid mapping: complex architecture graph for release traffic switching
-// d2-exempt: group-penetration — C-fallback: gate 路由不可行(ScopeMask)整体回退 root-scope；清零归 D₂.2b（group-frame-d2.md §8.10 登记表）
 diagram {
     profile: architecture,
     title: "K8s 蓝绿发布拓扑"

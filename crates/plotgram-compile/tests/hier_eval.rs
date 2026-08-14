@@ -64,8 +64,8 @@ use plotgram_compile::{
     build_debug_trace, build_layout, compute_hier_metrics, node_gap_from_source, BuildOptions,
     CrossAxis,
 };
-use plotgram_layout::{group_penetration_violations, GROUP_FRAME_GAP, PARTITION_EMPTY_BAND_MIN};
 use plotgram_layout::layout::hierarchical::GROUP_PAD;
+use plotgram_layout::{group_penetration_violations, GROUP_FRAME_GAP, PARTITION_EMPTY_BAND_MIN};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::graph::{Edge as ModelEdge, Group as ModelGroup};
 use plotgram_model::port::Side;
@@ -233,7 +233,10 @@ fn hierarchical_showcase_geometry_invariants() {
         // D₂.2b §8.12 observability: every gate-fallback event stays loud
         // (per-edge widening trial, derive-level impure rects, whole-diagram
         // gate-route fallback all record under this rule).
-        let fb = all_metrics.last().map(|m| m.gate_fallback_events).unwrap_or(0);
+        let fb = all_metrics
+            .last()
+            .map(|m| m.gate_fallback_events)
+            .unwrap_or(0);
         if fb > 0 {
             println!("{name}: [fallback] {fb} channel-group-fallback event(s)");
             for r in &result.diagnostics.relaxations {
@@ -292,8 +295,11 @@ fn hierarchical_showcase_geometry_invariants() {
             baseline.insert(m.name.clone(), metrics_to_value(m));
         }
         let path = baseline_path();
-        fs::write(&path, serde_json::to_string_pretty(&Value::Object(baseline)).unwrap())
-            .unwrap_or_else(|e| panic!("writing baseline {}: {e}", path.display()));
+        fs::write(
+            &path,
+            serde_json::to_string_pretty(&Value::Object(baseline)).unwrap(),
+        )
+        .unwrap_or_else(|e| panic!("writing baseline {}: {e}", path.display()));
         println!(
             "\nhier_eval: wrote baseline for {} fixtures to {}",
             all_metrics.len(),
@@ -330,8 +336,8 @@ fn check_orthogonal_and_ports(
     // Orthogonality is a property of the default/`orthogonal` ink style only;
     // fixtures that opt into `polyline` / `curved` declare it in the source
     // and legitimately emit diagonal / curved segments.
-    let orthogonal_style = !source.contains("routing_style: polyline")
-        && !source.contains("routing_style: curved");
+    let orthogonal_style =
+        !source.contains("routing_style: polyline") && !source.contains("routing_style: curved");
 
     let frame_of: BTreeMap<&str, Rect> = result
         .nodes
@@ -409,10 +415,7 @@ fn check_no_edge_node_penetration(
                     continue;
                 }
                 if segment_hits_rect_interior(a, b, frame, INSET) {
-                    failures.push(format!(
-                        "{name}: edge `{}` penetrates node `{nid}`",
-                        e.id
-                    ));
+                    failures.push(format!("{name}: edge `{}` penetrates node `{nid}`", e.id));
                 }
             }
         }
@@ -461,12 +464,7 @@ fn segment_hits_rect_interior(a: Point, b: Point, frame: Rect, inset: f64) -> bo
 ///   `// d2-exempt: group-penetration — <reason>` (class-C registry,
 ///   group-frame-d2.md §8.10) to downgrade to observation; exemptions are
 ///   never silent — the count and details stay printed.
-fn check_group_gates(
-    name: &str,
-    source: &str,
-    result: &LayoutResult,
-    failures: &mut Vec<String>,
-) {
+fn check_group_gates(name: &str, source: &str, result: &LayoutResult, failures: &mut Vec<String>) {
     if result.groups.is_empty() {
         return;
     }
@@ -689,7 +687,9 @@ fn check_partition_band_separation(
                     continue;
                 };
                 let band = &bands[ci];
-                if frame.x + GROUP_PAD + EPS < band.start || frame.right() - GROUP_PAD - EPS > band.end {
+                if frame.x + GROUP_PAD + EPS < band.start
+                    || frame.right() - GROUP_PAD - EPS > band.end
+                {
                     failures.push(format!(
                         "{name}: node `{}` frame [{:.3}, {:.3}] escapes partition band `{}` [{:.3}, {:.3}]",
                         node.id,
@@ -812,7 +812,9 @@ fn check_partition_bit_identical(name: &str, source: &str, failures: &mut Vec<St
         v
     };
     if frames(&first) != frames(&second) {
-        failures.push(format!("{name}: partition layout not bit-identical across two runs"));
+        failures.push(format!(
+            "{name}: partition layout not bit-identical across two runs"
+        ));
     }
     let paths = |r: &LayoutResult| -> Vec<(String, Vec<Point>)> {
         let mut v: Vec<(String, Vec<Point>)> = r
@@ -873,8 +875,18 @@ fn sibling_separation(
     }
     flatten(groups, &mut BTreeSet::new(), frame_of, &mut flat);
 
-    let main_band = |r: Rect| (if lr { r.x } else { r.y }, if lr { r.right() } else { r.bottom() });
-    let cross_edge = |r: Rect| (if lr { r.y } else { r.x }, if lr { r.bottom() } else { r.right() });
+    let main_band = |r: Rect| {
+        (
+            if lr { r.x } else { r.y },
+            if lr { r.right() } else { r.bottom() },
+        )
+    };
+    let cross_edge = |r: Rect| {
+        (
+            if lr { r.y } else { r.x },
+            if lr { r.bottom() } else { r.right() },
+        )
+    };
 
     let mut checked = 0usize;
     for i in 0..flat.len() {
@@ -1173,8 +1185,7 @@ fn check_bend_gate(metrics: &[FileMetrics], failures: &mut Vec<String>) {
         }
         // D₂.2a canvas-bloat guard (group-frame-d2.md §8.10): penetration
         // clearance must not be bought by enlarging the canvas.
-        if m.name.starts_with("group-weak/")
-            && bbox_over_guard(m.bbox_w, m.bbox_h, base_w, base_h)
+        if m.name.starts_with("group-weak/") && bbox_over_guard(m.bbox_w, m.bbox_h, base_w, base_h)
         {
             failures.push(format!(
                 "{}: canvas-bloat guard — bbox {:.0} x {:.0} exceeds baseline \
@@ -1191,11 +1202,7 @@ fn check_bend_gate(metrics: &[FileMetrics], failures: &mut Vec<String>) {
             m.reversed_count as isize - base_rev as isize,
             m.channel_used_gates as isize - base_gates as isize,
             m.relaxations as isize - base_relax,
-            format!(
-                "{:+.0} x {:+.0}",
-                m.bbox_w - base_w,
-                m.bbox_h - base_h
-            )
+            format!("{:+.0} x {:+.0}", m.bbox_w - base_w, m.bbox_h - base_h)
         );
     }
 }
@@ -1206,15 +1213,21 @@ fn symmetry_axis_d2_representative_spines_collinear() {
     // (relative path under showcase/hierarchical, spine node ids in TB order)
     const CASES: &[(&str, &[&str])] = &[
         ("flat/product.flat-rest-api.pgm", &["web", "lb", "api"]),
-        ("flat/mech.constrain-flat-chain.pgm", &["gw", "api", "worker"]),
-        ("flat/product.order-approval.pgm", &["submit", "review", "check"]),
+        (
+            "flat/mech.constrain-flat-chain.pgm",
+            &["gw", "api", "worker"],
+        ),
+        (
+            "flat/product.order-approval.pgm",
+            &["submit", "review", "check"],
+        ),
     ];
     let dir = showcase_dir();
     let mut failures = Vec::new();
     for &(rel, spine) in CASES {
         let path = dir.join(rel);
-        let source = fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let source =
+            fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
         let result = build_layout(&source, &BuildOptions::default())
             .unwrap_or_else(|e| panic!("{rel}: layout error: {e}"));
         let by_id: BTreeMap<&str, &plotgram_model::result::NodePlacement> =
@@ -1444,11 +1457,7 @@ fn diamond_fanout_gateway_sources_stay_on_south() {
     let path = showcase_dir().join("flat/smoke.flat-gateway-fanout.pgm");
     let source = fs::read_to_string(&path).expect("gateway-fanout fixture");
     let result = build_layout(&source, &BuildOptions::default()).expect("layout");
-    let gw = result
-        .nodes
-        .iter()
-        .find(|n| n.id == "gw")
-        .expect("gw node");
+    let gw = result.nodes.iter().find(|n| n.id == "gw").expect("gw node");
     let mut failures = Vec::new();
     let mut fan = 0usize;
     for e in &result.edges {
@@ -1576,10 +1585,7 @@ fn fan_out_four_cross_rails_nest_outer_inner() {
             for wi in si.windows(2) {
                 for wj in sj.windows(2) {
                     if segments_cross(wi[0], wi[1], wj[0], wj[1]) {
-                        failures.push(format!(
-                            "hub→{} crosses hub→{}",
-                            fan[i].2, fan[j].2
-                        ));
+                        failures.push(format!("hub→{} crosses hub→{}", fan[i].2, fan[j].2));
                     }
                 }
             }
@@ -1751,7 +1757,11 @@ fn d22a_exemption_marker_and_bbox_guard() {
         (90.0, 90.0, 100.0, 100.0, false),   // shrink is fine
     ];
     for (w, h, bw, bh, want) in cases {
-        assert_eq!(bbox_over_guard(*w, *h, *bw, *bh), *want, "({w}, {h}) vs ({bw}, {bh})");
+        assert_eq!(
+            bbox_over_guard(*w, *h, *bw, *bh),
+            *want,
+            "({w}, {h}) vs ({bw}, {bh})"
+        );
     }
 }
 
@@ -1766,17 +1776,19 @@ fn d22a_exemption_marker_and_bbox_guard() {
 ///   demand.rs table-driven unit tests (§8.13-2).
 #[test]
 fn d22b_fallback_observability_and_demand_floor() {
-    // (fixture, expect_fallback) — the five D₂.2a class-C-fallback fixtures
-    // plus the derive-level one; two gate-on fixtures stay clean.
+    // (fixture, expect_fallback) — gate-on fixtures stay clean. Remaining
+    // Weak penetration is C-lane (same-rank sibling horizontals). hybrid /
+    // blue-green around-path seams now park outside frames (pen=0).
     let cases: &[(&str, bool)] = &[
         ("group-weak/demo.k8s-blue-green-release-topology", false),
-        ("group-weak/demo.k8s-multi-namespace-overview", true),
-        ("group-weak/demo.k8s-platform-stack", true),
-        ("group-weak/demo.k8s-tenant-isolation", true),
+        ("group-weak/demo.k8s-multi-namespace-overview", false),
+        ("group-weak/demo.k8s-platform-stack", false),
+        ("group-weak/demo.k8s-tenant-isolation", false),
         ("group-weak/demo.plotgram-core-mod-deps", false),
-        ("group-weak/product.d2-cell-tower-network", true),
+        ("group-weak/product.d2-cell-tower-network", false),
         ("group-weak/demo.ai-agent-docops-pipeline", false),
         ("group-weak/demo.hybrid-cloud-dr-topology", false),
+        ("group-weak/stress.layout-stress-nested", false),
     ];
     let mut demand_seen = 0usize;
     for &(rel, expect_fb) in cases {
@@ -1796,11 +1808,14 @@ fn d22b_fallback_observability_and_demand_floor() {
             .filter(|r| r.rule == "channel-group-fallback")
             .count();
         assert_eq!(
-            obs.gate_fallback_events,
-            rule_count,
+            obs.gate_fallback_events, rule_count,
             "{rel}: events must equal relaxation count"
         );
-        assert_eq!(obs.gate_fallback_events > 0, expect_fb, "{rel}: fallback expectation");
+        assert_eq!(
+            obs.gate_fallback_events > 0,
+            expect_fb,
+            "{rel}: fallback expectation"
+        );
         // §8.11: gate capacity publishes only when gates are in use.
         if obs.channel_used_gates {
             assert!(
@@ -1823,5 +1838,8 @@ fn d22b_fallback_observability_and_demand_floor() {
         }
         demand_seen += obs.layer_gap_demands.len();
     }
-    assert!(demand_seen > 0, "weak fixtures must publish LayerGap demands");
+    assert!(
+        demand_seen > 0,
+        "weak fixtures must publish LayerGap demands"
+    );
 }

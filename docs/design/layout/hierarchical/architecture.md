@@ -347,7 +347,7 @@ III.4 InkVerifier（硬 FAIL）
 ### 6.3 穿组三道防线（从 Atlas 保留）
 
 1. **构建期**：跨非法 scope 的 link 拒绝  
-2. **搜索期**：ScopeMask 硬过滤（消灭「同线直穿」）  
+2. **搜索期**：ScopeMask 硬过滤；拒绝外国组内部的 root-scope Cross；落地 Main / Cross↔Main hop 不得跨外国组（消灭「同线直穿」与对面 ViaGap；绕行走 `k=r0` / `k=r1+1`）。外沿 Cross 的 Y 停在组框外，避免顶/底缝落进 pad。  
 3. **检查期**：`verify_no_group_penetration` / `ink_verify` 硬 FAIL  
 
 Gate 容量：相 I 累计 demand；相 II 用段长约束；**禁止**「容量 = 跨界边数」（恒真）。
@@ -571,7 +571,7 @@ Stage 只写自己拥有的变换自由度：核心写 component-local 坐标，
 
 | | |
 |--|--|
-| **已交付** | 契约 I/O · VPSC · 四向 Orientation · Channel + TrackOrder + rip-up · PortLane · `J(x)` 次轴 · Weak/Strong 单写者框 · 穿组 verifier · PartitionGrid **引擎消费**（M5：列/行 band、四向、Weak/Strong 共址；render 底色后置） |
+| **已交付** | 契约 I/O · VPSC · 四向 Orientation · Channel + TrackOrder + rip-up · PortLane · `J(x)` 次轴 · Weak/Strong 单写者框 · 穿组 verifier · PartitionGrid **引擎消费**（M5：列/行 band、四向、Weak/Strong 共址）· render 泳道底色/标题（只读 band） |
 | **未交付** | strong-port projection / label·loop reserve · 穿组构造清零 · 完整 integrated labeling |
 | **后置** | octilinear / 真 MCF / from-sketch |
 

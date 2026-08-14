@@ -56,7 +56,7 @@ plotgram-engine finalize        // 透传 groups
 
 ## 5. 余项（不挡已关闭的写权）
 
-- Weak 穿组 **构造**清零（门禁已硬，C 类豁免 / fallback 次数未降）。  
+- Weak 穿组 **构造**清零：跳组 Main 定向 + N/S ViaGap + 同线直穿过滤 + 落地 Main 不得跨外国组（绕行走顶/底缝，缝的 Cross 停在组框外）。已摘 hybrid / blue-green。剩余 C-lane：tenant / platform / plotgram / multi-ns / supply-chain 同层横线。  
 - GroupMinWidth / title 美学。  
 - `close_sibling_frame_slack` 并进 `J(x)`（现为投影后 compact）。  
 - Gate 容量公式与 Demand 下界已可观测；触发数下降仍开放。

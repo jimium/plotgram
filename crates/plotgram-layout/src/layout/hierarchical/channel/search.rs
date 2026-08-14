@@ -137,6 +137,29 @@ pub fn end_candidates(
                     extra_len: 0.0,
                 });
             }
+            // Column and overflow Mains: the facing Cross cell can belong
+            // to a sibling group after per-rank shift, making the normal
+            // host ScopeMask-infeasible. ViaGap onto a Main keeps
+            // around-routing connected without widening the mask.
+            // `edge_end_candidates` drops these when the Cross host is
+            // in-scope, so they do not steal the zero-bend vertical.
+            let line = if toward_higher { rank + 1 } else { rank };
+            for og in 0..=order_count {
+                let Some(tid) = index.main_at(og, rank) else {
+                    continue;
+                };
+                let face_dist = if og <= order {
+                    (order - og) as f64
+                } else {
+                    (og - (order + 1)) as f64
+                };
+                out.push(EndCandidate {
+                    track: tid,
+                    escape: EscapeEnd::ViaGap(line),
+                    extra_bends: 2,
+                    extra_len: 1.0 + face_dist,
+                });
+            }
         }
         Side::East => {
             for og in (order + 1)..=order_count {
@@ -255,6 +278,102 @@ impl ScopeMask {
         }
         self.allowed.contains(&scope)
     }
+}
+
+/// Architecture §6.3「同线直穿」: a Cross on a line a foreign group would
+/// cut (`r0 < k ≤ r1`) that is either a covering highway (ext spans the
+/// group's order interior) or a **root-scope remnant** on that interior
+/// line. Group-scope tracks of an allowed group stay (sibling groups may
+/// share a rank band). Root remnants on a foreign interior line are unsafe:
+/// Metric may place the two Mains on opposite sides of the frame, and Ink
+/// expands a Cross as an infinite-width horizontal. Top/bottom seams
+/// (`k=r0` / `k=r1+1`) stay legal because derive does not cut them.
+pub fn cross_covers_foreign_group(
+    substrate: &Substrate,
+    track: TrackId,
+    allowed: &ScopeMask,
+) -> bool {
+    let Some(t) = substrate.track(track) else {
+        return false;
+    };
+    if t.orient != TrackOrient::Cross {
+        return false;
+    }
+    for g in substrate.groups() {
+        if allowed.allows(Some(g.id)) {
+            continue;
+        }
+        let (r0, r1) = g.ranks;
+        if !(r0 < t.line && t.line <= r1) {
+            continue;
+        }
+        if t.scope.is_none() {
+            return true;
+        }
+        let (o0, o1) = g.orders;
+        let glo = 2 * o0 + 1;
+        let ghi = 2 * o1 + 1;
+        if t.ext.0 <= glo && ghi <= t.ext.1 {
+            return true;
+        }
+    }
+    false
+}
+
+/// True when a Main at `og` sits on the opposite side of a foreign group
+/// from `endpoint_order` on a rank that group occupies. Landing there
+/// makes Ink's first/last horizontal punch through the sibling frame;
+/// the around-path must stay on this side and cross at `k=r0` / `k=r1+1`.
+pub fn main_straddles_foreign_group(
+    substrate: &Substrate,
+    allowed: &ScopeMask,
+    endpoint_order: usize,
+    endpoint_rank: usize,
+    og: usize,
+) -> bool {
+    for g in substrate.groups() {
+        if allowed.allows(Some(g.id)) {
+            continue;
+        }
+        let (r0, r1) = g.ranks;
+        if endpoint_rank < r0 || endpoint_rank > r1 {
+            continue;
+        }
+        let (o0, o1) = g.orders;
+        let between = if og <= endpoint_order {
+            og <= o0 && endpoint_order >= o1 + 1
+        } else {
+            endpoint_order < o0 && og >= o1 + 1
+        };
+        if between {
+            return true;
+        }
+    }
+    false
+}
+
+/// Cross→Main (or reverse) whose order span jumps a foreign group: Ink
+/// draws one horizontal at the Cross Y through the sibling frame.
+fn hop_straddles_foreign_group(
+    substrate: &Substrate,
+    allowed: &ScopeMask,
+    from: TrackId,
+    to: TrackId,
+) -> bool {
+    let Some(a) = substrate.track(from) else {
+        return false;
+    };
+    let Some(b) = substrate.track(to) else {
+        return false;
+    };
+    let (cross, main_og) = match (a.orient, b.orient) {
+        (TrackOrient::Cross, TrackOrient::Main) => (a, b.line),
+        (TrackOrient::Main, TrackOrient::Cross) => (b, a.line),
+        _ => return false,
+    };
+    let mid = (cross.ext.0 / 2 + cross.ext.1 / 2) / 2;
+    let rank = cross.line.saturating_sub(1);
+    main_straddles_foreign_group(substrate, allowed, mid, rank, main_og)
 }
 
 /// Endpoint-induced corridor band for span affinity (D1.3.1).
@@ -691,10 +810,9 @@ fn route_edge_ungated(
         return RouteOutcome::infeasible();
     }
 
-    // Endpoint hosts keep the baseline scope contract (verify_route_scope
-    // audits every committed track), but transit between adjacent endpoint
-    // hosts is exempt: a host pair joined by one via always connects even
-    // when the scope chain between them is cut.
+    // Adjacent endpoint hosts still go through ScopeMask + through-highway
+    // filters (verify_route_scope audits every committed track). Direct
+    // start↔goal only skips the Dijkstra expansion, not the legality checks.
     let direct_via = |a: TrackId, b: TrackId| -> Option<Via> {
         graph
             .neighbors(a)
@@ -712,7 +830,9 @@ fn route_edge_ungated(
         let Some(start_t) = substrate.track(sc.track) else {
             continue;
         };
-        if !allowed.allows(start_t.scope) {
+        if !allowed.allows(start_t.scope)
+            || cross_covers_foreign_group(substrate, sc.track, allowed)
+        {
             continue;
         }
         let mut start_cost = LexCost {
@@ -754,6 +874,12 @@ fn route_edge_ungated(
             let Some(to_t) = substrate.track(gt) else {
                 continue;
             };
+            if !allowed.allows(to_t.scope)
+                || cross_covers_foreign_group(substrate, gt, allowed)
+                || hop_straddles_foreign_group(substrate, allowed, sc.track, gt)
+            {
+                continue;
+            }
             let mut direct = start_cost;
             if start_t.orient != to_t.orient {
                 direct.bends += 1;
@@ -884,7 +1010,10 @@ fn route_edge_ungated(
             let Some(to_t) = substrate.track(tr.to) else {
                 continue;
             };
-            if !allowed.allows(to_t.scope) {
+            if !allowed.allows(to_t.scope)
+                || cross_covers_foreign_group(substrate, tr.to, allowed)
+                || hop_straddles_foreign_group(substrate, allowed, track, tr.to)
+            {
                 continue;
             }
             let mut next = cost;

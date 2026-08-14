@@ -67,15 +67,19 @@ impl TrackCoords {
 /// Cross lanes sample a **per-corridor-line shared pitch grid**: group cuts
 /// split one rank gap into several scope-cut tracks, and every track on the
 /// line must map the same lane index to the same Y so gate crossings stay
-/// collinear (channel-d1 §5.1). Returns soft relaxations for shell-band
-/// fallbacks (lanes could not stay inside the band-free sub-interval).
+/// collinear (channel-d1 §5.1). Outer lines (`k=0` / past last rank) park
+/// clear of every group frame so an around-path seam cannot sit in the pad.
+/// Returns soft relaxations for shell-band fallbacks (lanes could not stay
+/// inside the band-free sub-interval).
 ///
 /// `group_obstacles`: group envelope frames (finalize pad contract,
-/// canonical space). Only the **outer** Main lanes clear them — outer lanes
-/// are the long-haul return corridors, and a full-height rail inside a
-/// foreign group frame is a penetration (strong-macro.md §6 SM-4). Inner
-/// lanes keep node-only clearance. Both policies pass the Metric group
-/// envelopes (D₂.0 frame true source; Weak previously passed nothing).
+/// canonical space). Skip-over Main lanes (every member straddles a
+/// foreign frame) clear **those straddled frames** directionally — the
+/// remnant's backbone vs the straddled union midpoint picks the face —
+/// so an around-path cannot collapse both verticals onto one X (Ink
+/// spike-fold would then punch through). Other foreign frames and node
+/// bodies stay nearest-side; a local skip around one group must not be
+/// yanked to the canvas rim.
 pub fn assign_track_coords(
     plan: &PlanGraph,
     main: &[f64],
@@ -139,26 +143,40 @@ pub fn assign_track_coords(
         let ys = if line == 0 || line >= plan.layers.len() {
             // Outside the stack — park near adjacent layer; still separate
             // lanes (P5-5). Keep one `edge_gap` clear of the group shell
-            // band that extends past the outer rank.
+            // band that extends past the outer rank, and of every group
+            // frame (around-path bottom/top seams otherwise sit in the pad).
             let below = line > 0;
+            let mut park_obs = obstacles.clone();
+            park_obs.extend(groups.iter().map(|(_, r)| *r));
             let base = if line == 0 {
-                let top = main.get(plan.layers[0][0]).copied().unwrap_or(0.0);
+                let mut top = plan.layers[0]
+                    .iter()
+                    .map(|&e| main[e])
+                    .fold(f64::INFINITY, f64::min);
+                for &(_, (_, t, _, _)) in groups {
+                    top = top.min(t);
+                }
+                if !top.is_finite() {
+                    top = 0.0;
+                }
                 top - edge_gap.max(shell.outer_top + edge_gap)
             } else {
                 let last = plan.layers.len() - 1;
-                let e = plan.layers[last][0];
-                main[e] + size_of(e).height + edge_gap.max(shell.outer_bottom + edge_gap)
+                let mut bot = plan.layers[last]
+                    .iter()
+                    .map(|&e| main[e] + size_of(e).height)
+                    .fold(0.0_f64, f64::max);
+                for &(_, (_, _, _, b)) in groups {
+                    bot = bot.max(b);
+                }
+                bot + edge_gap.max(shell.outer_bottom + edge_gap)
             };
             let mid = (count.saturating_sub(1) as f64) * 0.5;
             (0..count)
                 .map(|i| {
-                    // A row taller than edge_gap puts the naive parked lane
-                    // inside the adjacent row's Y-projection — push further
-                    // out until clear (mirror of clear_main_x; gates-run e21
-                    // penetrated a last-rank body through such a lane).
                     clear_parked_y(
                         base + (i as f64 - mid) * edge_gap,
-                        &obstacles,
+                        &park_obs,
                         edge_gap,
                         below,
                     )
@@ -212,8 +230,6 @@ pub fn assign_track_coords(
                 // no routed member (`main_line_backbone_x` folds every rank,
                 // so it means little for a corridor that spans a few).
                 let og = t.line;
-                let max_cols = plan.layers.iter().map(|l| l.len()).max().unwrap_or(0);
-                let outer = og == 0 || og >= max_cols;
                 let backbone = main_line_backbone_x(plan, cross_centers, size_of, og, edge_gap);
 
                 let mut xs: Vec<f64> = Vec::with_capacity(count);
@@ -226,10 +242,27 @@ pub fn assign_track_coords(
                     let band = lane_rank_band(facts, members);
                     let lane_obstacles =
                         band_obstacles(plan, main, cross_centers, size_of, facts, members);
-                    let _ = outer;
                     let foreign = foreign_group_frames(groups, facts, members);
-                    let settle =
-                        |x: f64| -> f64 { clear_outside(x, &lane_obstacles, &foreign, edge_gap) };
+                    let straddled = straddled_frames(facts, members, &foreign);
+                    let dir = skip_over_clear_dir(backbone, facts, members, &straddled);
+                    let other: Vec<(f64, f64, f64, f64)> = foreign
+                        .iter()
+                        .copied()
+                        .filter(|f| !straddled.iter().any(|s| frames_eq(*s, *f)))
+                        .collect();
+                    let settle = |x: f64| -> f64 {
+                        match dir {
+                            Some(rightward) => clear_skip_over(
+                                x,
+                                &lane_obstacles,
+                                &other,
+                                &straddled,
+                                edge_gap,
+                                rightward,
+                            ),
+                            None => clear_outside(x, &lane_obstacles, &foreign, edge_gap),
+                        }
+                    };
                     let (blo, bhi) = lane_x_bounds(facts, members);
                     let settle = |x: f64| settle_within(x, blo, bhi, edge_gap, &settle);
                     let x = if members.is_empty() {
@@ -365,6 +398,82 @@ fn foreign_group_frames(
         .filter(|(id, _)| !own.contains(id.as_str()))
         .map(|(_, r)| *r)
         .collect()
+}
+
+/// `Some(rightward)` when every member of this lane skips over a foreign
+/// group: park on the face of the **straddled** union that this remnant's
+/// backbone already sits on. `best_lane_x` otherwise ties to the smaller
+/// X and both around-verticals collapse (Ink spike-fold punches through).
+/// Direction is vs the straddled midpoint — not the canvas / all-foreign
+/// union — so a local skip around one middle group stays local.
+fn skip_over_clear_dir(
+    backbone: f64,
+    facts: &MainLaneFacts,
+    members: &[String],
+    straddled: &[(f64, f64, f64, f64)],
+) -> Option<bool> {
+    if straddled.is_empty() {
+        return None;
+    }
+    if !lane_is_skip_over_only(facts, members, straddled) {
+        return None;
+    }
+    let left = straddled
+        .iter()
+        .map(|&(l, _, _, _)| l)
+        .fold(f64::INFINITY, f64::min);
+    let right = straddled
+        .iter()
+        .map(|&(_, _, r, _)| r)
+        .fold(f64::NEG_INFINITY, f64::max);
+    Some(backbone >= (left + right) * 0.5)
+}
+
+fn lane_is_skip_over_only(
+    facts: &MainLaneFacts,
+    members: &[String],
+    foreign: &[(f64, f64, f64, f64)],
+) -> bool {
+    !members.is_empty()
+        && members
+            .iter()
+            .all(|id| edge_straddles_foreign(facts, id, foreign))
+}
+
+fn straddled_frames(
+    facts: &MainLaneFacts,
+    members: &[String],
+    foreign: &[(f64, f64, f64, f64)],
+) -> Vec<(f64, f64, f64, f64)> {
+    foreign
+        .iter()
+        .copied()
+        .filter(|&frame| {
+            members
+                .iter()
+                .any(|id| edge_straddles_foreign(facts, id, &[frame]))
+        })
+        .collect()
+}
+
+fn frames_eq(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)) -> bool {
+    const EPS: f64 = 1e-9;
+    (a.0 - b.0).abs() < EPS
+        && (a.1 - b.1).abs() < EPS
+        && (a.2 - b.2).abs() < EPS
+        && (a.3 - b.3).abs() < EPS
+}
+
+fn edge_straddles_foreign(
+    facts: &MainLaneFacts,
+    id: &str,
+    foreign: &[(f64, f64, f64, f64)],
+) -> bool {
+    let Some(&(a, b)) = facts.endpoint_x.get(id) else {
+        return false;
+    };
+    let (min_x, max_x) = (a.min(b), a.max(b));
+    foreign.iter().any(|&(l, _, r, _)| min_x < l && max_x > r)
 }
 
 /// Intersection of the member edges' admissible corridor X intervals.
@@ -607,6 +716,32 @@ fn clear_main_x(x: f64, obstacles: &[(f64, f64, f64, f64)], edge_gap: f64) -> f6
     x
 }
 
+/// Skip-over remnant: nearest-side against nodes and non-straddled foreign
+/// frames; directional (including wrong-face yank) against the straddled
+/// union only.
+fn clear_skip_over(
+    mut x: f64,
+    nodes: &[(f64, f64, f64, f64)],
+    other_foreign: &[(f64, f64, f64, f64)],
+    straddled: &[(f64, f64, f64, f64)],
+    edge_gap: f64,
+    rightward: bool,
+) -> f64 {
+    for _ in 0..16 {
+        let next = clear_main_x_dir(
+            clear_main_x(clear_main_x(x, nodes, edge_gap), other_foreign, edge_gap),
+            straddled,
+            edge_gap,
+            rightward,
+        );
+        if next == x {
+            return x;
+        }
+        x = next;
+    }
+    x
+}
+
 /// Outer-rail clearance: [`clear_main_x`] against node bodies **and** group
 /// envelopes, iterated to a fixpoint (pushing out of a group can land
 /// inside a node projection further out, and vice versa).
@@ -626,6 +761,59 @@ fn clear_outside(
             return x;
         }
         x = next;
+    }
+    x
+}
+
+fn clear_main_x_dir(
+    x: f64,
+    obstacles: &[(f64, f64, f64, f64)],
+    edge_gap: f64,
+    rightward: bool,
+) -> f64 {
+    const EPS: f64 = 1e-6;
+    let margin = edge_gap.max(1.0) * 0.5;
+    let mut intervals: Vec<(f64, f64)> = obstacles.iter().map(|&(l, _, r, _)| (l, r)).collect();
+    intervals.sort_by(|a, b| {
+        a.0.partial_cmp(&b.0)
+            .unwrap()
+            .then(a.1.partial_cmp(&b.1).unwrap())
+    });
+    let mut merged: Vec<(f64, f64)> = Vec::new();
+    for (l, r) in intervals {
+        if let Some(last) = merged.last_mut() {
+            if l <= last.1 + 2.0 * margin {
+                last.1 = last.1.max(r);
+            } else {
+                merged.push((l, r));
+            }
+        } else {
+            merged.push((l, r));
+        }
+    }
+    for &(l, r) in &merged {
+        if x > l + EPS && x < r - EPS {
+            return if rightward { r + margin } else { l - margin };
+        }
+    }
+    if merged.is_empty() {
+        return x;
+    }
+    // Already clear of every interval, but possibly parked on the wrong
+    // side of the stack (best_lane_x snapped to the far endpoint).
+    if rightward {
+        let right = merged
+            .iter()
+            .map(|&(_, r)| r)
+            .fold(f64::NEG_INFINITY, f64::max);
+        if x < right + margin - EPS {
+            return right + margin;
+        }
+    } else {
+        let left = merged.iter().map(|&(l, _)| l).fold(f64::INFINITY, f64::min);
+        if x > left - margin + EPS {
+            return left - margin;
+        }
     }
     x
 }

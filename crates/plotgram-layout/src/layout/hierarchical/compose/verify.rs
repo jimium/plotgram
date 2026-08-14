@@ -56,13 +56,9 @@ fn verify_ports_complete(
     Ok(())
 }
 
-fn escape_compatible(end: EscapeEnd, side: Side) -> bool {
-    match (end, side) {
-        (EscapeEnd::AtPortNormal, _) => true,
-        (EscapeEnd::ViaGap(_), Side::East | Side::West) => true,
-        // ViaGap on N/S is never enumerated by the Channel solver: the gap
-        // move would retrace the port normal already covered by AtPortNormal.
-        _ => false,
+fn escape_compatible(end: EscapeEnd, _side: Side) -> bool {
+    match end {
+        EscapeEnd::AtPortNormal | EscapeEnd::ViaGap(_) => true,
     }
 }
 

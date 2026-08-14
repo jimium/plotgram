@@ -92,7 +92,6 @@ impl Track {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // ranks/orders reserved for L6 penetration verifier
 pub struct GroupScope {
     pub id: GroupId,
     pub parent: Option<GroupId>,
@@ -203,9 +202,13 @@ impl Substrate {
         self.tracks.values()
     }
 
-    #[allow(dead_code)] // used by future L6 / debug projectors
+    #[allow(dead_code)] // L6 / debug projectors
     pub fn group(&self, id: GroupId) -> Option<&GroupScope> {
         self.groups.get(&id)
+    }
+
+    pub fn groups(&self) -> impl Iterator<Item = &GroupScope> {
+        self.groups.values()
     }
 
     pub fn gate(&self, id: GateId) -> Option<&Gate> {
