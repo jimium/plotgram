@@ -1,5 +1,6 @@
 ---
 source: crates/plotgram-layout/tests/hierarchical_coordinates.rs
+assertion_line: 78
 expression: "layout_json(graph, Size::new(120.0, 40.0))"
 ---
 {
@@ -8,7 +9,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "from_port": {
         "along": {
           "LocalOffset": {
-            "x": 39.99999999999999,
+            "x": 30.0,
             "y": 40.0
           }
         },
@@ -19,8 +20,16 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
         "polyline": {
           "points": [
             {
-              "x": 60.0,
+              "x": 102.0,
               "y": 40.0
+            },
+            {
+              "x": 102.0,
+              "y": 60.0
+            },
+            {
+              "x": 60.0,
+              "y": 60.0
             },
             {
               "x": 60.0,
@@ -61,14 +70,6 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
             },
             {
               "x": 60.0,
-              "y": 140.0
-            },
-            {
-              "x": 243.9882255071351,
-              "y": 140.0
-            },
-            {
-              "x": 243.9882255071351,
               "y": 160.0
             }
           ]
@@ -101,12 +102,20 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
         "polyline": {
           "points": [
             {
-              "x": 243.9882255071351,
+              "x": 60.0,
               "y": 200.0
             },
             {
-              "x": 243.9882255071351,
-              "y": 240.0
+              "x": 60.0,
+              "y": 220.0
+            },
+            {
+              "x": 174.0,
+              "y": 220.0
+            },
+            {
+              "x": 174.0,
+              "y": 256.0
             }
           ]
         }
@@ -116,7 +125,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "to_port": {
         "along": {
           "LocalOffset": {
-            "x": 79.9882255071351,
+            "x": 30.0,
             "y": 0.0
           }
         },
@@ -127,7 +136,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "from_port": {
         "along": {
           "LocalOffset": {
-            "x": 120.0,
+            "x": 80.0,
             "y": 40.0
           }
         },
@@ -138,20 +147,20 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
         "polyline": {
           "points": [
             {
-              "x": 140.0,
+              "x": 152.0,
               "y": 40.0
             },
             {
-              "x": 140.0,
-              "y": 220.0
+              "x": 152.0,
+              "y": 236.0
             },
             {
-              "x": 227.9882255071351,
-              "y": 220.0
+              "x": 190.0,
+              "y": 236.0
             },
             {
-              "x": 227.9882255071351,
-              "y": 240.0
+              "x": 190.0,
+              "y": 256.0
             }
           ]
         }
@@ -161,7 +170,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "to_port": {
         "along": {
           "LocalOffset": {
-            "x": 63.9882255071351,
+            "x": 46.0,
             "y": 0.0
           }
         },
@@ -174,7 +183,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "frame": {
         "height": 40.0,
         "width": 120.0,
-        "x": 20.000000000000007,
+        "x": 72.0,
         "y": 0.0
       },
       "id": "a"
@@ -192,7 +201,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "frame": {
         "height": 40.0,
         "width": 120.0,
-        "x": 183.9882255071351,
+        "x": 0.0,
         "y": 160.0
       },
       "id": "c"
@@ -200,9 +209,9 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
     {
       "frame": {
         "height": 40.0,
-        "width": 120.0,
-        "x": 164.0,
-        "y": 240.0
+        "width": 120.00000000000001,
+        "x": 144.0,
+        "y": 256.0
       },
       "id": "d"
     }

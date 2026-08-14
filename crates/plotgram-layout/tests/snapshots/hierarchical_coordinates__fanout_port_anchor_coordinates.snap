@@ -1,5 +1,6 @@
 ---
 source: crates/plotgram-layout/tests/hierarchical_coordinates.rs
+assertion_line: 96
 expression: "layout_json(graph, Size::new(120.0, 40.0))"
 ---
 {
@@ -8,7 +9,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "from_port": {
         "along": {
           "LocalOffset": {
-            "x": 79.99683222807957,
+            "x": 20.0,
             "y": 40.0
           }
         },
@@ -19,12 +20,20 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
         "polyline": {
           "points": [
             {
-              "x": 79.99683222807957,
+              "x": 164.0,
               "y": 40.0
             },
             {
-              "x": 79.99683222807957,
-              "y": 96.0
+              "x": 164.0,
+              "y": 60.0
+            },
+            {
+              "x": 60.0,
+              "y": 60.0
+            },
+            {
+              "x": 60.0,
+              "y": 80.0
             }
           ]
         }
@@ -45,7 +54,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "from_port": {
         "along": {
           "LocalOffset": {
-            "x": 104.0,
+            "x": 60.0,
             "y": 40.0
           }
         },
@@ -56,28 +65,12 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
         "polyline": {
           "points": [
             {
-              "x": 104.0,
+              "x": 204.0,
               "y": 40.0
             },
             {
-              "x": 104.0,
-              "y": 60.0
-            },
-            {
-              "x": 147.99683222807957,
-              "y": 60.0
-            },
-            {
-              "x": 147.99683222807957,
-              "y": 156.0
-            },
-            {
-              "x": 63.99683222807957,
-              "y": 156.0
-            },
-            {
-              "x": 63.99683222807957,
-              "y": 192.0
+              "x": 204.0,
+              "y": 160.0
             }
           ]
         }
@@ -87,7 +80,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "to_port": {
         "along": {
           "LocalOffset": {
-            "x": 63.99683222807957,
+            "x": 60.0,
             "y": 0.0
           }
         },
@@ -98,7 +91,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "from_port": {
         "along": {
           "LocalOffset": {
-            "x": 120.0,
+            "x": 100.0,
             "y": 40.0
           }
         },
@@ -109,20 +102,20 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
         "polyline": {
           "points": [
             {
-              "x": 120.0,
+              "x": 244.0,
               "y": 40.0
             },
             {
-              "x": 120.0,
+              "x": 244.0,
               "y": 60.0
             },
             {
-              "x": 247.99683222807957,
+              "x": 348.0,
               "y": 60.0
             },
             {
-              "x": 247.99683222807957,
-              "y": 96.0
+              "x": 348.0,
+              "y": 80.0
             }
           ]
         }
@@ -154,12 +147,20 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
         "polyline": {
           "points": [
             {
-              "x": 79.99683222807957,
-              "y": 136.0
+              "x": 60.0,
+              "y": 120.0
             },
             {
-              "x": 79.99683222807957,
-              "y": 192.0
+              "x": 60.0,
+              "y": 140.0
+            },
+            {
+              "x": 174.0,
+              "y": 140.0
+            },
+            {
+              "x": 174.0,
+              "y": 160.0
             }
           ]
         }
@@ -169,7 +170,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "to_port": {
         "along": {
           "LocalOffset": {
-            "x": 79.99683222807957,
+            "x": 30.0,
             "y": 0.0
           }
         },
@@ -182,7 +183,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "frame": {
         "height": 40.0,
         "width": 120.0,
-        "x": 0.0,
+        "x": 144.0,
         "y": 0.0
       },
       "id": "src"
@@ -191,8 +192,8 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "frame": {
         "height": 40.0,
         "width": 120.0,
-        "x": 19.99683222807957,
-        "y": 96.0
+        "x": 0.0,
+        "y": 80.0
       },
       "id": "t0"
     },
@@ -200,8 +201,8 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "frame": {
         "height": 40.0,
         "width": 120.0,
-        "x": 0.0,
-        "y": 192.0
+        "x": 144.0,
+        "y": 160.0
       },
       "id": "t1"
     },
@@ -209,8 +210,8 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "frame": {
         "height": 40.0,
         "width": 120.0,
-        "x": 187.99683222807957,
-        "y": 96.0
+        "x": 288.0,
+        "y": 80.0
       },
       "id": "t2"
     }
