@@ -290,14 +290,27 @@ fn color_cross_outer_first(
             bundles.entry(m.4).or_default().push(idx);
         }
     }
-    for (_, idxs) in &bundles {
+    for (_, all_idxs) in &bundles {
+        // Movement sign: above column minus below column (`above = lo + hi
+        // − below`, since `below` is one of the two endpoint columns). A
+        // sub-pixel movement (port-chase overshoot — freeze→verify on
+        // `demo.k8s-incident-response` lands 0.05px past its source column)
+        // is a straight drop: point-span, no seam to nest. It sits out the
+        // bundle entirely — voting with its flipped sign would disqualify
+        // the run, and reordering it by below-extremity demotes wider spans
+        // (equal below_x ties resolve by insertion order).
+        const STRAIGHT_DROP_EPS: f64 = 0.5;
+        let mov = |i: usize| members[i].3.map(|b| members[i].1 + members[i].2 - 2.0 * b);
+        let idxs: Vec<usize> = all_idxs
+            .iter()
+            .copied()
+            .filter(|&i| mov(i).is_some_and(|d| d.abs() > STRAIGHT_DROP_EPS))
+            .collect();
         if idxs.len() < 2 {
             continue;
         }
-        // Movement sign: above column minus below column (`above = lo + hi
-        // − below`, since `below` is one of the two endpoint columns). The
-        // bundle nests only when every member converges from the same side.
-        let mov = |i: usize| members[i].3.map(|b| members[i].1 + members[i].2 - 2.0 * b);
+        // The bundle nests only when every voting member converges from the
+        // same side.
         let dirs: Vec<f64> = idxs.iter().filter_map(|&i| mov(i)).collect();
         if dirs.len() != idxs.len() || dirs.iter().any(|d| d.signum() != dirs[0].signum()) {
             continue;
@@ -913,6 +926,157 @@ mod tests {
             far < near,
             "farthest slot must take the shallowest lane (got far={far} near={near})"
         );
+    }
+
+    /// A straight-drop member (landing a hair past its source column —
+    /// port-chase overshoot flips the movement sign at noise scale) must
+    /// abstain from the converging-bundle direction vote, not disqualify
+    /// the whole bundle. Regression: `demo.k8s-incident-response` verify
+    /// fan-in inverted its seam nesting (+3 crossings) when freeze's port
+    /// slid 0.05px left of its source column.
+    #[test]
+    fn converging_bundle_straight_drop_abstains_from_vote() {
+        use crate::layout::hierarchical::compose::ports::ResolvedPort;
+        use plotgram_algo::orientation::Side as AlgoSide;
+        use plotgram_model::geometry::Point;
+        use plotgram_model::port::AlongSpec;
+
+        // Sources above at cx 74.5 / 115.5 / 227.7 / 315.67; target below
+        // with four north slots. The rightmost source lands 0.05px LEFT of
+        // its own column (straight drop, sign-flipped mov = +0.05).
+        let src_ids = ["s_resched", "s_rate", "s_dep", "s_freeze"];
+        let elems = src_ids
+            .iter()
+            .map(|id| Elem {
+                key: ElemKey::Real((*id).into()),
+                group_path: vec![],
+                rank: 0,
+            })
+            .chain(std::iter::once(Elem {
+                key: ElemKey::Real("tgt".into()),
+                group_path: vec![],
+                rank: 1,
+            }))
+            .collect::<Vec<_>>();
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let edge_ids = ["e_resched", "e_rate", "e_dep", "e_freeze"];
+        let tgt = src_ids.len();
+        let plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: (0..=tgt).collect(),
+            segments: edge_ids
+                .iter()
+                .enumerate()
+                .map(|(i, eid)| Segment {
+                    edge_id: (*eid).into(),
+                    ordinal: 0,
+                    from: i,
+                    to: tgt,
+                })
+                .collect(),
+            layers: vec![(0..tgt).collect::<Vec<_>>(), vec![tgt]],
+            ..Default::default()
+        };
+        let mut ids = BTreeMap::new();
+        for (i, id) in src_ids.iter().chain(["tgt"].iter()).enumerate() {
+            ids.insert((*id).into(), i);
+        }
+        let graph = RealGraph {
+            ids: src_ids
+                .iter()
+                .chain(["tgt"].iter())
+                .map(|s| (*s).to_string())
+                .collect(),
+            index_of: ids,
+            group_path: vec![vec![]; tgt + 1],
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; tgt + 1],
+            edges: edge_ids
+                .iter()
+                .enumerate()
+                .map(|(i, eid)| RealEdge {
+                    edge_id: (*eid).into(),
+                    original_source: i,
+                    original_target: tgt,
+                    working_source: i,
+                    working_target: tgt,
+                    reversed: false,
+                    from_port: None,
+                    to_port: None,
+                    weight: 1.0,
+                    ..Default::default()
+                })
+                .collect(),
+            self_loops: vec![],
+            ..Default::default()
+        };
+        // Landing columns on tgt (x∈[251.5,323.5]): 260.55 / 276.55 /
+        // 292.55 / 315.62 — the last 0.05px left of its source 315.67.
+        let mut ports = BTreeMap::new();
+        for (i, eid) in edge_ids.iter().enumerate() {
+            ports.insert(
+                (*eid).into(),
+                EdgePorts {
+                    source: ResolvedPort {
+                        side: AlgoSide::South,
+                        along: AlongSpec::Ordered { order: 0, count: 1 },
+                    },
+                    target: ResolvedPort {
+                        side: AlgoSide::North,
+                        along: AlongSpec::LocalOffset(Point {
+                            x: [9.05, 25.05, 41.05, 64.12][i],
+                            y: 0.0,
+                        }),
+                    },
+                    source_cluster: None,
+                    target_cluster: None,
+                },
+            );
+        }
+        let (sub, idx) = derive_root_substrate(&plan);
+        let cross = idx.cross_at(1, 0).expect("cross gap");
+        let mut routes = BTreeMap::new();
+        for eid in edge_ids {
+            routes.insert(
+                eid.into(),
+                RouteTopology::Orthogonal(ChannelPath::new(vec![cross], vec![])),
+            );
+        }
+        let route_plan = ChannelRoutePlan {
+            substrate: sub,
+            index: idx,
+            routes,
+            bundles: vec![],
+            relaxations: vec![],
+            ripup_rounds: 0,
+            used_gates: false,
+            route_order: vec![],
+        };
+        // Source frames centred 74.5 / 115.5 / 227.7 / 315.67; target frame
+        // x=251.5 w=72 → LocalOffset 9.05..64.12 land at 260.55..315.62.
+        let frames = vec![
+            Rect::new(64.5, 0.0, 20.0, 10.0),
+            Rect::new(105.5, 0.0, 20.0, 10.0),
+            Rect::new(217.7, 0.0, 20.0, 10.0),
+            Rect::new(305.67, 0.0, 20.0, 10.0),
+            Rect::new(251.5, 50.0, 72.0, 10.0),
+        ];
+        let order = assign_track_order(&plan, &graph, &ports, &frames, &[], &route_plan);
+        let lane = |eid: &str| order.assignments[&(eid.into(), cross)].track_index;
+        // Left-converging run nests: leftmost landing deepest (highest
+        // lane); the straight drop shares the shallowest lane disjointly.
+        assert!(
+            lane("e_resched") > lane("e_rate") && lane("e_rate") > lane("e_dep"),
+            "seam nesting must not invert: resched={} rate={} dep={}",
+            lane("e_resched"),
+            lane("e_rate"),
+            lane("e_dep")
+        );
+        assert_eq!(lane("e_freeze"), 0, "straight drop takes the free lane");
     }
 
     /// Gate-cut corridor: one Cross line split into two scope-cut tracks.
