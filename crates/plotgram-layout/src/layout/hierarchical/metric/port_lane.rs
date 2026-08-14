@@ -495,16 +495,28 @@ fn project_ordered(targets: &[f64], pitch: f64, lo: f64, hi: f64) -> Vec<f64> {
         }
     }
 
+    // Fit pooled blocks into the band block-wise, not with one global shift:
+    // blocks are independently movable (only within a block is the run
+    // rigid). In the pitch-shifted frame `u_i = x_i − i·pitch`, a block
+    // covering `s..=e` has a common value bounded by `[lo − s·pitch,
+    // hi − e·pitch]` plus monotonicity to the previous block. A single
+    // shift correcting the left block's `lo` violation drags right-hand
+    // blocks that were already in-band out through `hi` — the corner-slam
+    // escape seen on `demo.flat-realtime-recommendation` recall→item_db.
     let mut out: Vec<f64> = Vec::with_capacity(n);
+    let mut prev_u = f64::NEG_INFINITY;
     for block in &blocks {
-        let v = median(block);
+        let s = out.len();
+        let e = s + block.len() - 1;
+        let lo_u = lo - s as f64 * pitch;
+        let hi_u = hi - e as f64 * pitch;
+        let v = median(block).max(lo_u.max(prev_u)).min(hi_u);
+        prev_u = v;
         for _ in 0..block.len() {
             out.push(v + out.len() as f64 * pitch);
         }
     }
-    // The pooled run is rigid, so fitting it inside the face is a plain shift.
-    let shift = (lo - out[0]).max(0.0) + (hi - out[n - 1]).min(0.0);
-    out.iter().map(|x| x + shift).collect()
+    out
 }
 
 /// Lower median — deterministic, and it lands on an actual target.
