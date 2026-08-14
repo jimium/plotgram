@@ -10,7 +10,7 @@
 主链节点中心共线与扇出几何居中，是**同一条次轴对称**的两个面。  
 旧路径用 `SymmetryPlan`（轴 / 刚体列 / FanPack）+ 贪心 `claimed` 在树上精确、在 DAG/多父上塌陷，且只能靠再加谓词修补（roadmap 熔断点）。
 
-现行写者最小化可观测目标 **`J(x)`**，硬约束只保留层内分离与 VV 共线；产品规则（主臂 / twin 占脊、扇叶铺开）进**权重与终局 snap**，不进约束循环里的 ad-hoc continue。
+现行写者最小化可观测目标 **`J(x)`**，硬约束只保留层内分离与 VV 共线；产品规则（1:1 茎 / twin 占脊、扇叶铺开）进**权重与终局 snap**，不进约束循环里的 ad-hoc continue。
 
 **写什么**：每个 plan elem 的 **次轴中心**（TB 下为 `x`）。  
 **不写**：端口 `side`、脸内 along、轨坐标 —— 那些分别属 Compose / PortLane / TrackOrder。Compose 已定的 ports 只被消费：把链端 dummy 的 soft desired 拉到 `port_anchor.x`。
@@ -21,9 +21,9 @@
 J_edge = Σ_seg w · |(x_from + off_from) − (x_to + off_to)|
 ```
 
-`off` = 该边在该端的槽位相对中心的偏移 `((order+1)/(count+1) − 1/2) · width`；虚元与 E/W 端口取 0（E/W 边横着走，x 上没有可对的列）。同一条纪律进 `snap_fan_pack_style` 的共线语句：主臂 / twin / 脊链上的 `desired[peer] = axis` 改成 `axis + (off_hub − off_peer)`，链上逐跳累加。
+`off` = 该边在该端的槽位相对中心的偏移 `((order+1)/(count+1) − 1/2) · width`；虚元与 E/W 端口取 0（E/W 边横着走，x 上没有可对的列）。同一条纪律进 `snap_fan_pack_style` 的共线语句：twin / exclusive 脊链上的 `desired[peer] = axis` 改成 `axis + (off_hub − off_peer)`，链上逐跳累加。
 
-因此 **「主臂占脊」的门禁断言的是边的两个端口列，不是两个节点中心**（`order_approval` 门禁已按此改写）。
+因此 **「短支占脊」的门禁断言的是边的两个端口列，不是两个节点中心**（`order_approval` 门禁已按此改写）。
 
 ## 2. 写者边界
 
@@ -32,13 +32,13 @@ J_edge = Σ_seg w · |(x_from + off_from) − (x_to + off_to)|
 | BK 四候选合并 ideal | `bk_ideal` | 兼任对称终局 |
 | **次轴中心 `x[e]`** | **`solve_symmetry_objective`** | Channel / Ink / 端口相改写 side |
 | 层内分离、VV 共线、（可行时）twin 跨层等式 | VPSC 硬约束 | `if even_fan` / 图名特判 |
-| 扇叶槽 / 主臂·twin 占脊 / spine | 终局 snap 展开 J 已有的相对项；IPSEP 不再 1e6 绝对锁 | 第三趟 ad-hoc 拉回 |
+| 扇叶槽 / twin 占脊 / exclusive 茎 | 终局 snap 展开 J 已有的相对项；IPSEP 不再 1e6 绝对锁 | 第三趟 ad-hoc 拉回 |
 | 折线像素 | Ink | 发明列位 |
 
 ```text
 BK ideal
   → VPSC（可行初值）
-  → K 轮 IPSEP：无约束 L2 步（邻域重心，twin/主臂/exclusive 脊带 boost + hub→center_h）→ VPSC 投影这一步的 x；J 更优则 snapshot
+  → K 轮 IPSEP：无约束 L2 步（邻域重心，twin/exclusive/扇出 mass 带 boost + hub→center_h）→ VPSC 投影这一步的 x；J 更优则 snapshot
        （`symmetry_place: median` 仍走旧的 weighted-median desired 装箱）
   → snap（叶槽 / hub 扇心 / exclusive 脊 / exteriorize dummy；IPSEP 不 1e6 锁 twin/primary）
   → VPSC → 返回 x[]
@@ -47,11 +47,15 @@ BK ideal
 ## 3. 目标与约束
 
 ```text
-J(x) = Σ_seg w_uv · boost_uv · |(x+off)_u − (x+off)_v|
-     + λ_sym · Σ_hub |x_h − center_h(x)|
-boost_uv = twin_spine_boost | chain_end_boost | primary_arm_boost
-           （exclusive 1:1 计入；两端都是扇 hub 的 min-span 子不加；
-             chain_end = 悬挂汇点↔长边 dummy，父不是 span-1 扇 hub）
+J(x) = Σ_seg w_base · w_author · φ(role) · ψ(L) · |(x+off)_u − (x+off)_v|
+     + λ_sym · Σ_hub |x_h − center_h^mass(x)|
+boost / φ / ψ（twin 与 chain_end 仍优先）:
+  twin_spine_boost | chain_end_boost
+  exclusive 1:1：φ = primary_arm_boost，ψ = 1 + α log2(L) 封顶 2
+                 L = 该边 plan 点数（含 dummy）；扇出长侧枝不加 ψ
+  扇出 hop：φ = 1 + β · mass(child) / Σ siblings（两端都是扇 hub 则 φ=1）
+  进入扇入：φ = 1（汇点由 λ_sym 写扇心）
+  mass(v) = 1 + Σ_c mass(c) / max(up_deg[c], 1)
 
 硬约束：层内分离（node_gap）+ VV dummy 链共线
          + 链恒等：长边（≥2 颗 dummy）相邻 dummy 双向 0-gap 等式，
@@ -64,18 +68,20 @@ boost_uv = twin_spine_boost | chain_end_boost | primary_arm_boost
 
 | 参数 | 默认 | 作用 |
 |------|------|------|
-| `lambda_sym` | `1.0` | hub 贴扇心强度 |
+| `lambda_sym` | `1.0` | hub 贴扇心强度（1:1 茎上的扇出 hub 不加此项，以免拉离脊） |
 | `twin_spine_boost` | `8.0` | 2-cycle 对端占脊（进 J / L2，不再靠 1e6 desired） |
-| `primary_arm_boost` | `4.0` | 最短跨主臂与 exclusive 1:1 脊进 J；两端都是扇 hub 则不加 |
+| `primary_arm_boost` | `4.0` | exclusive 1:1 脊进 J（参数名沿用；含 dummy 整边段） |
+| `stem_length_gain` | `0.5` | exclusive 茎长 α：`ψ = 1 + α log2(L)`，封顶 2 |
+| `fan_mass_gain` | `1.0` | 扇出 hop 按下游 mass 分流的 β |
 | `chain_end_boost` | `8.0` | 悬挂汇点跟长边廊（父非 span-1 扇 hub）；snap：叶跟廊；恰好一端是扇 hub 时非 hub 写整链 |
 | `symmetry_iters` | `8` | IPSEP / 中位迭代轮数 |
 | `symmetry_place` | `ipsep` | 主路径 = 对 J 的 L2 无约束步 + VPSC 投影。`median` = 旧 desired-packer；`bk` = 诊断（BK ideal + 硬约束，跳过迭代与 fan snap）。后两档**不是产品档**。 |
 | `layer_alignment` | `0.5` | 主轴：实节点在层带内对齐；**零高 elem 钉层带顶边**（避免中心走廊穿同层节点） |
 
 边权基：`real–real=1` / `real–virt=2` / `virt–virt=8`（作者 `weight` 乘基；`critical: true` 糖 = `2.0`）。  
-`center_h`：该 hub 向下/上扇叶的中位或两中位中点（`axis_from_neighbors`）；多父取折中（邻位加权，非先到先得认领）。
+`center_h`：**扇出**为孩子的 mass 加权重心（质量全相等则回退中位，保 D3）；**纯扇入**仍是父母等权中位。1:1 茎上的扇出 hub 不进 `λ_sym`。
 
-**邻接真源**：`RealGraph` **正向** real 端点（长边一跳；**reversed 不计扇**）。辅助谓词仍在 [`metric/symmetry.rs`](../../../../crates/plotgram-layout/src/layout/hierarchical/metric/symmetry.rs)（`forward_real_adjacency` / `twin_plan_pairs` / `unique_min_span_primary` / `fan_pitch` / `slot_multipliers`）。
+**邻接真源**：`RealGraph` **正向** real 端点（长边一跳；**reversed 不计扇**）。辅助谓词仍在 [`metric/symmetry.rs`](../../../../crates/plotgram-layout/src/layout/hierarchical/metric/symmetry.rs)（`forward_real_adjacency` / `descendant_mass` / `twin_plan_pairs` / `fan_pitch` / `slot_multipliers`）。
 
 ## 4. 终局 snap（展开，非新自由度）
 
@@ -84,7 +90,7 @@ boost_uv = twin_spine_boost | chain_end_boost | primary_arm_boost
 1. hub → `center_h`（纯扇）；IPSEP 下 **J 已保住的列**（dummy 链上的 hub、1:1 茎上的扇出 hub）snap 不改写；  
 2. **只铺扇出叶**（`down_deg ≥ 2`）：≥2 自由叶 `axis + slot_multipliers · pitch`（FanPack / D3）；扇入只动汇点，不 FanPack 父节点（否则 1:1 茎被拽开，汇点看起来贴在 median 父下）；  
 3. 恰 1 自由叶：IPSEP **保持 J 的列**（`node_gap` 只当分离下限）；median 档仍 `axis ± pitch`；  
-4. twin 仍只在 J；主臂 peer → 轴（**仅 `symmetry_place: median`** 仍 1e6 锁；IPSEP 用 `primary_arm_boost` 展开端口列，不 1e6）；  
+4. twin 仍只在 J；**仅 `symmetry_place: median`** 仍 1e6 锁 twin 列；IPSEP 不把扇叶吸到 hub 轴；  
 5. exclusive 1:1 spine / follower 跟列；  
 6. **1:1 茎焊列**：父的唯一向下邻居 = 子的唯一向上邻居、且子不是扇出 hub 时，子跟父的端口列（悬挂汇点叶除外）。两端都是 hub 的茎层内分离可能禁掉共列，不焊。这是短茎共列与扇入汇点偏轴的同一写者；  
 7. **纯扇入汇点**（`up_deg ≥ 2` 且无扇出、且不在 keep-J 集）再贴 `center_h`（焊茎后的父母跨度）；  
@@ -113,7 +119,7 @@ boost_uv = twin_spine_boost | chain_end_boost | primary_arm_boost
 | `hier_eval::symmetry_axis_d2_*` | 代表图主链共线 |
 | `symmetry_axis_d3_fan_pack_multi_rank_backedge` | 跨层扇 + 回边不算扇 |
 | `twin_spine_constrain_sink_*` / PortLane 相关 | twin 占脊 + 外叶序 |
-| `order_approval` / `ticket_triage_*` | 主臂占脊 / 侧廊 |
+| `order_approval` / `ticket_triage_*` | 短支端口共列 / 侧廊 |
 | `hier_eval` 基线 | bends / crossings / `symmetry_deviation_*` 观测 |
 
 ## 7. 刻意不做

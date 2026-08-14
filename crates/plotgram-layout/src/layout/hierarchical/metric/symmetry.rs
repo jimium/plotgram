@@ -3,10 +3,13 @@
 //! Fan adjacency is **real endpoints** on [`RealGraph`]: after P1 the
 //! `reversed` bit is only a direction, so reversed edges count like forward
 //! ones (working source → working target); long edges still count as one
-//! hop. Twin pairs (2-cycle) and unique-min-span primary arms feed soft
-//! weights / snap desired in [`super::symmetry_objective`]. The old
-//! SymmetryPlan tables (claimed / FanPack / RigidColumnClass) were deleted
-//! in P4-S4.
+//! hop. Twin pairs (2-cycle) and exclusive 1:1 stems feed soft weights /
+//! snap desired in [`super::symmetry_objective`]. Stem-flow J: exclusive
+//! hops scale with dummy-inclusive length; fan-out hops share weight by
+//! descendant mass; fan-in hops stay unboosted. Unique-min-span "primary
+//! arm" identity was dropped (it glued a fan hub onto its shortest child).
+//! The old SymmetryPlan tables (claimed / FanPack / RigidColumnClass) were
+//! deleted in P4-S4.
 
 use std::collections::BTreeSet;
 
@@ -96,75 +99,63 @@ pub(crate) fn twin_plan_pairs(plan: &PlanGraph, graph: &RealGraph) -> BTreeSet<(
     out
 }
 
-fn is_twin_peer(hub: usize, peer: usize, twins: &BTreeSet<(usize, usize)>) -> bool {
-    twins.contains(&undirected_real_pair(hub, peer))
+/// Downstream flow mass: `1 + Σ_c mass(c) / max(up_deg[c], 1)`.
+/// High rank first so children are ready; virtuals stay 0.
+pub(crate) fn descendant_mass(
+    plan: &PlanGraph,
+    down_nbs: &[Vec<usize>],
+    up_deg: &[usize],
+) -> Vec<f64> {
+    let n = plan.elems.len();
+    let mut mass = vec![0.0; n];
+    let mut order: Vec<usize> = (0..n)
+        .filter(|&e| !plan.elems[e].key.is_virtual() && !plan.elems[e].key.is_zero_width())
+        .collect();
+    order.sort_by(|&a, &b| plan.elems[b].rank.cmp(&plan.elems[a].rank).then(a.cmp(&b)));
+    for v in order {
+        let mut s = 1.0;
+        for &c in &down_nbs[v] {
+            let child = if mass[c] > 0.0 { mass[c] } else { 1.0 };
+            s += child / (up_deg[c].max(1) as f64);
+        }
+        mass[v] = s;
+    }
+    mass
 }
 
-/// Unique min-span non-twin real neighbor on one side — primary arm on spine.
-/// Tied minima → `None` (keep even/odd fan-out mirror).
-pub(crate) fn unique_min_span_primary(
-    hub: usize,
-    neighbors: &[usize],
-    plan: &PlanGraph,
-    twins: &BTreeSet<(usize, usize)>,
-) -> Option<usize> {
-    let cands = min_span_candidates(hub, neighbors, plan, twins);
-    match cands.as_slice() {
-        [only] => Some(*only),
-        _ => None,
+/// Exclusive-stem length gain: `1 + α log2(L)`, capped at 2.
+pub(crate) fn stem_psi(len: usize, gain: f64) -> f64 {
+    if len < 2 || gain <= 0.0 {
+        1.0
+    } else {
+        (1.0 + gain * (len as f64).log2()).min(2.0)
     }
 }
 
-/// Fan-in primary: unique min-span, or on an **odd** tie the median parent by
-/// layer order. Even ties → `None` so the hub stays on the fan midpoint
-/// (D3 multi-rank backedge / even mirror).
-pub(crate) fn min_span_primary_median_tie(
-    hub: usize,
-    neighbors: &[usize],
-    plan: &PlanGraph,
-    twins: &BTreeSet<(usize, usize)>,
-    layer_pos: &[usize],
-) -> Option<usize> {
-    let mut cands = min_span_candidates(hub, neighbors, plan, twins);
-    match cands.len() {
-        0 => None,
-        1 => Some(cands[0]),
-        n if n % 2 == 0 => None,
-        _ => {
-            cands.sort_by(|&a, &b| layer_pos[a].cmp(&layer_pos[b]).then(a.cmp(&b)));
-            Some(cands[cands.len() / 2])
-        }
+/// Fan-out axis: mass-weighted barycenter, or unweighted median when
+/// sibling masses are equal (D3 even/odd mirror).
+pub(crate) fn fan_axis_from_children(neighbors: &[usize], x: &[f64], mass: &[f64]) -> f64 {
+    if neighbors.is_empty() {
+        return 0.0;
     }
-}
-
-fn min_span_candidates(
-    hub: usize,
-    neighbors: &[usize],
-    plan: &PlanGraph,
-    twins: &BTreeSet<(usize, usize)>,
-) -> Vec<usize> {
-    let hub_rank = plan.elems[hub].rank as i64;
-    let mut best_span: Option<i64> = None;
-    let mut cands = Vec::new();
-    for &nb in neighbors {
-        if plan.elems[nb].key.is_virtual() || is_twin_peer(hub, nb, twins) {
-            continue;
-        }
-        let span = (plan.elems[nb].rank as i64 - hub_rank).abs();
-        match best_span {
-            None => {
-                best_span = Some(span);
-                cands = vec![nb];
-            }
-            Some(s) if span < s => {
-                best_span = Some(span);
-                cands = vec![nb];
-            }
-            Some(s) if span == s => cands.push(nb),
-            _ => {}
-        }
+    let mut min_m = f64::INFINITY;
+    let mut max_m = 0.0_f64;
+    for &c in neighbors {
+        let m = mass[c].max(1e-12);
+        min_m = min_m.min(m);
+        max_m = max_m.max(m);
     }
-    cands
+    if max_m <= min_m * (1.0 + 1e-9) {
+        return axis_from_neighbors(neighbors, x);
+    }
+    let mut num = 0.0;
+    let mut den = 0.0;
+    for &c in neighbors {
+        let m = mass[c].max(1e-12);
+        num += m * x[c];
+        den += m;
+    }
+    num / den
 }
 
 /// Odd → median neighbor center; even → midpoint of two middle neighbors.
@@ -232,121 +223,5 @@ mod tests {
         assert_eq!(slot_multipliers(2), vec![-0.5, 0.5]);
         assert_eq!(slot_multipliers(3), vec![-1.0, 0.0, 1.0]);
         assert_eq!(slot_multipliers(4), vec![-1.5, -0.5, 0.5, 1.5]);
-    }
-
-    #[test]
-    fn unique_min_span_primary_picks_nearest() {
-        let elems = vec![
-            crate::layout::hierarchical::model::Elem {
-                key: ElemKey::Real("h".into()),
-                group_path: Vec::new(),
-                rank: 0,
-            },
-            crate::layout::hierarchical::model::Elem {
-                key: ElemKey::Real("near".into()),
-                group_path: Vec::new(),
-                rank: 1,
-            },
-            crate::layout::hierarchical::model::Elem {
-                key: ElemKey::Real("far".into()),
-                group_path: Vec::new(),
-                rank: 3,
-            },
-        ];
-        let index_of = elems
-            .iter()
-            .enumerate()
-            .map(|(i, e)| (e.key.clone(), i))
-            .collect();
-        let plan = PlanGraph {
-            elems,
-            index_of,
-            decl_index: vec![0, 1, 2],
-            segments: Vec::new(),
-            layers: vec![vec![0], vec![1], vec![], vec![2]],
-            ..Default::default()
-        };
-        let twins = BTreeSet::new();
-        assert_eq!(unique_min_span_primary(0, &[1, 2], &plan, &twins), Some(1));
-        // Tied spans → None
-        let elems2 = vec![
-            crate::layout::hierarchical::model::Elem {
-                key: ElemKey::Real("h".into()),
-                group_path: Vec::new(),
-                rank: 0,
-            },
-            crate::layout::hierarchical::model::Elem {
-                key: ElemKey::Real("a".into()),
-                group_path: Vec::new(),
-                rank: 2,
-            },
-            crate::layout::hierarchical::model::Elem {
-                key: ElemKey::Real("b".into()),
-                group_path: Vec::new(),
-                rank: 2,
-            },
-        ];
-        let index_of = elems2
-            .iter()
-            .enumerate()
-            .map(|(i, e)| (e.key.clone(), i))
-            .collect();
-        let plan2 = PlanGraph {
-            elems: elems2,
-            index_of,
-            decl_index: vec![0, 1, 2],
-            segments: Vec::new(),
-            layers: vec![vec![0], vec![], vec![1, 2]],
-            ..Default::default()
-        };
-        assert_eq!(unique_min_span_primary(0, &[1, 2], &plan2, &twins), None);
-        let layer_pos = [0usize, 0, 1];
-        assert_eq!(
-            min_span_primary_median_tie(0, &[1, 2], &plan2, &twins, &layer_pos),
-            None,
-            "even fan-in tie keeps midpoint (no primary)"
-        );
-        // Odd tie → median by layer order.
-        let elems3 = vec![
-            crate::layout::hierarchical::model::Elem {
-                key: ElemKey::Real("h".into()),
-                group_path: Vec::new(),
-                rank: 1,
-            },
-            crate::layout::hierarchical::model::Elem {
-                key: ElemKey::Real("a".into()),
-                group_path: Vec::new(),
-                rank: 0,
-            },
-            crate::layout::hierarchical::model::Elem {
-                key: ElemKey::Real("b".into()),
-                group_path: Vec::new(),
-                rank: 0,
-            },
-            crate::layout::hierarchical::model::Elem {
-                key: ElemKey::Real("c".into()),
-                group_path: Vec::new(),
-                rank: 0,
-            },
-        ];
-        let index_of = elems3
-            .iter()
-            .enumerate()
-            .map(|(i, e)| (e.key.clone(), i))
-            .collect();
-        let plan3 = PlanGraph {
-            elems: elems3,
-            index_of,
-            decl_index: vec![0, 1, 2, 3],
-            segments: Vec::new(),
-            layers: vec![vec![1, 2, 3], vec![0]],
-            ..Default::default()
-        };
-        let layer_pos3 = [0usize, 0, 1, 2];
-        assert_eq!(
-            min_span_primary_median_tie(0, &[1, 2, 3], &plan3, &twins, &layer_pos3),
-            Some(2),
-            "odd fan-in tie picks layer-order median parent"
-        );
     }
 }

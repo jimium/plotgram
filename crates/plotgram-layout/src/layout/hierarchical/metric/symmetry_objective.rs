@@ -20,8 +20,8 @@ use crate::layout::hierarchical::metric::partition_bands::{
     PartitionBandPlan, PARTITION_EMPTY_BAND_MIN,
 };
 use crate::layout::hierarchical::metric::symmetry::{
-    axis_from_neighbors, degrees_of, fan_pitch, forward_real_adjacency,
-    min_span_primary_median_tie, slot_multipliers, twin_plan_pairs, unique_min_span_primary,
+    axis_from_neighbors, degrees_of, descendant_mass, fan_axis_from_children, fan_pitch,
+    forward_real_adjacency, slot_multipliers, stem_psi, twin_plan_pairs,
 };
 use crate::layout::hierarchical::model::{BoundarySide, Elem, ElemKey, PlanGraph, RealGraph};
 use crate::layout::hierarchical::params::{GroupPolicy, HierarchicalParams, SymmetryPlace};
@@ -52,9 +52,6 @@ pub fn solve_symmetry_objective(
     let up_deg = degrees_of(&up_nbs);
     let twins = twin_plan_pairs(plan, graph);
     let layer_pos = plan.layer_positions();
-    let primary = primary_arm_pairs(
-        plan, &down_nbs, &up_nbs, &down_deg, &up_deg, &twins, &layer_pos,
-    );
     // Constraint degradation chain: full (twin hard + cross-rank clamp
     // equalities) → twin soft → no clamp equalities. The gb equalities make
     // each clamp column the cross-rank frame edge; they can only cycle when
@@ -65,8 +62,8 @@ pub fn solve_symmetry_objective(
     //
     // Real↔virtual BK collinear is intentionally soft (via median / J), not
     // hard: hard RV equality lets a long side-leaf corridor yank the hub off
-    // its short primary arm (order-approval). Primary-arm collinearity stays
-    // soft too — hard primary equalities bloat the canvas on dense layers.
+    // a short exclusive stem. Collinearity stays soft — hard equalities
+    // bloat the canvas on dense layers.
     let bands = PartitionBandPlan::build(plan, params.node_gap);
     let bands = bands.as_ref();
     // Linear segment (yfiles/01 §4.5): adjacent-dummy pairs of every long
@@ -153,7 +150,9 @@ pub fn solve_symmetry_objective(
         })
         .collect();
     let chain_end_leaves = chain_end_leaves(plan, &down_deg, &up_deg, &down_nbs, &up_nbs);
-    let exclusive = exclusive_spine_pairs(
+    let segs_by_edge = plan.segments_by_edge();
+    let mass = descendant_mass(plan, &down_nbs, &up_deg);
+    let spine = exclusive_spine_pairs(
         plan,
         &down_nbs,
         &up_nbs,
@@ -161,9 +160,18 @@ pub fn solve_symmetry_objective(
         &up_deg,
         &chain_end_leaves,
     );
-    let spine = spine_align_pairs(&primary, &exclusive, &down_deg, &up_deg);
+    let hop_boost = stem_flow_hop_boost(
+        plan,
+        graph,
+        &down_nbs,
+        &down_deg,
+        &up_deg,
+        &spine,
+        &mass,
+        &segs_by_edge,
+        params,
+    );
     let chain_end = chain_end_rv_pairs(plan, &chain_end_leaves);
-    let segs_by_edge = plan.segments_by_edge();
 
     // Prefer the full chain; degrade only when it cycles with separation.
     let mut chain_idx = 0usize;
@@ -203,8 +211,8 @@ pub fn solve_symmetry_objective(
 
     let score = |x: &[f64]| {
         objective_j(
-            plan, x, &seg_offs, &hubs, &down_nbs, &up_nbs, &down_deg, &up_deg, &twins, &spine,
-            &chain_end, params,
+            plan, x, &seg_offs, &hubs, &down_nbs, &up_nbs, &down_deg, &up_deg, &twins, &hop_boost,
+            &chain_end, &mass, params,
         )
     };
     let mut best = x.clone();
@@ -217,8 +225,8 @@ pub fn solve_symmetry_objective(
             // a few neighbor columns and the projection packs the layer.
             SymmetryPlace::Ipsep => {
                 let desired = unconstrained_l2_step(
-                    &x, &nbs, &hubs, &down_nbs, &up_nbs, &down_deg, &up_deg, &twins, &spine,
-                    &chain_end, params,
+                    &x, &nbs, &hubs, &down_nbs, &up_nbs, &down_deg, &up_deg, &twins, &hop_boost,
+                    &chain_end, &mass, params,
                 );
                 (desired, weights.clone())
             }
@@ -226,13 +234,16 @@ pub fn solve_symmetry_objective(
                 let mut desired = vec![0.0; n];
                 for (e, slot) in desired.iter_mut().enumerate() {
                     *slot = weighted_median_desired(
-                        e, &x, &nbs, &twins, &primary, &chain_end, params, &layer_pos, plan,
+                        e, &x, &nbs, &twins, &hop_boost, &chain_end, params, &layer_pos, plan,
                     );
                 }
                 let alpha = params.lambda_sym / (1.0 + params.lambda_sym);
                 let mut iter_weights = weights.clone();
                 for &h in &hubs {
-                    let c = center_h(&x, h, &down_nbs, &up_nbs, &down_deg, &up_deg);
+                    if stem_fan_out_keep_j(h, &down_nbs, &up_nbs, &down_deg) {
+                        continue;
+                    }
+                    let c = center_h(&x, h, &down_nbs, &up_nbs, &down_deg, &up_deg, &mass);
                     desired[h] = desired[h] * (1.0 - alpha) + c * alpha;
                     iter_weights[h] = REAL_WEIGHT * (1.0 + params.lambda_sym);
                 }
@@ -282,10 +293,10 @@ pub fn solve_symmetry_objective(
         &down_deg,
         &up_deg,
         &twins,
-        &primary,
         &chain_end_leaves,
         &layer_pos,
         &segs_by_edge,
+        &mass,
     )?;
     // Sibling frame separation is guaranteed by the hard constraint set
     // (unrelated boundary-clamp pairs reserve GROUP_FRAME_GAP — D₂.1): the
@@ -363,25 +374,9 @@ fn min_center_sep(h: usize, leaf: usize, size_of: &dyn Fn(usize) -> Size, node_g
     (node_gap + size_of(h).width / 2.0 + size_of(leaf).width / 2.0).max(node_gap)
 }
 
-/// Side of `axis` this free leaf belongs on: left of a primary in layer
-/// order, else FanPack slot sign (left half / right half).
-fn leaf_side_sign(
-    leaf: usize,
-    leaves: &[usize],
-    side: &[usize],
-    h: usize,
-    primary: &BTreeSet<(usize, usize)>,
-    layer_pos: &[usize],
-    best: &[f64],
-    axis: f64,
-) -> f64 {
-    if let Some(&p) = side.iter().find(|&&l| primary.contains(&undirected(h, l))) {
-        return if layer_pos[leaf] < layer_pos[p] || (layer_pos[leaf] == layer_pos[p] && leaf < p) {
-            -1.0
-        } else {
-            1.0
-        };
-    }
+/// Side of `axis` this free leaf belongs on: FanPack slot sign
+/// (left half / right half), or the iterate's side when the slot is the mid.
+fn leaf_side_sign(leaf: usize, leaves: &[usize], best: &[f64], axis: f64) -> f64 {
     let idx = leaves.iter().position(|&x| x == leaf).unwrap_or(0);
     let mid = (leaves.len() as f64 - 1.0) / 2.0;
     let m = idx as f64 - mid;
@@ -400,22 +395,19 @@ fn leaf_side_sign(
 
 /// C: keep the iterate's x when the leaf is already on the correct side of
 /// the hub and clear of min-sep. Only rewrite when J sat on the axis or the
-/// wrong side (order-approval "long no" left of primary).
+/// wrong side (order-approval long branch left of the hub).
 fn place_leaves_keep_j(
     h: usize,
     axis: f64,
     leaves: &[usize],
-    side: &[usize],
     best: &[f64],
     size_of: &dyn Fn(usize) -> Size,
     node_gap: f64,
-    layer_pos: &[usize],
-    primary: &BTreeSet<(usize, usize)>,
     desired: &mut [f64],
     iter_weights: &mut [f64],
 ) {
     for &leaf in leaves {
-        let sign = leaf_side_sign(leaf, leaves, side, h, primary, layer_pos, best, axis);
+        let sign = leaf_side_sign(leaf, leaves, best, axis);
         let min_sep = min_center_sep(h, leaf, size_of, node_gap);
         let dx = best[leaf] - axis;
         if dx * sign > 1.0 && dx.abs() + 1e-9 >= min_sep {
@@ -446,10 +438,10 @@ fn snap_fan_pack_style(
     down_deg: &[usize],
     up_deg: &[usize],
     twins: &BTreeSet<(usize, usize)>,
-    primary: &BTreeSet<(usize, usize)>,
     chain_end_leaves: &BTreeSet<usize>,
     layer_pos: &[usize],
     segs_by_edge: &BTreeMap<String, Vec<usize>>,
+    mass: &[f64],
 ) -> Result<Vec<f64>, VpscError> {
     let n = plan.elems.len();
     let mut hub_order: Vec<usize> = hubs.to_vec();
@@ -471,8 +463,7 @@ fn snap_fan_pack_style(
         .iter()
         .copied()
         .filter(|&h| {
-            long_edge_hubs.contains(&h)
-                || (down_deg[h] >= 2 && up_nbs[h].len() == 1 && down_nbs[up_nbs[h][0]].len() == 1)
+            long_edge_hubs.contains(&h) || stem_fan_out_keep_j(h, down_nbs, up_nbs, down_deg)
         })
         .collect();
 
@@ -480,7 +471,7 @@ fn snap_fan_pack_style(
         let axis = if params.symmetry_place == SymmetryPlace::Ipsep && keep_j.contains(&h) {
             best[h]
         } else {
-            center_h(best, h, down_nbs, up_nbs, down_deg, up_deg)
+            center_h(best, h, down_nbs, up_nbs, down_deg, up_deg, mass)
         };
         desired[h] = axis;
         iter_weights[h] = REAL_WEIGHT * (1.0 + params.lambda_sym) * 8.0;
@@ -512,7 +503,6 @@ fn snap_fan_pack_style(
                     !plan.elems[leaf].key.is_virtual()
                         && !plan.elems[leaf].key.is_zero_width()
                         && !twins.contains(&undirected(h, leaf))
-                        && !primary.contains(&undirected(h, leaf))
                 })
                 .collect();
             if leaves.is_empty() {
@@ -527,12 +517,9 @@ fn snap_fan_pack_style(
                     h,
                     axis,
                     &leaves,
-                    side,
                     best,
                     size_of,
                     params.node_gap,
-                    layer_pos,
-                    primary,
                     &mut desired,
                     &mut iter_weights,
                 );
@@ -559,34 +546,10 @@ fn snap_fan_pack_style(
                 axis,
                 deltas,
                 twins,
-                primary,
                 params,
                 &mut desired,
                 &mut iter_weights,
             );
-        }
-        // Primary occupies axis → remaining leaf must leave the axis.
-        if down_deg[h] >= 2
-            && down_nbs[h]
-                .iter()
-                .any(|&l| primary.contains(&undirected(h, l)))
-        {
-            for &leaf in &down_nbs[h] {
-                if plan.elems[leaf].key.is_virtual()
-                    || plan.elems[leaf].key.is_zero_width()
-                    || twins.contains(&undirected(h, leaf))
-                    || primary.contains(&undirected(h, leaf))
-                {
-                    continue;
-                }
-                if (desired[leaf] - axis).abs() < 1.0 {
-                    let pitch =
-                        (params.node_gap + size_of(h).width / 2.0 + size_of(leaf).width / 2.0)
-                            .max(params.node_gap);
-                    desired[leaf] = axis - pitch; // long "no" prefers left
-                    iter_weights[leaf] = iter_weights[leaf].max(REAL_WEIGHT * 16.0);
-                }
-            }
         }
     }
     weld_unique_stems(
@@ -608,6 +571,7 @@ fn snap_fan_pack_style(
         up_deg,
         &keep_j,
         params.lambda_sym,
+        mass,
         &mut desired,
         &mut iter_weights,
     );
@@ -668,22 +632,12 @@ fn snap_fan_pack_style(
             .flatten()
         {
             let skip: BTreeSet<usize> = side.iter().copied().collect();
-            let side_has_primary = side
-                .iter()
-                .any(|&leaf| primary.contains(&undirected(h, leaf)));
             for &leaf in side.iter() {
                 if plan.elems[leaf].key.is_virtual()
                     || plan.elems[leaf].key.is_zero_width()
                     || twins.contains(&undirected(h, leaf))
-                    || primary.contains(&undirected(h, leaf))
                 {
                     continue;
-                }
-                if side_has_primary && (desired[leaf] - axis).abs() < 1.0 {
-                    let pitch =
-                        (params.node_gap + size_of(h).width / 2.0 + size_of(leaf).width / 2.0)
-                            .max(params.node_gap);
-                    desired[leaf] = axis - pitch;
                 }
                 iter_weights[leaf] = iter_weights[leaf].max(REAL_WEIGHT * 8.0);
                 let toward_up = up_nbs[leaf].contains(&h);
@@ -710,7 +664,6 @@ fn snap_fan_pack_style(
                     axis,
                     deltas,
                     twins,
-                    primary,
                     params,
                     &mut desired,
                     &mut iter_weights,
@@ -752,6 +705,7 @@ fn snap_fan_pack_style(
         up_deg,
         &keep_j,
         params.lambda_sym,
+        mass,
         &mut desired,
         &mut iter_weights,
     );
@@ -1636,6 +1590,17 @@ fn undirected(a: usize, b: usize) -> (usize, usize) {
     }
 }
 
+/// Fan-out hub on a unique 1:1 parent stem: J already owns the column
+/// (exclusive hop). λ_sym must not pull it onto the child barycenter.
+fn stem_fan_out_keep_j(
+    h: usize,
+    down_nbs: &[Vec<usize>],
+    up_nbs: &[Vec<usize>],
+    down_deg: &[usize],
+) -> bool {
+    down_deg[h] >= 2 && up_nbs[h].len() == 1 && down_nbs[up_nbs[h][0]].len() == 1
+}
+
 /// Dangling sinks whose only span-1 parent is itself not a fan hub
 /// (span-1 degree; long-edge hops do not count). They may leave that 1:1
 /// parent to sit on a long corridor. Forward sources, through-nodes, and
@@ -1695,49 +1660,10 @@ fn chain_end_rv_pairs(plan: &PlanGraph, leaves: &BTreeSet<usize>) -> BTreeSet<(u
     out
 }
 
-fn primary_arm_pairs(
-    plan: &PlanGraph,
-    down_nbs: &[Vec<usize>],
-    up_nbs: &[Vec<usize>],
-    down_deg: &[usize],
-    up_deg: &[usize],
-    twins: &BTreeSet<(usize, usize)>,
-    layer_pos: &[usize],
-) -> BTreeSet<(usize, usize)> {
-    let mut out = BTreeSet::new();
-    let n = plan.elems.len();
-    for h in 0..n {
-        if plan.elems[h].key.is_virtual() || plan.elems[h].key.is_zero_width() {
-            continue;
-        }
-        // At most one primary arm per hub (prefer down fan-out, else up fan-in).
-        // Fan-out: unique min-span (ties → None). Fan-in on flat (no group_path):
-        // odd-tie median parent (§10.2). Grouped fan-in keeps unique-min-span —
-        // median+1e6 lock on parents inside weak groups bloats frames.
-        let nb = if down_deg[h] >= 2 {
-            unique_min_span_primary(h, &down_nbs[h], plan, twins)
-        } else if up_deg[h] >= 2 {
-            let flat = plan.elems[h].group_path.is_empty()
-                && up_nbs[h]
-                    .iter()
-                    .all(|&p| plan.elems[p].group_path.is_empty());
-            if flat {
-                min_span_primary_median_tie(h, &up_nbs[h], plan, twins, layer_pos)
-            } else {
-                unique_min_span_primary(h, &up_nbs[h], plan, twins)
-            }
-        } else {
-            None
-        };
-        if let Some(nb) = nb {
-            out.insert(undirected(h, nb));
-        }
-    }
-    out
-}
-
 /// Exclusive 1:1 real hops (same walk as [`pull_exclusive_chain`]), from every
 /// real — not only hubs — so a leaf's own continuation (fan `b→b2`) is in J.
+/// Stops at hubs without inserting into a fan-in target (stem-flow: fan-in
+/// hops stay unboosted; λ_sym writes the sink).
 fn exclusive_spine_pairs(
     plan: &PlanGraph,
     down_nbs: &[Vec<usize>],
@@ -1770,17 +1696,10 @@ fn exclusive_spine_pairs(
                     break;
                 }
                 if down_deg[next] >= 2 || up_deg[next] >= 2 {
-                    if toward_up && up_nbs[cur].len() == 1 && down_deg[next] == 1 {
-                        out.insert(undirected(cur, next));
-                    }
-                    // Unique span-1 child into a fan-in hub: the hop is still
-                    // a port-column spine, even if the hub has other long-edge
-                    // parents.
-                    if !toward_up
-                        && down_nbs[cur].len() == 1
-                        && up_deg[next] >= 2
-                        && down_deg[next] < 2
-                    {
+                    // Unique parent into a fan-out hub: 1:1 stem ends at the
+                    // fan (ticket-triage handle→resolve_gate). Do not insert
+                    // into a fan-in target.
+                    if !toward_up && down_nbs[cur].len() == 1 && up_deg[next] == 1 {
                         out.insert(undirected(cur, next));
                     }
                     break;
@@ -1796,30 +1715,105 @@ fn exclusive_spine_pairs(
     out
 }
 
-/// Primary + exclusive pairs that may enter J. Skip a min-span child that is
-/// itself a fan hub — that glue is the old 1e6 packer.
-fn spine_align_pairs(
-    primary: &BTreeSet<(usize, usize)>,
-    exclusive: &BTreeSet<(usize, usize)>,
+/// φ(role)·ψ(L) on every plan segment of a real edge (stem-flow J).
+fn stem_flow_hop_boost(
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    down_nbs: &[Vec<usize>],
     down_deg: &[usize],
     up_deg: &[usize],
-) -> BTreeSet<(usize, usize)> {
-    let is_hub = |e: usize| down_deg[e] >= 2 || up_deg[e] >= 2;
-    let mut out = exclusive.clone();
-    for &(u, v) in primary {
-        if is_hub(u) && is_hub(v) {
+    exclusive: &BTreeSet<(usize, usize)>,
+    mass: &[f64],
+    segs_by_edge: &BTreeMap<String, Vec<usize>>,
+    params: &HierarchicalParams,
+) -> BTreeMap<(usize, usize), f64> {
+    let mut out = BTreeMap::new();
+    for e in &graph.edges {
+        if e.edge_id.starts_with("gb:") || e.edge_id.starts_with("pb:") {
             continue;
         }
-        out.insert((u, v));
+        let Some(&src) = plan
+            .index_of
+            .get(&ElemKey::Real(graph.ids[e.working_source].clone()))
+        else {
+            continue;
+        };
+        let Some(&tgt) = plan
+            .index_of
+            .get(&ElemKey::Real(graph.ids[e.working_target].clone()))
+        else {
+            continue;
+        };
+        let Some(seg_idx) = segs_by_edge.get(&e.edge_id) else {
+            continue;
+        };
+        if seg_idx.is_empty() {
+            continue;
+        }
+        let phi = hop_phi(
+            src, tgt, down_nbs, down_deg, up_deg, exclusive, mass, params,
+        );
+        let mut elems = BTreeSet::new();
+        for &i in seg_idx {
+            let s = &plan.segments[i];
+            elems.insert(s.from);
+            elems.insert(s.to);
+        }
+        let psi = if exclusive.contains(&undirected(src, tgt)) {
+            stem_psi(elems.len().max(2), params.stem_length_gain)
+        } else {
+            1.0
+        };
+        let boost = phi * psi;
+        for &i in seg_idx {
+            let s = &plan.segments[i];
+            let p = undirected(s.from, s.to);
+            let slot = out.entry(p).or_insert(1.0);
+            if boost > *slot {
+                *slot = boost;
+            }
+        }
     }
     out
+}
+
+fn hop_phi(
+    src: usize,
+    tgt: usize,
+    down_nbs: &[Vec<usize>],
+    down_deg: &[usize],
+    up_deg: &[usize],
+    exclusive: &BTreeSet<(usize, usize)>,
+    mass: &[f64],
+    params: &HierarchicalParams,
+) -> f64 {
+    if up_deg[tgt] >= 2 {
+        return 1.0;
+    }
+    if down_deg[src] >= 2 && down_deg[tgt] >= 2 {
+        return 1.0;
+    }
+    if exclusive.contains(&undirected(src, tgt)) {
+        return params.primary_arm_boost;
+    }
+    if down_deg[src] >= 2 {
+        let mut sum = 0.0;
+        for &c in &down_nbs[src] {
+            sum += mass[c].max(1e-12);
+        }
+        if sum <= 1e-12 {
+            return 1.0;
+        }
+        return 1.0 + params.fan_mass_gain * mass[tgt].max(1e-12) / sum;
+    }
+    1.0
 }
 
 fn align_boost(
     u: usize,
     v: usize,
     twins: &BTreeSet<(usize, usize)>,
-    spine: &BTreeSet<(usize, usize)>,
+    hop_boost: &BTreeMap<(usize, usize), f64>,
     chain_end: &BTreeSet<(usize, usize)>,
     params: &HierarchicalParams,
 ) -> f64 {
@@ -1828,10 +1822,8 @@ fn align_boost(
         params.twin_spine_boost
     } else if chain_end.contains(&p) {
         params.chain_end_boost
-    } else if spine.contains(&p) {
-        params.primary_arm_boost
     } else {
-        1.0
+        hop_boost.get(&p).copied().unwrap_or(1.0)
     }
 }
 
@@ -1841,7 +1833,7 @@ fn desired_weight(
     base: f64,
     weight: f64,
     twins: &BTreeSet<(usize, usize)>,
-    primary: &BTreeSet<(usize, usize)>,
+    hop_boost: &BTreeMap<(usize, usize), f64>,
     chain_end: &BTreeSet<(usize, usize)>,
     params: &HierarchicalParams,
 ) -> f64 {
@@ -1852,17 +1844,14 @@ fn desired_weight(
     if chain_end.contains(&undirected(u, v)) {
         w *= params.chain_end_boost;
     }
-    if primary.contains(&undirected(u, v)) {
-        w *= params.primary_arm_boost;
-    }
+    w *= hop_boost.get(&undirected(u, v)).copied().unwrap_or(1.0);
     w *= weight;
     w
 }
 
 /// Jacobi step of `min Σ w((x+off)_u − (x+off)_v)² + λ Σ (x_h − center_h)²`
-/// with neighbors frozen. Twin / eligible-primary / exclusive-spine pairs
-/// carry their boost in `w` (A2 relative collinearity). Fan-hub min-span
-/// children are not in `spine`, so a fan hub is not glued onto its parent.
+/// with neighbors frozen. Twin / exclusive-spine / fan-mass hops carry their
+/// boost in `w`. Fan-in targets stay unboosted so λ_sym writes the sink.
 fn unconstrained_l2_step(
     x: &[f64],
     nbs: &[Vec<Nb>],
@@ -1872,8 +1861,9 @@ fn unconstrained_l2_step(
     down_deg: &[usize],
     up_deg: &[usize],
     twins: &BTreeSet<(usize, usize)>,
-    spine: &BTreeSet<(usize, usize)>,
+    hop_boost: &BTreeMap<(usize, usize), f64>,
     chain_end: &BTreeSet<(usize, usize)>,
+    mass: &[f64],
     params: &HierarchicalParams,
 ) -> Vec<f64> {
     let n = x.len();
@@ -1882,7 +1872,7 @@ fn unconstrained_l2_step(
         let mut num = 0.0;
         let mut den = 0.0;
         for &(nb, base, w, delta) in &nbs[e] {
-            let dw = base * w * align_boost(e, nb, twins, spine, chain_end, params);
+            let dw = base * w * align_boost(e, nb, twins, hop_boost, chain_end, params);
             num += dw * (x[nb] + delta);
             den += dw;
         }
@@ -1893,11 +1883,14 @@ fn unconstrained_l2_step(
     let lambda_sym = params.lambda_sym;
     if lambda_sym > 1e-12 {
         for &h in hubs {
-            let c = center_h(x, h, down_nbs, up_nbs, down_deg, up_deg);
+            if stem_fan_out_keep_j(h, down_nbs, up_nbs, down_deg) {
+                continue;
+            }
+            let c = center_h(x, h, down_nbs, up_nbs, down_deg, up_deg, mass);
             let mut num = 0.0;
             let mut den = 0.0;
             for &(nb, base, w, delta) in &nbs[h] {
-                let dw = base * w * align_boost(h, nb, twins, spine, chain_end, params);
+                let dw = base * w * align_boost(h, nb, twins, hop_boost, chain_end, params);
                 num += dw * (x[nb] + delta);
                 den += dw;
             }
@@ -1916,7 +1909,7 @@ fn weighted_median_desired(
     x: &[f64],
     nbs: &[Vec<Nb>],
     twins: &BTreeSet<(usize, usize)>,
-    primary: &BTreeSet<(usize, usize)>,
+    hop_boost: &BTreeMap<(usize, usize), f64>,
     chain_end: &BTreeSet<(usize, usize)>,
     params: &HierarchicalParams,
     layer_pos: &[usize],
@@ -1924,7 +1917,7 @@ fn weighted_median_desired(
 ) -> f64 {
     let mut weighted: Vec<(f64, f64, usize)> = Vec::new();
     for &(nb, base, w, delta) in &nbs[e] {
-        let dw = desired_weight(e, nb, base, w, twins, primary, chain_end, params);
+        let dw = desired_weight(e, nb, base, w, twins, hop_boost, chain_end, params);
         weighted.push((x[nb] + delta, dw, nb));
     }
     if weighted.is_empty() {
@@ -1951,8 +1944,8 @@ fn weighted_median_desired(
     weighted.last().map(|(p, _, _)| *p).unwrap_or(x[e])
 }
 
-/// Fan center via neighbor median / mid-of-two-middle (`axis_from_neighbors`).
-/// Equal-spaced packs match review §4.3.1 `(bbox_mid+median)/2`.
+/// Fan center: fan-out uses mass-weighted barycenter (equal masses → median);
+/// fan-in stays unweighted median of parents.
 fn center_h(
     x: &[f64],
     h: usize,
@@ -1960,10 +1953,11 @@ fn center_h(
     up_nbs: &[Vec<usize>],
     down_deg: &[usize],
     up_deg: &[usize],
+    mass: &[f64],
 ) -> f64 {
     let mut parts = Vec::new();
     if down_deg[h] >= 2 {
-        parts.push(axis_from_neighbors(&down_nbs[h], x));
+        parts.push(fan_axis_from_children(&down_nbs[h], x, mass));
     }
     if up_deg[h] >= 2 {
         parts.push(axis_from_neighbors(&up_nbs[h], x));
@@ -1985,8 +1979,9 @@ fn objective_j(
     down_deg: &[usize],
     up_deg: &[usize],
     twins: &BTreeSet<(usize, usize)>,
-    spine: &BTreeSet<(usize, usize)>,
+    hop_boost: &BTreeMap<(usize, usize), f64>,
     chain_end: &BTreeSet<(usize, usize)>,
+    mass: &[f64],
     params: &HierarchicalParams,
 ) -> f64 {
     let mut j = 0.0;
@@ -1995,12 +1990,15 @@ fn objective_j(
             continue;
         }
         let w = edge_weight_base(&plan.elems[s.from], &plan.elems[s.to])
-            * align_boost(s.from, s.to, twins, spine, chain_end, params);
+            * align_boost(s.from, s.to, twins, hop_boost, chain_end, params);
         let (off_from, off_to) = seg_offs[i];
         j += w * ((x[s.from] + off_from) - (x[s.to] + off_to)).abs();
     }
     for &h in hubs {
-        let c = center_h(x, h, down_nbs, up_nbs, down_deg, up_deg);
+        if stem_fan_out_keep_j(h, down_nbs, up_nbs, down_deg) {
+            continue;
+        }
+        let c = center_h(x, h, down_nbs, up_nbs, down_deg, up_deg, mass);
         j += params.lambda_sym * (x[h] - c).abs();
     }
     j
@@ -2153,6 +2151,7 @@ fn recenter_fan_in_sinks(
     up_deg: &[usize],
     keep_j: &BTreeSet<usize>,
     lambda_sym: f64,
+    mass: &[f64],
     desired: &mut [f64],
     weights: &mut [f64],
 ) {
@@ -2165,7 +2164,7 @@ fn recenter_fan_in_sinks(
         if plan.elems[h].key.is_virtual() || plan.elems[h].key.is_zero_width() {
             continue;
         }
-        let axis = center_h(desired, h, down_nbs, up_nbs, down_deg, up_deg);
+        let axis = center_h(desired, h, down_nbs, up_nbs, down_deg, up_deg, mass);
         desired[h] = axis;
         weights[h] = weights[h].max(REAL_WEIGHT * (1.0 + lambda_sym) * 16.0);
     }
@@ -2177,27 +2176,18 @@ fn snap_spine_peer(
     axis: f64,
     deltas: &AlignDeltas,
     twins: &BTreeSet<(usize, usize)>,
-    primary: &BTreeSet<(usize, usize)>,
     params: &HierarchicalParams,
     desired: &mut [f64],
     weights: &mut [f64],
 ) {
-    let p = undirected(hub, peer);
-    let is_twin = twins.contains(&p);
-    let is_primary = primary.contains(&p);
-    if !is_twin && !is_primary {
+    if !twins.contains(&undirected(hub, peer)) {
         return;
     }
     desired[peer] = axis + deltas.get(hub, peer);
+    // IPSEP: twin stays in J only — a hard lock glued a fan hub onto its
+    // parent. Median still 1e6-locks the twin column (legacy packer).
     if params.symmetry_place == SymmetryPlace::Median {
         weights[peer] = weights[peer].max(1.0e6);
-        return;
-    }
-    // IPSEP: expand J's relative term. Twin stays in J only — a hard lock
-    // glued a fan hub onto its parent. Primary gets a typed boost so the
-    // min-span child tracks the hub's port column.
-    if is_primary {
-        weights[peer] = weights[peer].max(REAL_WEIGHT * 8.0 * params.primary_arm_boost);
     }
 }
 
@@ -2239,7 +2229,9 @@ fn pull_exclusive_chain(
             break;
         }
         if down_deg[next] >= 2 || up_deg[next] >= 2 {
-            // Absorb unique parent fan hub (ticket-triage handle above resolve_gate).
+            // Unique parent of a fan-out hub follows the child's keep-J
+            // column (ticket-triage handle above resolve_gate). Not a
+            // unique-child-into-fan-in glue.
             if toward_up && up_nbs[cur].len() == 1 && down_deg[next] == 1 {
                 desired[next] = axis + deltas.get(cur, next);
                 weights[next] = weights[next].max(REAL_WEIGHT * 32.0);

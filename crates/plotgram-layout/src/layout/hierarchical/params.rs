@@ -174,13 +174,17 @@ pub struct HierarchicalParams {
     pub lambda_sym: f64,
     /// Median/VPSC boost for twin (2-cycle) spine pairs.
     pub twin_spine_boost: f64,
-    /// Median/VPSC boost for unique min-span primary arm.
+    /// Median/VPSC boost for exclusive 1:1 spine pairs.
     pub primary_arm_boost: f64,
+    /// Exclusive-stem length gain α in `ψ = 1 + α log2(L)` (capped at 2).
+    pub stem_length_gain: f64,
+    /// Fan-out hop extra weight β in `φ = 1 + β · mass(child) / Σ siblings`.
+    pub fan_mass_gain: f64,
     /// J / L2 boost for a long-edge RV segment whose real end is a dangling
     /// sink (no forward children). The hanging sink follows the dummy
     /// corridor (expectations: long same-column back-edges use the dummy
     /// column). Forward sources and through-nodes stay unboosted so a
-    /// reverse long edge cannot yank a primary spine.
+    /// reverse long edge cannot yank an exclusive 1:1 stem.
     pub chain_end_boost: f64,
     /// Fixed iteration budget for symmetry objective solver.
     pub symmetry_iters: u32,
@@ -232,6 +236,8 @@ impl Default for HierarchicalParams {
             lambda_sym: 1.0,
             twin_spine_boost: 8.0,
             primary_arm_boost: 4.0,
+            stem_length_gain: 0.5,
+            fan_mass_gain: 1.0,
             chain_end_boost: 8.0,
             symmetry_iters: 8,
             symmetry_place: SymmetryPlace::Ipsep,
@@ -360,6 +366,15 @@ impl HierarchicalParams {
         {
             params.primary_arm_boost = v.max(0.0);
         }
+        if let Some(v) = binder
+            .get_f64_any(&["stem_length_gain"])
+            .map_err(bind_err)?
+        {
+            params.stem_length_gain = v.max(0.0);
+        }
+        if let Some(v) = binder.get_f64_any(&["fan_mass_gain"]).map_err(bind_err)? {
+            params.fan_mass_gain = v.max(0.0);
+        }
         if let Some(v) = binder.get_f64_any(&["chain_end_boost"]).map_err(bind_err)? {
             params.chain_end_boost = v.max(0.0);
         }
@@ -477,7 +492,8 @@ impl HierarchicalParams {
         let canonical = format!(
             "orientation={}|node_gap={:e}|layer_gap={:e}|layer_alignment={:e}|edge_gap={:e}|\
              group_boundary_weight={:e}|lambda_sym={:e}|twin_spine_boost={:e}|\
-             primary_arm_boost={:e}|chain_end_boost={:e}|symmetry_iters={}|\
+             primary_arm_boost={:e}|stem_length_gain={:e}|fan_mass_gain={:e}|\
+             chain_end_boost={:e}|symmetry_iters={}|\
              symmetry_place={}|\
              routing_style={}|auto_edge_grouping={}|\
              min_first_segment={:e}|min_last_segment={:e}|port_stub={:e}|\
@@ -492,6 +508,8 @@ impl HierarchicalParams {
             self.lambda_sym,
             self.twin_spine_boost,
             self.primary_arm_boost,
+            self.stem_length_gain,
+            self.fan_mass_gain,
             self.chain_end_boost,
             self.symmetry_iters,
             self.symmetry_place.as_str(),
@@ -616,6 +634,14 @@ mod tests {
             },
             HierarchicalParams {
                 chain_end_boost: a.chain_end_boost + 1.0,
+                ..a
+            },
+            HierarchicalParams {
+                stem_length_gain: a.stem_length_gain + 0.25,
+                ..a
+            },
+            HierarchicalParams {
+                fan_mass_gain: a.fan_mass_gain + 0.5,
                 ..a
             },
         ];
