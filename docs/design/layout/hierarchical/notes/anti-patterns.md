@@ -34,6 +34,9 @@ v1 源码仍在 `crates/v1/plotgram-core/src/layout/atlas/`（只读）。可借
 | 给菱形「是」加 through-hop / 把 1:1 改成 `κ=1/(down·up)` 写进 J 或 FanPack 插值 | 与最短跨同类。J：`check→finance` 与菱形「是」同 κ，order-approval 脊裂 2–4px；兄弟归一化等于认领 through-hop。FanPack 按 κ 插值：desired 被层内分离吃掉，software-release 脊跨度仍 ~156px | 1:1 与扇出是同一自由度的两端；incoming 茎权必须明显大于 outgoing 半 1:1，否则伤 D2。不加第三趟 |
 | 重心方案 C：不铺扇出 hub 孩子 + mass 过半直通叶贴父轴 | software-release 脊跨度仍 ~154px（分离吃掉 desired）；D2 `check` 偏 1px；n19 离 n1 更远 | 不恢复；重心不能当第三趟 snap |
 | 直通节点沿唯一父上溯加 `|x_c−x_anc|`（最多 3 层） | 流水线脊跨度仍 ~156px：`unit_test` 已被右侧 notify 回边 dummy 廊顶在分离下限（cx 152 vs dummy 212），祖先列 191 不可行。mech：`n1` 的唯一父链是 `n19/n18`，上溯把脊拉向短支（n0/n1 裂开，n19−n1 ~17px） | 唯一父 ≠ 主链。跨层直度不能当臂身份；dummy 占列是 P3/链列的事，不是再加 P4 项。勿与 `w_end` 长边端点项一起再试 |
+| 混合扇短边权 + 单 dummy 由扇 hub 写列 | n13−n11 仅 90→84px（yFiles 31）；dummy 可贴 n11，短叶仍停在廊墙外侧。稍宽的「混合扇」谓词会把 n19 粘回 n18、n1 粘到 n0 | 短叶列不是再加认领谓词能写的；廊墙在 VPSC 硬分离。勿恢复 `fan_short_hop_boost` / `unique_short_side_leaf` |
+| 加大 `λ_sym`（1→4）加强扇心 | n19 跟孩子走：n19−n1 从 ~0 裂到 51px；n19 偏向 n0/n24 中点而非 n1。D2 脊仍焊。门禁绿但丢茎流刚换来的 n19≈n1 | 扇心就是孩子重心。加力 = 下定心，会离开 1:1 脊。n19 不是 keep_j（父 n18 已扇出）。勿再调 `lambda_sym` 默认 |
+| Dummy 在 VPSC 里不当实节点（触及 dummy 的对 extra=`edge_gap`，宽仍 0） | n13−n11 仅 90→76px（yFiles 31）——dummy 仍夹在短叶和父列之间，两侧各省 8px 不够。D3 FanPack 漂 ~5px；n19−n1 裂 ~5px | 不是「虚节点宽=edge_gap」（那条另否决）。实–虚分离不是把 dummy 从层内公民里请出去；廊墙还在。下一刀是 P3 链块 / 源 hub 写列 |
 | 扇出 `center_h` 用加权中位 | 两点时重孩子通吃，等于又认领主臂 | 加权重心；等质量回退中位 |
 | 两端等权折中写长链列 | 廊停在两端中间（e18 把 L2 整层顶开 ~90px） | ≥2 dummy：约束层链恒等；desired 层单写者（一非叶端，或两端 hub 时本层更靠边缘的那端） |
 | port-anchor 放进 IPSEP 迭代 | 整图无界左漂 | 只在终局 snap 写 dummy desired |
@@ -72,6 +75,6 @@ v1 源码仍在 `crates/v1/plotgram-core/src/layout/atlas/`（只读）。可借
 
 这些是**当前缺口**，不是可以再试一遍的补丁：
 
-- **扇出下的短链贴父槽**（n13 相对 n11 仍偏左；n19 已离开 n18，剩余是贴 n0/n1 脊约 30px）：P3 廊已在短链右侧。再对调父脸槽序、再让带 dummy 的扇入汇点 `center_h`、再在单 dummy 链上拉扇入端跟廊、再恢复最短跨主臂身份，会打 D3 / 上游轴继承 / 把 n19 粘回去。下一步只许继续改 P4 的 `J` / 权重。
+- **扇出下的短链贴父槽**（n13 相对 n11 仍偏左；n19 已离开 n18，剩余是贴 n0/n1 脊约 30px）：P3 廊已在短链右侧。再对调父脸槽序、再让带 dummy 的扇入汇点 `center_h`、再在单 dummy 链上拉扇入端跟廊、再恢复最短跨主臂身份、再把 dummy–real 分离改成 `edge_gap`，会打 D3 / 上游轴继承 / 把 n19 粘回去。廊墙是层内序，不是分离常数。下一刀是 P3 链块 / 源 hub 写列。
 - **dense 层整层 `node_gap` 取等**：投影在吃 slack。不要加宽 dummy，先查下降步。
 - **PartitionGrid 引擎消费、穿组构造清零、label/loop reserve**：见 [roadmap](../roadmap.md)，不是再开一张 claimed 表。
