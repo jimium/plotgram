@@ -482,7 +482,10 @@ mod tests {
         assert_eq!(r.shape, theme.defaults.node_shape);
 
         // Layer 3: explicit DSL shape overrides default shape, paint from variant
-        let r = resolve_node(&node(Some("primary"), Some(NodeShape::Hexagon), &[]), &theme);
+        let r = resolve_node(
+            &node(Some("primary"), Some(NodeShape::Hexagon), &[]),
+            &theme,
+        );
         assert_eq!(r.shape, NodeShape::Hexagon);
         assert_eq!(r.fill, primary.fill);
 
@@ -521,7 +524,11 @@ mod tests {
 
         // Unparseable numerics fall through instead of clobbering lower layers
         let r = resolve_node(
-            &node(None, None, &[("style.stroke_width", AttrValue::Str("wide".to_string()))]),
+            &node(
+                None,
+                None,
+                &[("style.stroke_width", AttrValue::Str("wide".to_string()))],
+            ),
             &theme,
         );
         assert_eq!(r.stroke_width, defaults.stroke_width);

@@ -126,20 +126,30 @@ pub(super) fn draw_edge_route(
             // Fallback: if arrow lands on a boundary, step back one cell.
             if is_on_rect_boundary(ax, ay, node_rects) {
                 if x1 == x2 {
-                    if y2 > y1 { ay = ay.saturating_sub(1); } else { ay += 1; }
+                    if y2 > y1 {
+                        ay = ay.saturating_sub(1);
+                    } else {
+                        ay += 1;
+                    }
                 } else if y1 == y2 {
-                    if x2 > x1 { ax = ax.saturating_sub(1); } else { ax += 1; }
+                    if x2 > x1 {
+                        ax = ax.saturating_sub(1);
+                    } else {
+                        ax += 1;
+                    }
                 }
             }
             // A horizontal arrow snug against a box corner reads badly (`▶└`);
             // step back one cell and blank the gap. Plain borders stay snug (`▶│`).
             if y1 == y2 && is_box_corner(canvas, x2, y2) {
                 canvas.clear_span(ay, ax, 1);
-                if x2 > x1 { ax = ax.saturating_sub(1); } else { ax += 1; }
+                if x2 > x1 {
+                    ax = ax.saturating_sub(1);
+                } else {
+                    ax += 1;
+                }
             }
-            if !canvas.is_interior(ax, ay, node_rects)
-                && !is_on_rect_boundary(ax, ay, node_rects)
-            {
+            if !canvas.is_interior(ax, ay, node_rects) && !is_on_rect_boundary(ax, ay, node_rects) {
                 canvas.set_char(ax, ay, ch);
             }
         }
@@ -150,14 +160,26 @@ pub(super) fn draw_edge_route(
             if let Some((mut ax, mut ay, ch)) = arrow_before_end(bx, by, x0, y0) {
                 if is_on_rect_boundary(ax, ay, node_rects) {
                     if bx == x0 {
-                        if y0 > by { ay = ay.saturating_sub(1); } else { ay += 1; }
+                        if y0 > by {
+                            ay = ay.saturating_sub(1);
+                        } else {
+                            ay += 1;
+                        }
                     } else if by == y0 {
-                        if x0 > bx { ax = ax.saturating_sub(1); } else { ax += 1; }
+                        if x0 > bx {
+                            ax = ax.saturating_sub(1);
+                        } else {
+                            ax += 1;
+                        }
                     }
                 }
                 if by == y0 && is_box_corner(canvas, x0, y0) {
                     canvas.clear_span(ay, ax, 1);
-                    if x0 > bx { ax = ax.saturating_sub(1); } else { ax += 1; }
+                    if x0 > bx {
+                        ax = ax.saturating_sub(1);
+                    } else {
+                        ax += 1;
+                    }
                 }
                 if !canvas.is_interior(ax, ay, node_rects)
                     && !is_on_rect_boundary(ax, ay, node_rects)
@@ -181,46 +203,56 @@ pub(super) fn draw_segment(
     if x1 == x2 {
         let (start, end) = if y1 <= y2 { (y1, y2) } else { (y2, y1) };
         for y in start..end {
-            if !canvas.is_interior(x1, y, node_rects)
-                && !is_on_rect_boundary(x1, y, node_rects)
-            {
+            if !canvas.is_interior(x1, y, node_rects) && !is_on_rect_boundary(x1, y, node_rects) {
                 draw_line_char(canvas, x1, y, if dashed { DASH_V } else { BOX_V });
             }
         }
-        maybe_merge_endpoint(canvas, x1, end, if dashed { DASH_V } else { BOX_V }, node_rects);
+        maybe_merge_endpoint(
+            canvas,
+            x1,
+            end,
+            if dashed { DASH_V } else { BOX_V },
+            node_rects,
+        );
     } else if y1 == y2 {
         let (start, end) = if x1 <= x2 { (x1, x2) } else { (x2, x1) };
         for x in start..end {
-            if !canvas.is_interior(x, y1, node_rects)
-                && !is_on_rect_boundary(x, y1, node_rects)
-            {
+            if !canvas.is_interior(x, y1, node_rects) && !is_on_rect_boundary(x, y1, node_rects) {
                 draw_line_char(canvas, x, y1, if dashed { DASH_H } else { BOX_H });
             }
         }
-        maybe_merge_endpoint(canvas, end, y1, if dashed { DASH_H } else { BOX_H }, node_rects);
+        maybe_merge_endpoint(
+            canvas,
+            end,
+            y1,
+            if dashed { DASH_H } else { BOX_H },
+            node_rects,
+        );
     } else {
         // Diagonal in grid space: draw as horizontal-then-vertical elbow.
         for x in x1.min(x2)..x1.max(x2) {
-            if !canvas.is_interior(x, y1, node_rects)
-                && !is_on_rect_boundary(x, y1, node_rects)
-            {
+            if !canvas.is_interior(x, y1, node_rects) && !is_on_rect_boundary(x, y1, node_rects) {
                 draw_line_char(canvas, x, y1, if dashed { DASH_H } else { BOX_H });
             }
         }
         for y in y1.min(y2)..y1.max(y2) {
-            if !canvas.is_interior(x2, y, node_rects)
-                && !is_on_rect_boundary(x2, y, node_rects)
-            {
+            if !canvas.is_interior(x2, y, node_rects) && !is_on_rect_boundary(x2, y, node_rects) {
                 draw_line_char(canvas, x2, y, if dashed { DASH_V } else { BOX_V });
             }
         }
-        if !canvas.is_interior(x2, y1, node_rects)
-            && !is_on_rect_boundary(x2, y1, node_rects)
-        {
+        if !canvas.is_interior(x2, y1, node_rects) && !is_on_rect_boundary(x2, y1, node_rects) {
             // Compute direction-aware corner character for the elbow
             let mut dirs = 0u8;
-            if x2 > x1 { dirs |= 8; } else if x2 < x1 { dirs |= 4; }
-            if y2 > y1 { dirs |= 2; } else if y2 < y1 { dirs |= 1; }
+            if x2 > x1 {
+                dirs |= 8;
+            } else if x2 < x1 {
+                dirs |= 4;
+            }
+            if y2 > y1 {
+                dirs |= 2;
+            } else if y2 < y1 {
+                dirs |= 1;
+            }
             canvas.set_char(x2, y1, directions_to_char(dirs));
         }
     }

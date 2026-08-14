@@ -1,7 +1,7 @@
 //! Standard render strategy: precise geometry, solid fills.
 
-use plotgram_model::geometry::Point;
 use super::FillMode;
+use plotgram_model::geometry::Point;
 
 /// Precise line rendering (default).
 #[derive(Debug, Clone, Copy, Default)]

@@ -182,13 +182,25 @@ mod tests {
         for &id in BUILTIN_THEME_IDS {
             let t = load(Some(id));
             assert_eq!(t.id, id, "embedded JSON id must match registry id");
-            assert!(!t.defaults.canvas_background.is_empty(), "{id}: canvas background");
+            assert!(
+                !t.defaults.canvas_background.is_empty(),
+                "{id}: canvas background"
+            );
             assert!(!t.defaults.node.fill.is_empty(), "{id}: node fill");
-            assert!(!t.defaults.node.text_fill.is_empty(), "{id}: node text_fill");
-            assert!(t.defaults.node.stroke_width > 0.0, "{id}: node stroke_width");
+            assert!(
+                !t.defaults.node.text_fill.is_empty(),
+                "{id}: node text_fill"
+            );
+            assert!(
+                t.defaults.node.stroke_width > 0.0,
+                "{id}: node stroke_width"
+            );
             assert!(t.defaults.node.font_size > 0.0, "{id}: node font_size");
             assert!(t.defaults.edge.font_size > 0.0, "{id}: edge font_size");
-            assert!(!t.defaults.edge.response_dasharray.is_empty(), "{id}: response dasharray");
+            assert!(
+                !t.defaults.edge.response_dasharray.is_empty(),
+                "{id}: response dasharray"
+            );
             assert_eq!(t.group_nest.len(), 4, "{id}: group_nest ladder");
             assert_eq!(
                 t.group_nest[0].fill, t.defaults.group.fill,

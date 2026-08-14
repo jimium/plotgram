@@ -1,7 +1,7 @@
 //! Sketch render strategy: hand-drawn jitter + hatch fills.
 
-use plotgram_model::geometry::Point;
 use super::FillMode;
+use plotgram_model::geometry::Point;
 
 /// Hand-drawn style rendering.
 #[derive(Debug, Clone)]

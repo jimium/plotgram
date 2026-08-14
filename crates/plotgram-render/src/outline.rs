@@ -25,9 +25,15 @@ pub fn shape_outlines(
     let cy = y + h / 2.0;
 
     match shape {
-        NodeShape::Rect => vec![(sample_rounded_rect(x, y, w, h, style.radius.unwrap_or(0.0)), None)],
+        NodeShape::Rect => vec![(
+            sample_rounded_rect(x, y, w, h, style.radius.unwrap_or(0.0)),
+            None,
+        )],
         NodeShape::RoundedRect => {
-            vec![(sample_rounded_rect(x, y, w, h, style.radius.unwrap_or(4.0)), None)]
+            vec![(
+                sample_rounded_rect(x, y, w, h, style.radius.unwrap_or(4.0)),
+                None,
+            )]
         }
         NodeShape::Stadium => vec![(sample_rounded_rect(x, y, w, h, h.min(w) / 2.0), None)],
         NodeShape::Circle => {
@@ -87,10 +93,7 @@ pub fn shape_outlines(
             push_arc(&mut body, (cx, y + h - ry), rx, ry, 180.0, 0.0);
             push_line(&mut body, (x + w, y + h - ry), (x + w, y + ry));
             push_arc(&mut body, (cx, y + ry), rx, ry, 0.0, -180.0);
-            vec![
-                (body, None),
-                (sample_ellipse(cx, y + ry, rx, ry, 16), None),
-            ]
+            vec![(body, None), (sample_ellipse(cx, y + ry, rx, ry, 16), None)]
         }
         NodeShape::Document => {
             let wave_y = y + h * 0.85;
@@ -129,7 +132,10 @@ pub fn shape_outlines(
         NodeShape::Subprocess => {
             let pad = (w.min(h) * 0.08).clamp(4.0, 10.0);
             vec![
-                (sample_polygon(&[(x, y), (x + w, y), (x + w, y + h), (x, y + h)]), None),
+                (
+                    sample_polygon(&[(x, y), (x + w, y), (x + w, y + h), (x, y + h)]),
+                    None,
+                ),
                 (
                     sample_polygon(&[
                         (x + pad, y + pad),
@@ -279,7 +285,11 @@ mod tests {
             let outlines = shape_outlines(shape, &frame, &style);
             assert_eq!(outlines.len(), subpaths, "{name}: subpath count");
             for (pts, _) in &outlines {
-                assert!(pts.len() >= 8, "{name}: sampling too sparse ({} pts)", pts.len());
+                assert!(
+                    pts.len() >= 8,
+                    "{name}: sampling too sparse ({} pts)",
+                    pts.len()
+                );
                 for p in pts {
                     assert!(p.x.is_finite() && p.y.is_finite(), "{name}: NaN/inf point");
                     assert!(

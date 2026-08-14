@@ -101,7 +101,7 @@ Atlas 有 track demand / label band 等碎片；缺统一板时，迁移容易�
 出处：08；落地：[ADR-008](../../../adr/008-partition-grid.md) · [shared/partition](../../shared/partition.md)。
 
 - 组与泳道都是「层内连续块」——**边界 dummy + 受约束排序**，机制同构、政策不同；  
-- 泳道在 DSL / model 侧已是 **PartitionGrid 一等公民**（`partition { column … }` + `cell_col`；仅列 = 泳道），不再用 group「演」；Hier 引擎消费 **已落地**（PG-0–PG-4；render 底色后置）；  
+- 泳道在 DSL / model 侧已是 **PartitionGrid 一等公民**（`partition { column … }` + `cell_col`；仅列 = 泳道），不再用 group「演」；Hier 引擎消费 **已落地**（PG-0–PG-4）；render 只读 band 画底色/标题；  
 - 组框 / 列区间都是约束求解变量（VPSC 或等价分隔约束），**禁止事后包围盒当真源**。  
 
 对照 archive 30·R3：Weak / StrongMacro 应是收缩 / 连续块**参数**；Horizontal 堆叠 ≠ PartitionGrid（ADR-008 明令禁止以 group Horizontal 冒充分区）。  

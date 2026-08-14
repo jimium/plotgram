@@ -50,8 +50,9 @@ pub fn clamp_partition_main_ranks(
     let node_axis: Vec<Option<usize>> = (0..n)
         .map(|i| {
             graph.partition_cell.get(i).and_then(|c| {
-                c.as_ref()
-                    .and_then(|cell| cell_on(cell, axes.main).and_then(|id| index_of.get(id).copied()))
+                c.as_ref().and_then(|cell| {
+                    cell_on(cell, axes.main).and_then(|id| index_of.get(id).copied())
+                })
             })
         })
         .collect();
@@ -392,10 +393,7 @@ mod tests {
         let mut ranks = vec![0, 1, 2];
         let axes = tb_axes(&g);
         let err = clamp_partition_main_ranks(&g, &mut ranks, &axes).unwrap_err();
-        assert!(
-            err.to_string().contains("interleave"),
-            "unexpected: {err}"
-        );
+        assert!(err.to_string().contains("interleave"), "unexpected: {err}");
     }
 
     #[test]
@@ -407,10 +405,7 @@ mod tests {
         });
         // n0 in row b, n1 in row a, edge n0→n1. Packing declaration order
         // puts a before b, reversing the working edge.
-        g.partition_cell = vec![
-            Some(PartitionCell::row("b")),
-            Some(PartitionCell::row("a")),
-        ];
+        g.partition_cell = vec![Some(PartitionCell::row("b")), Some(PartitionCell::row("a"))];
         let mut ranks = vec![0, 1];
         let axes = tb_axes(&g);
         let err = clamp_partition_main_ranks(&g, &mut ranks, &axes).unwrap_err();

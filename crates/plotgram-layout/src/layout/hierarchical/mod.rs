@@ -689,12 +689,7 @@ fn compute_channel_ink_tail<'g>(
     let (cross_bands, main_bands) = if has_clamps {
         (
             metric::partition_bands::band_coords(&plan, &cross),
-            metric::partition_bands::row_band_coords(
-                &plan,
-                &main,
-                &size_of,
-                layer_gaps_for_rows,
-            ),
+            metric::partition_bands::row_band_coords(&plan, &main, &size_of, layer_gaps_for_rows),
         )
     } else if !plan.partition_columns.is_empty() || !plan.partition_rows.is_empty() {
         metric::partition_bands::band_coords_from_member_frames(
@@ -1690,10 +1685,7 @@ mod tests {
                 node("a1", "left", "bot"),
                 node("b1", "right", "bot"),
             ],
-            edges: vec![
-                edge("e0", "a0", "a1"),
-                edge("e1", "b0", "b1"),
-            ],
+            edges: vec![edge("e0", "a0", "a1"), edge("e1", "b0", "b1")],
             groups: vec![],
             partition: Some(PartitionGrid {
                 columns: vec![PartitionAxis::new("left"), PartitionAxis::new("right")],
@@ -1760,10 +1752,7 @@ mod tests {
             attrs: AttrMap::new(),
         };
         let graph = Graph {
-            nodes: vec![
-                node("l", "left"),
-                node("r", "right"),
-            ],
+            nodes: vec![node("l", "left"), node("r", "right")],
             edges: vec![edge("e0", "l", "r")],
             groups: vec![],
             partition: Some(PartitionGrid {

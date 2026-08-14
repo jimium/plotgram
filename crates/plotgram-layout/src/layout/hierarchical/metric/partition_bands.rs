@@ -230,12 +230,7 @@ pub fn row_band_coords(
     out
 }
 
-fn empty_row_strip(
-    r: usize,
-    n_layers: usize,
-    layer_top: &[f64],
-    layer_gaps: &[f64],
-) -> (f64, f64) {
+fn empty_row_strip(r: usize, n_layers: usize, layer_top: &[f64], layer_gaps: &[f64]) -> (f64, f64) {
     let y = layer_top.get(r).copied().unwrap_or(0.0);
     if r + 1 < n_layers {
         let gap = layer_gaps

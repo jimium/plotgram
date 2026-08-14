@@ -332,7 +332,10 @@ pub fn publish_partition_row_gap_demand(board: &mut DemandBoard, plan: &PlanGrap
         if r + 1 < n_layers {
             board.publish(DemandKey::LayerGap(lo), PARTITION_EMPTY_BAND_MIN);
         } else if r > 0 {
-            board.publish(DemandKey::LayerGap((r as u32) - 1), PARTITION_EMPTY_BAND_MIN);
+            board.publish(
+                DemandKey::LayerGap((r as u32) - 1),
+                PARTITION_EMPTY_BAND_MIN,
+            );
         }
     }
 }

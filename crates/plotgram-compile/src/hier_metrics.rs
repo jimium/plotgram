@@ -91,12 +91,12 @@ pub struct HierQualityMetrics {
 }
 
 /// Compute P1 metrics from a finished layout.
-pub fn compute(
-    result: &LayoutResult,
-    cross: CrossAxis,
-    node_gap: f64,
-) -> HierQualityMetrics {
-    let gap = if node_gap > EPS { node_gap } else { DEFAULT_NODE_GAP };
+pub fn compute(result: &LayoutResult, cross: CrossAxis, node_gap: f64) -> HierQualityMetrics {
+    let gap = if node_gap > EPS {
+        node_gap
+    } else {
+        DEFAULT_NODE_GAP
+    };
     let obs = result
         .diagnostics
         .hierarchical
@@ -111,8 +111,12 @@ pub fn compute(
     let mut out: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     let mut inn: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for e in &result.edges {
-        out.entry(e.source.as_str()).or_default().push(e.target.as_str());
-        inn.entry(e.target.as_str()).or_default().push(e.source.as_str());
+        out.entry(e.source.as_str())
+            .or_default()
+            .push(e.target.as_str());
+        inn.entry(e.target.as_str())
+            .or_default()
+            .push(e.source.as_str());
     }
     for v in out.values_mut() {
         v.sort_unstable();
@@ -172,11 +176,7 @@ fn fan_metrics(
             .get(hub)
             .filter(|k| k.len() >= 2)
             .map(|v| v.as_slice())
-            .or_else(|| {
-                inn.get(hub)
-                    .filter(|k| k.len() >= 2)
-                    .map(|v| v.as_slice())
-            })
+            .or_else(|| inn.get(hub).filter(|k| k.len() >= 2).map(|v| v.as_slice()))
             .unwrap_or(&[]);
         if kids.len() < 2 {
             continue;

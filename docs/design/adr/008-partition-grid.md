@@ -24,7 +24,7 @@
    - 节点可同时属于某 group **且** 占据某 cell；**禁止**「group ⇒ 自动成列」作为 IR 语义
 5. **id 空间**：partition 轴 id 与 node / group id **同一空间，禁止冲突**。
 6. **校验**：无 grid 却写了 cell → 错；cell 引用未知轴 → 错；有 grid 但节点无 cell → **允许**（未分区自由区；Hier 算法未接线前可忽略其列约束）。
-7. **引擎消费**：Hierarchical 组合/度量相 **已接线**（PG-0–PG-4）；**禁止**用 group Horizontal 冒充 PartitionGrid。render 泳道底色/标题后置。
+7. **引擎消费**：Hierarchical 组合/度量相 **已接线**（PG-0–PG-4）；**禁止**用 group Horizontal 冒充 PartitionGrid。render 只读 band 画泳道底色/标题。
 8. **ADR-001**：grid 在 `Graph` 内随 `LayoutContract` 进入引擎；不引入 profile/图种分支。
 
 ## 含义

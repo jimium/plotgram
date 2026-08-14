@@ -77,4 +77,4 @@ v1 源码仍在 `crates/v1/plotgram-core/src/layout/atlas/`（只读）。可借
 
 - **扇出下的短链贴父槽**（n13 相对 n11 仍偏左；n19 已离开 n18，剩余是贴 n0/n1 脊约 30px）：P3 廊已在短链右侧。再对调父脸槽序、再让带 dummy 的扇入汇点 `center_h`、再在单 dummy 链上拉扇入端跟廊、再恢复最短跨主臂身份、再把 dummy–real 分离改成 `edge_gap`，会打 D3 / 上游轴继承 / 把 n19 粘回去。廊墙是层内序，不是分离常数。下一刀是 P3 链块 / 源 hub 写列。
 - **dense 层整层 `node_gap` 取等**：投影在吃 slack。不要加宽 dummy，先查下降步。
-- **PartitionGrid 引擎消费、穿组构造清零、label/loop reserve**：见 [roadmap](../roadmap.md)，不是再开一张 claimed 表。
+- **穿组构造清零、label/loop reserve**：见 [roadmap](../roadmap.md)，不是再开一张 claimed 表。

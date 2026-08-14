@@ -47,8 +47,7 @@ pub fn render_ascii(input: &RenderInput) -> String {
 
     // ── Canvas size: quantized layout canvas + padding, with a sane floor ──
     let width = ((input.layout.canvas_width / SCALE_X).ceil() as usize + PADDING * 2 + 4).max(40);
-    let height =
-        ((input.layout.canvas_height / SCALE_Y).ceil() as usize + PADDING * 2 + 4).max(20);
+    let height = ((input.layout.canvas_height / SCALE_Y).ceil() as usize + PADDING * 2 + 4).max(20);
     let mut cv = DisplayCanvas::new(width, height);
 
     // ── Nodes: every shape becomes a rectangular box ──
@@ -85,18 +84,33 @@ pub fn render_ascii(input: &RenderInput) -> String {
         let (cx, gy) = mapper.to_grid(np.frame.x + np.frame.width / 2.0, np.frame.y);
         let gx = cx.saturating_sub(gw / 2);
         boxes.push(NodeBox {
-            rect: GridRect { x: gx, y: gy, w: gw, h: gh },
+            rect: GridRect {
+                x: gx,
+                y: gy,
+                w: gw,
+                h: gh,
+            },
             label,
         });
     }
     let node_rects: Vec<GridRect> = boxes
         .iter()
-        .map(|b| GridRect { x: b.rect.x, y: b.rect.y, w: b.rect.w, h: b.rect.h })
+        .map(|b| GridRect {
+            x: b.rect.x,
+            y: b.rect.y,
+            w: b.rect.w,
+            h: b.rect.h,
+        })
         .collect();
 
     for b in &boxes {
         let chars = BoxChars {
-            tl: BOX_TL, tr: BOX_TR, bl: BOX_BL, br: BOX_BR, v: BOX_V, h: BOX_H,
+            tl: BOX_TL,
+            tr: BOX_TR,
+            bl: BOX_BL,
+            br: BOX_BR,
+            v: BOX_V,
+            h: BOX_H,
         };
         draw_box(&mut cv, b.rect.x, b.rect.y, b.rect.w, b.rect.h, &chars);
     }
@@ -143,7 +157,9 @@ pub fn render_ascii(input: &RenderInput) -> String {
 
     // ── Edge labels: centered on the slot frame (layout already decided where) ──
     for ls in &input.layout.labels {
-        let LabelOwner::Edge(_) = &ls.owner else { continue };
+        let LabelOwner::Edge(_) = &ls.owner else {
+            continue;
+        };
         let label = clean_label(&ls.text);
         if label.is_empty() {
             continue;
@@ -171,9 +187,7 @@ mod tests {
     use plotgram_model::geometry::{Point, Rect};
     use plotgram_model::graph::{Edge, Graph, Node};
     use plotgram_model::render::RenderMeta;
-    use plotgram_model::result::{
-        EdgePath, EdgePlacement, LabelSlot, LayoutResult, NodePlacement,
-    };
+    use plotgram_model::result::{EdgePath, EdgePlacement, LabelSlot, LayoutResult, NodePlacement};
 
     fn node(id: &str, label: &str) -> Node {
         Node {
@@ -206,7 +220,10 @@ mod tests {
     }
 
     fn place(id: &str, x: f64, y: f64, w: f64, h: f64) -> NodePlacement {
-        NodePlacement { id: id.to_string(), frame: Rect::new(x, y, w, h) }
+        NodePlacement {
+            id: id.to_string(),
+            frame: Rect::new(x, y, w, h),
+        }
     }
 
     fn route(id: &str, source: &str, target: &str, pts: &[(f64, f64)]) -> EdgePlacement {
@@ -238,7 +255,10 @@ mod tests {
             partition: None,
         };
         let layout = LayoutResult {
-            nodes: vec![place("a", 0.0, 24.0, 96.0, 36.0), place("b", 240.0, 24.0, 96.0, 36.0)],
+            nodes: vec![
+                place("a", 0.0, 24.0, 96.0, 36.0),
+                place("b", 240.0, 24.0, 96.0, 36.0),
+            ],
             edges: vec![route("e1", "a", "b", &[(96.0, 42.0), (240.0, 42.0)])],
             groups: vec![],
             labels: vec![
@@ -296,7 +316,11 @@ mod tests {
 
     #[test]
     fn title_is_not_rendered() {
-        let out = render_ascii(&two_node_input(Arrow::Forward, ("A", "B"), Some("登录流程")));
+        let out = render_ascii(&two_node_input(
+            Arrow::Forward,
+            ("A", "B"),
+            Some("登录流程"),
+        ));
         assert!(
             !out.contains("登录流程") && !out.contains("==="),
             "title should not appear in ascii output:\n{out}"
@@ -327,7 +351,10 @@ mod tests {
             partition: None,
         };
         let layout = LayoutResult {
-            nodes: vec![place("a", 0.0, 0.0, 96.0, 36.0), place("b", 0.0, 120.0, 96.0, 36.0)],
+            nodes: vec![
+                place("a", 0.0, 0.0, 96.0, 36.0),
+                place("b", 0.0, 120.0, 96.0, 36.0),
+            ],
             edges: vec![],
             groups: vec![],
             labels: vec![
@@ -341,19 +368,32 @@ mod tests {
         let input = RenderInput {
             graph,
             layout,
-            meta: RenderMeta { title: None, theme: None, render_style: None, extra: Default::default() },
+            meta: RenderMeta {
+                title: None,
+                theme: None,
+                render_style: None,
+                extra: Default::default(),
+            },
         };
         let out = render_ascii(&input);
         let lines: Vec<&str> = out.lines().collect();
         let top_bottom = lines.iter().position(|l| l.contains('└')).unwrap();
         let bottom_top = lines.iter().rposition(|l| l.contains('┌')).unwrap();
         assert!(
-            lines[top_bottom + 1..bottom_top].iter().any(|l| l.is_empty()),
+            lines[top_bottom + 1..bottom_top]
+                .iter()
+                .any(|l| l.is_empty()),
             "blank gap rows between boxes must survive:\n{out}"
         );
         // No leading/trailing blank lines
-        assert!(!lines.first().unwrap().is_empty(), "leading blanks trimmed:\n{out}");
-        assert!(!lines.last().unwrap().is_empty(), "trailing blanks trimmed:\n{out}");
+        assert!(
+            !lines.first().unwrap().is_empty(),
+            "leading blanks trimmed:\n{out}"
+        );
+        assert!(
+            !lines.last().unwrap().is_empty(),
+            "trailing blanks trimmed:\n{out}"
+        );
     }
 
     #[test]
@@ -371,6 +411,9 @@ mod tests {
             frame: Rect::new(0.0, 0.0, 100.0, 12.0),
         });
         let out = render_ascii(&input);
-        assert!(!out.contains("GROUP-TITLE"), "group label should be skipped:\n{out}");
+        assert!(
+            !out.contains("GROUP-TITLE"),
+            "group label should be skipped:\n{out}"
+        );
     }
 }

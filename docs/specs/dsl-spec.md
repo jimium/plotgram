@@ -1408,7 +1408,7 @@ variant **只**贡献 fill / stroke / font / dash / radius 等颜料；**不**�
 | `Node.role` / `host_group` / `anchor`（group_anchor；可 FixedOrder） | **已落地**（plotgram-model；见 §5.7 / ADR-004） |
 | `Graph.partition` / `Node.partition_cell`（ADR-008） | **已落地**（plotgram-model + `validate_partition`；`cell_*` lift 已接） |
 | `partition { column/row … }` 块 parse | **已落地** |
-| Hier 消费 PartitionGrid（连续块 / 层区间） | **已落地**（PG-0–PG-4；render 泳道底色后置） |
+| Hier 消费 PartitionGrid（连续块 / 层区间） | **已落地**（PG-0–PG-4；render 只读 band 画泳道底色/标题） |
 | `@group` 糖展开（§7.6） | **待 parser** |
 | 布局组合相写入 `EdgePlacement` 的 `PortRef`（`side` + `along`：Ordered / LocalOffset） | **已落地**（Hierarchical Compose `ports.rs` 唯一写者；Metric 展开像素；Ink 零猜测） |
 | Ink 零发明端口 / 锚点几何 | **纪律已定**；引擎实现时强制 |

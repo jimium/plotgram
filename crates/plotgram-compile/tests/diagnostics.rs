@@ -6,7 +6,8 @@
 use plotgram_compile::{build_layout, BuildOptions};
 use plotgram_model::result::{EdgePath, LayoutResult};
 
-const BASE: &str = "diagram {\n  layout: hierarchical { %OPTIONS% }\n  node a \"A\"\n  node b \"B\"\n  a -> b\n}";
+const BASE: &str =
+    "diagram {\n  layout: hierarchical { %OPTIONS% }\n  node a \"A\"\n  node b \"B\"\n  a -> b\n}";
 
 fn source_with(options: &str) -> String {
     if options.is_empty() {
@@ -69,7 +70,10 @@ fn routing_style_builtin_styles_end_to_end() {
     let r = build_layout(&fan_with(""), &opts).unwrap();
     assert!(!r.edges.is_empty());
     for e in &r.edges {
-        let pts = e.path.polyline_points().expect("orthogonal emits polylines");
+        let pts = e
+            .path
+            .polyline_points()
+            .expect("orthogonal emits polylines");
         for w in pts.windows(2) {
             let orthogonal = (w[0].x - w[1].x).abs() < 1e-6 || (w[0].y - w[1].y).abs() < 1e-6;
             assert!(orthogonal, "default style must stay orthogonal");
@@ -82,11 +86,14 @@ fn routing_style_builtin_styles_end_to_end() {
     for e in &r.edges {
         let pts = e.path.polyline_points().expect("polyline emits polylines");
         assert!(pts.len() >= 2);
-        any_diagonal |= pts.windows(2).any(|w| {
-            (w[0].x - w[1].x).abs() > 1e-6 && (w[0].y - w[1].y).abs() > 1e-6
-        });
+        any_diagonal |= pts
+            .windows(2)
+            .any(|w| (w[0].x - w[1].x).abs() > 1e-6 && (w[0].y - w[1].y).abs() > 1e-6);
     }
-    assert!(any_diagonal, "fan edges should run diagonally in polyline style");
+    assert!(
+        any_diagonal,
+        "fan edges should run diagonally in polyline style"
+    );
 
     // Curved: every edge is a single cubic between its port anchors.
     let r = build_layout(&fan_with("routing_style: curved"), &opts).unwrap();
@@ -142,13 +149,11 @@ fn auto_edge_grouping_fans_share_source_port_and_bus() {
     assert_eq!(r.edges.len(), 3);
 
     // Shared source PortPoint (yFiles bus): all members start at the same point.
-    let starts: Vec<_> = r
-        .edges
-        .iter()
-        .map(|e| e.path.samples()[0])
-        .collect();
+    let starts: Vec<_> = r.edges.iter().map(|e| e.path.samples()[0]).collect();
     assert!(
-        starts.iter().all(|p| (p.x - starts[0].x).abs() < 1e-6 && (p.y - starts[0].y).abs() < 1e-6),
+        starts
+            .iter()
+            .all(|p| (p.x - starts[0].x).abs() < 1e-6 && (p.y - starts[0].y).abs() < 1e-6),
         "clustered fan must share one source port, got {starts:?}"
     );
 
@@ -256,10 +261,7 @@ fn fan_out_without_grouping_uses_distinct_horizontal_tracks() {
             }
         }
     }
-    assert!(
-        !rail_ys.is_empty(),
-        "fan-out must produce horizontal rails"
-    );
+    assert!(!rail_ys.is_empty(), "fan-out must produce horizontal rails");
     rail_ys.sort_by(|a, b| a.total_cmp(b));
     rail_ys.dedup_by(|a, b| (*a - *b).abs() < 1e-6);
     assert!(

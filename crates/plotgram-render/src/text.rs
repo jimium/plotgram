@@ -31,11 +31,7 @@ pub fn render_label(
                         return;
                     }
                 }
-                (
-                    ns.text_fill.clone(),
-                    ns.font_size,
-                    ns.font_weight.clone(),
-                )
+                (ns.text_fill.clone(), ns.font_size, ns.font_weight.clone())
             } else {
                 (
                     theme.defaults.node.text_fill.clone(),
@@ -63,7 +59,11 @@ pub fn render_label(
                 .get(id)
                 .map(|g| g.text_fill.clone())
                 .unwrap_or_else(|| theme.defaults.group.text_fill.clone());
-            (fill, theme.defaults.typography.small_size, Some("500".to_string()))
+            (
+                fill,
+                theme.defaults.typography.small_size,
+                Some("500".to_string()),
+            )
         }
     };
 

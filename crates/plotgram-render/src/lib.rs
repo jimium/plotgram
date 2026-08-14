@@ -14,6 +14,7 @@ pub mod edges;
 pub mod group;
 pub mod icons;
 pub mod outline;
+pub mod partition;
 pub mod resolve;
 pub mod shapes;
 pub mod strategy;
@@ -38,6 +39,9 @@ pub fn render_svg(input: &RenderInput) -> String {
 
     // Canvas background
     svg.canvas_bg(&theme);
+
+    // Partition bands (behind groups): Metric intervals only — no cell invention.
+    partition::render_partition_bands(&mut svg, &input.graph, &input.layout, &theme);
 
     // NOTE: meta.title is intentionally not drawn: layout does not reserve
     // space for it, so painting it would overlap top-most nodes.
@@ -180,8 +184,14 @@ mod tests {
         };
         let layout = LayoutResult {
             nodes: vec![
-                NodePlacement { id: "a".to_string(), frame: Rect::new(10.0, 10.0, 80.0, 40.0) },
-                NodePlacement { id: "b".to_string(), frame: Rect::new(10.0, 110.0, 80.0, 40.0) },
+                NodePlacement {
+                    id: "a".to_string(),
+                    frame: Rect::new(10.0, 10.0, 80.0, 40.0),
+                },
+                NodePlacement {
+                    id: "b".to_string(),
+                    frame: Rect::new(10.0, 110.0, 80.0, 40.0),
+                },
             ],
             edges: vec![EdgePlacement {
                 id: "e1".to_string(),
@@ -203,7 +213,12 @@ mod tests {
         RenderInput {
             graph,
             layout,
-            meta: RenderMeta { title: None, theme: None, render_style: None, extra: Default::default() },
+            meta: RenderMeta {
+                title: None,
+                theme: None,
+                render_style: None,
+                extra: Default::default(),
+            },
         }
     }
 
@@ -215,18 +230,28 @@ mod tests {
         // seeds, hatch pattern defs, and the def dedup set.
         let mut input = minimal_input();
         input.meta.render_style = Some("sketch".to_string());
-        input.graph.nodes[0]
-            .attrs
-            .insert("style.fill".to_string(), AttrValue::Str("#E3F2FD".to_string()));
-        input.graph.nodes[1]
-            .attrs
-            .insert("style.fill".to_string(), AttrValue::Str("#FFF3E0".to_string()));
+        input.graph.nodes[0].attrs.insert(
+            "style.fill".to_string(),
+            AttrValue::Str("#E3F2FD".to_string()),
+        );
+        input.graph.nodes[1].attrs.insert(
+            "style.fill".to_string(),
+            AttrValue::Str("#FFF3E0".to_string()),
+        );
 
         let first_svg = render_svg(&input);
         let first_ascii = render_ascii(&input);
         for _ in 0..2 {
-            assert_eq!(render_svg(&input), first_svg, "render_svg must be byte-identical");
-            assert_eq!(render_ascii(&input), first_ascii, "render_ascii must be byte-identical");
+            assert_eq!(
+                render_svg(&input),
+                first_svg,
+                "render_svg must be byte-identical"
+            );
+            assert_eq!(
+                render_ascii(&input),
+                first_ascii,
+                "render_ascii must be byte-identical"
+            );
         }
     }
 
@@ -240,9 +265,18 @@ mod tests {
         svg.add_def_once("<filter x=\"0\"/>".to_string());
         svg.add_def_once("<filter x=\"0\"/>".to_string());
         let out = svg.finish();
-        assert!(out.contains(r#"data="first""#), "first def per id wins:\n{out}");
-        assert!(!out.contains(r#"data="second""#), "same id must not be emitted twice:\n{out}");
-        assert!(out.contains(r#"id="p2""#), "distinct ids all emitted:\n{out}");
+        assert!(
+            out.contains(r#"data="first""#),
+            "first def per id wins:\n{out}"
+        );
+        assert!(
+            !out.contains(r#"data="second""#),
+            "same id must not be emitted twice:\n{out}"
+        );
+        assert!(
+            out.contains(r#"id="p2""#),
+            "distinct ids all emitted:\n{out}"
+        );
         assert_eq!(
             out.matches("<filter").count(),
             1,
@@ -351,14 +385,23 @@ mod tests {
             to_port: None,
         });
         let svg = render_svg(&input);
-        assert_eq!(svg.matches("<marker").count(), 2, "one def per color:\n{svg}");
+        assert_eq!(
+            svg.matches("<marker").count(),
+            2,
+            "one def per color:\n{svg}"
+        );
 
         // Per-edge arrow_style: none suppresses this edge's markers only
-        input.graph.edges[1]
-            .attrs
-            .insert("style.arrow_style".to_string(), AttrValue::Atom("none".to_string()));
+        input.graph.edges[1].attrs.insert(
+            "style.arrow_style".to_string(),
+            AttrValue::Atom("none".to_string()),
+        );
         let svg = render_svg(&input);
-        assert_eq!(svg.matches("<marker").count(), 1, "only e1's marker remains:\n{svg}");
+        assert_eq!(
+            svg.matches("<marker").count(),
+            1,
+            "only e1's marker remains:\n{svg}"
+        );
         assert_eq!(
             svg.matches("marker-end").count(),
             1,
@@ -383,9 +426,15 @@ mod tests {
             sketch_svg.contains(r##"fill="url(#hatch-"##),
             "sketch node fill should reference hatch pattern:\n{sketch_svg}"
         );
-        assert_ne!(sketch_svg, standard_svg, "sketch output must differ from standard");
+        assert_ne!(
+            sketch_svg, standard_svg,
+            "sketch output must differ from standard"
+        );
         // Standard keeps exact primitives (nodes are rects by default)
-        assert!(standard_svg.contains("<rect x="), "standard should keep exact rects");
+        assert!(
+            standard_svg.contains("<rect x="),
+            "standard should keep exact rects"
+        );
     }
 
     #[test]

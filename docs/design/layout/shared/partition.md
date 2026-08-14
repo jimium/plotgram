@@ -1,6 +1,6 @@
 # PartitionGrid（正交分区）
 
-> 状态：现行契约（model/DSL 已定；Hier 引擎消费 **已落地**，PG-0–PG-4；render 泳道底色后置）  
+> 状态：现行契约（model/DSL 已定；Hier 引擎消费 **已落地**，PG-0–PG-4；render 只读 band 画泳道底色/标题）  
 > ADR：[008-partition-grid](../../adr/008-partition-grid.md)  
 > 实施方案：[hierarchical/phases/partition-grid.md](../hierarchical/phases/partition-grid.md)（PG-0–PG-4）  
 > Model：`plotgram_model::partition`  

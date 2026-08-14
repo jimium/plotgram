@@ -68,14 +68,18 @@ pub fn shape_svg(
             let rx = style.radius.unwrap_or(0.0);
             format!(
                 r#"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
-                fill = style.fill, stroke = style.stroke, sw = style.stroke_width
+                fill = style.fill,
+                stroke = style.stroke,
+                sw = style.stroke_width
             )
         }
         NodeShape::RoundedRect => {
             let rx = style.radius.unwrap_or(4.0);
             format!(
                 r#"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
-                fill = style.fill, stroke = style.stroke, sw = style.stroke_width
+                fill = style.fill,
+                stroke = style.stroke,
+                sw = style.stroke_width
             )
         }
         NodeShape::Circle => {
@@ -84,7 +88,9 @@ pub fn shape_svg(
             let cy = y + h / 2.0;
             format!(
                 r#"<circle cx="{cx}" cy="{cy}" r="{r}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
-                fill = style.fill, stroke = style.stroke, sw = style.stroke_width
+                fill = style.fill,
+                stroke = style.stroke,
+                sw = style.stroke_width
             )
         }
         NodeShape::Diamond => {
@@ -93,7 +99,9 @@ pub fn shape_svg(
             let points = format!("{cx},{y} {},{cy} {cx},{} {x},{cy}", x + w, y + h);
             format!(
                 r#"<polygon points="{points}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
-                fill = style.fill, stroke = style.stroke, sw = style.stroke_width
+                fill = style.fill,
+                stroke = style.stroke,
+                sw = style.stroke_width
             )
         }
         NodeShape::Cylinder => {
@@ -102,8 +110,12 @@ pub fn shape_svg(
             let rx = w / 2.0;
             format!(
                 r#"<path d="M {x} {y_ry} A {rx} {ry} 0 0 1 {x_w} {y_ry} L {x_w} {y_h_ry} A {rx} {ry} 0 0 1 {x} {y_h_ry} Z" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/><ellipse cx="{cx}" cy="{y_ry}" rx="{rx}" ry="{ry}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
-                y_ry = y + ry, x_w = x + w, y_h_ry = y + h - ry,
-                fill = style.fill, stroke = style.stroke, sw = style.stroke_width
+                y_ry = y + ry,
+                x_w = x + w,
+                y_h_ry = y + h - ry,
+                fill = style.fill,
+                stroke = style.stroke,
+                sw = style.stroke_width
             )
         }
         NodeShape::Hexagon => {
@@ -111,11 +123,21 @@ pub fn shape_svg(
             let w4 = w / 4.0;
             let points = format!(
                 "{} {y} {} {y} {} {} {} {} {} {} {x} {}",
-                x + w4, x + w - w4, x + w, y + hm, x + w - w4, y + h, x + w4, y + h, y + hm
+                x + w4,
+                x + w - w4,
+                x + w,
+                y + hm,
+                x + w - w4,
+                y + h,
+                x + w4,
+                y + h,
+                y + hm
             );
             format!(
                 r#"<polygon points="{points}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
-                fill = style.fill, stroke = style.stroke, sw = style.stroke_width
+                fill = style.fill,
+                stroke = style.stroke,
+                sw = style.stroke_width
             )
         }
         NodeShape::Person => {
@@ -128,28 +150,44 @@ pub fn shape_svg(
             format!(
                 r#"<circle cx="{cx}" cy="{head_cy}" r="{head_r}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/><path d="M {lx} {by} L {lx} {tys} A {sr} {sr} 0 0 1 {lxs} {ty} L {rxs} {ty} A {sr} {sr} 0 0 1 {rx} {tys} L {rx} {by} Z" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
                 head_cy = y + head_r,
-                lx = cx - tw / 2.0, rx = cx + tw / 2.0,
-                lxs = cx - tw / 2.0 + sr, rxs = cx + tw / 2.0 - sr,
-                tys = ty + sr, by = y + h,
-                fill = style.fill, stroke = style.stroke, sw = style.stroke_width
+                lx = cx - tw / 2.0,
+                rx = cx + tw / 2.0,
+                lxs = cx - tw / 2.0 + sr,
+                rxs = cx + tw / 2.0 - sr,
+                tys = ty + sr,
+                by = y + h,
+                fill = style.fill,
+                stroke = style.stroke,
+                sw = style.stroke_width
             )
         }
         NodeShape::Stadium => {
             let rx = h.min(w) / 2.0;
             format!(
                 r#"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
-                fill = style.fill, stroke = style.stroke, sw = style.stroke_width
+                fill = style.fill,
+                stroke = style.stroke,
+                sw = style.stroke_width
             )
         }
         NodeShape::Parallelogram => {
             let skew = w * 0.15;
             let points = format!(
                 "{},{} {},{} {},{} {},{}",
-                x + skew, y, x + w, y, x + w - skew, y + h, x, y + h
+                x + skew,
+                y,
+                x + w,
+                y,
+                x + w - skew,
+                y + h,
+                x,
+                y + h
             );
             format!(
                 r#"<polygon points="{points}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
-                fill = style.fill, stroke = style.stroke, sw = style.stroke_width
+                fill = style.fill,
+                stroke = style.stroke,
+                sw = style.stroke_width
             )
         }
         NodeShape::Document => {
@@ -167,7 +205,9 @@ pub fn shape_svg(
             );
             format!(
                 r#"<path d="{d}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
-                fill = style.fill, stroke = style.stroke, sw = style.stroke_width
+                fill = style.fill,
+                stroke = style.stroke,
+                sw = style.stroke_width
             )
         }
         NodeShape::Cloud => {
@@ -190,7 +230,9 @@ pub fn shape_svg(
             }
             format!(
                 r#"<polygon points="{points}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
-                fill = style.fill, stroke = style.stroke, sw = style.stroke_width
+                fill = style.fill,
+                stroke = style.stroke,
+                sw = style.stroke_width
             )
         }
         NodeShape::Subprocess => {
@@ -201,7 +243,9 @@ pub fn shape_svg(
             let ih = h - pad * 2.0;
             format!(
                 r#"<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/><rect x="{ix}" y="{iy}" width="{iw}" height="{ih}" fill="none" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
-                fill = style.fill, stroke = style.stroke, sw = style.stroke_width
+                fill = style.fill,
+                stroke = style.stroke,
+                sw = style.stroke_width
             )
         }
     }

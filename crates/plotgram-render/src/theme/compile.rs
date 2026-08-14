@@ -4,12 +4,12 @@
 
 use std::collections::BTreeMap;
 
+use super::color::darken;
 use super::schema::{StyleValue, ThemeFile};
 use super::{
     CompiledDefaults, CompiledTheme, EdgeDefaults, GroupDefaults, GroupNestStep, Typography,
     VariantStyle,
 };
-use super::color::darken;
 
 /// Compile a theme, resolving `extends` inheritance chain.
 ///
@@ -20,8 +20,8 @@ pub fn compile_theme(json: &str, resolver: &dyn Fn(&str) -> Option<&'static str>
 
     // Resolve extends chain
     let merged = if let Some(parent_id) = &file.extends {
-        let parent_json = resolver(parent_id)
-            .unwrap_or_else(|| panic!("parent theme '{parent_id}' not found"));
+        let parent_json =
+            resolver(parent_id).unwrap_or_else(|| panic!("parent theme '{parent_id}' not found"));
         let parent: ThemeFile = serde_json::from_str(parent_json)
             .unwrap_or_else(|e| panic!("parent theme parse error: {e}"));
         // Recursively resolve parent's extends
@@ -35,13 +35,10 @@ pub fn compile_theme(json: &str, resolver: &dyn Fn(&str) -> Option<&'static str>
 }
 
 /// Recursively resolve a ThemeFile's extends chain.
-fn resolve_extends(
-    file: ThemeFile,
-    resolver: &dyn Fn(&str) -> Option<&'static str>,
-) -> ThemeFile {
+fn resolve_extends(file: ThemeFile, resolver: &dyn Fn(&str) -> Option<&'static str>) -> ThemeFile {
     if let Some(parent_id) = &file.extends {
-        let parent_json = resolver(parent_id)
-            .unwrap_or_else(|| panic!("parent theme '{parent_id}' not found"));
+        let parent_json =
+            resolver(parent_id).unwrap_or_else(|| panic!("parent theme '{parent_id}' not found"));
         let parent: ThemeFile = serde_json::from_str(parent_json)
             .unwrap_or_else(|e| panic!("parent theme parse error: {e}"));
         let resolved_parent = resolve_extends(parent, resolver);
@@ -131,7 +128,10 @@ fn compile_resolved(file: ThemeFile) -> CompiledTheme {
         .variants
         .iter()
         .map(|(variant, props)| {
-            (variant.clone(), compile_variant_style(props, &token_map, &defaults.node))
+            (
+                variant.clone(),
+                compile_variant_style(props, &token_map, &defaults.node),
+            )
         })
         .collect();
 
@@ -230,11 +230,11 @@ fn resolve_ref(s: &str, tokens: &BTreeMap<String, String>) -> String {
 fn compile_defaults(file: &ThemeFile, tokens: &BTreeMap<String, String>) -> CompiledDefaults {
     let d = &file.defaults;
 
-    let canvas_background = get_resolved(&d.canvas, "background", tokens)
-        .unwrap_or_else(|| "#FFFFFF".to_string());
+    let canvas_background =
+        get_resolved(&d.canvas, "background", tokens).unwrap_or_else(|| "#FFFFFF".to_string());
 
-    let title_fill = get_resolved(&d.title, "fill", tokens)
-        .unwrap_or_else(|| "#18181B".to_string());
+    let title_fill =
+        get_resolved(&d.title, "fill", tokens).unwrap_or_else(|| "#18181B".to_string());
     let title_font_size = get_f64(&d.title, "font_size", tokens).unwrap_or(21.0);
 
     // Extract node shape separately (variants must not contain shape).
@@ -249,10 +249,13 @@ fn compile_defaults(file: &ThemeFile, tokens: &BTreeMap<String, String>) -> Comp
     let edge = EdgeDefaults {
         stroke: get_resolved(&d.edge, "stroke", tokens).unwrap_or_else(|| "#9C9CA6".to_string()),
         stroke_width: get_f64(&d.edge, "stroke_width", tokens).unwrap_or(1.25),
-        text_fill: get_resolved(&d.edge, "text_fill", tokens).unwrap_or_else(|| "#71717A".to_string()),
+        text_fill: get_resolved(&d.edge, "text_fill", tokens)
+            .unwrap_or_else(|| "#71717A".to_string()),
         font_size: get_f64(&d.edge, "font_size", tokens).unwrap_or(14.0),
-        arrow_fill: get_resolved(&d.edge, "arrow_fill", tokens).unwrap_or_else(|| "#0F766E".to_string()),
-        arrow_style: get_resolved(&d.edge, "arrow_style", tokens).unwrap_or_else(|| "normal".to_string()),
+        arrow_fill: get_resolved(&d.edge, "arrow_fill", tokens)
+            .unwrap_or_else(|| "#0F766E".to_string()),
+        arrow_style: get_resolved(&d.edge, "arrow_style", tokens)
+            .unwrap_or_else(|| "normal".to_string()),
         response_dasharray: get_resolved(&d.edge, "response_dasharray", tokens)
             .unwrap_or_else(|| "6,4".to_string()),
         stroke_linecap: get_resolved(&d.edge, "stroke_linecap", tokens),
@@ -266,7 +269,8 @@ fn compile_defaults(file: &ThemeFile, tokens: &BTreeMap<String, String>) -> Comp
         fill: get_resolved(&d.group, "fill", tokens).unwrap_or_else(|| "#ECECEF".to_string()),
         stroke: get_resolved(&d.group, "stroke", tokens).unwrap_or_else(|| "#B0B0B8".to_string()),
         stroke_width: get_f64(&d.group, "stroke_width", tokens).unwrap_or(1.25),
-        text_fill: get_resolved(&d.group, "text_fill", tokens).unwrap_or_else(|| "#71717A".to_string()),
+        text_fill: get_resolved(&d.group, "text_fill", tokens)
+            .unwrap_or_else(|| "#71717A".to_string()),
         radius: get_f64(&d.group, "radius", tokens).unwrap_or(6.0),
         stroke_dasharray: get_resolved(&d.group, "stroke_dasharray", tokens)
             .filter(|s| s != "none"),
@@ -295,12 +299,7 @@ fn compile_defaults(file: &ThemeFile, tokens: &BTreeMap<String, String>) -> Comp
 ///
 /// Deeper groups darken (aligned with v1 `common.clean-light` `group_nest` entries).
 fn synthesize_group_nest(group: &GroupDefaults) -> Vec<GroupNestStep> {
-    const DARKEN: [(f64, f64); 4] = [
-        (0.0, 0.0),
-        (0.04, 0.04),
-        (0.08, 0.08),
-        (0.12, 0.12),
-    ];
+    const DARKEN: [(f64, f64); 4] = [(0.0, 0.0), (0.04, 0.04), (0.08, 0.08), (0.12, 0.12)];
 
     DARKEN
         .iter()
@@ -332,15 +331,19 @@ fn compile_variant_style(
         fill: get_resolved(props, "fill", tokens).unwrap_or_else(|| base.fill.clone()),
         stroke: get_resolved(props, "stroke", tokens).unwrap_or_else(|| base.stroke.clone()),
         stroke_width: get_f64(props, "stroke_width", tokens).unwrap_or(base.stroke_width),
-        text_fill: get_resolved(props, "text_fill", tokens).unwrap_or_else(|| base.text_fill.clone()),
+        text_fill: get_resolved(props, "text_fill", tokens)
+            .unwrap_or_else(|| base.text_fill.clone()),
         font_size: get_f64(props, "font_size", tokens).unwrap_or(base.font_size),
-        font_weight: get_resolved(props, "font_weight", tokens).or_else(|| base.font_weight.clone()),
+        font_weight: get_resolved(props, "font_weight", tokens)
+            .or_else(|| base.font_weight.clone()),
         radius: get_f64(props, "radius", tokens).or(base.radius),
         stroke_dasharray: get_resolved(props, "stroke_dasharray", tokens)
             .filter(|s| s != "none")
             .or_else(|| base.stroke_dasharray.clone()),
-        stroke_linecap: get_resolved(props, "stroke_linecap", tokens).or_else(|| base.stroke_linecap.clone()),
-        stroke_linejoin: get_resolved(props, "stroke_linejoin", tokens).or_else(|| base.stroke_linejoin.clone()),
+        stroke_linecap: get_resolved(props, "stroke_linecap", tokens)
+            .or_else(|| base.stroke_linecap.clone()),
+        stroke_linejoin: get_resolved(props, "stroke_linejoin", tokens)
+            .or_else(|| base.stroke_linejoin.clone()),
         fill_opacity: get_f64(props, "fill_opacity", tokens).or(base.fill_opacity),
         stroke_opacity: get_f64(props, "stroke_opacity", tokens).or(base.stroke_opacity),
     }
