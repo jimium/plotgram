@@ -1,0 +1,25 @@
+// PG-4: Weak group nested inside a single partition column.
+// Members of `review` all sit in `sales`; spanning ≥2 columns remains a hard error.
+diagram {
+    profile: flowchart,
+    title: "组嵌套在泳道内（Weak）",
+    layout: hierarchical { direction: top-to-bottom }
+
+    partition {
+        column sales { label: "销售" }
+        column warehouse { label: "仓储" }
+    }
+
+    group review {
+        label: "审核"
+        node check { label: "核对", archetype: process, cell_col: sales }
+        node approve { label: "批准", archetype: process, cell_col: sales }
+    }
+
+    node pick { label: "拣货", archetype: process, cell_col: warehouse }
+    node ship { label: "发运", archetype: end, cell_col: warehouse }
+
+    check -> approve
+    approve -> pick
+    pick -> ship
+}

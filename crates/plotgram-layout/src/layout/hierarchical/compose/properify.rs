@@ -121,7 +121,12 @@ pub fn properify(graph: &RealGraph, rank: &RankMap) -> PlanGraph {
         segments,
         layers,
         partition_columns: Vec::new(),
+        partition_cross_kind: Default::default(),
         partition_elem_col: Vec::new(),
+        partition_rows: Vec::new(),
+        partition_main_kind: Default::default(),
+        partition_elem_row: Vec::new(),
+        partition_row_intervals: Vec::new(),
     }
 }
 

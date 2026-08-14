@@ -14,7 +14,7 @@ model 是**纯数据层**：定义所有 crate 共享的类型，不含布局/�
 | `geometry` | `Point`, `Rect` | 全部 |
 | `attr` | `AttrValue`, `AttrMap` | 全部（样式/meta/开放扩展） |
 | `graph` | `Node`（含 `role`/`host_group`/`anchor`/`partition_cell`）, `Edge`, `Group`, `Graph`（含 `partition`）, `Arrow` | engine, render |
-| `partition` | `PartitionGrid`, `PartitionAxis`, `PartitionCell`, `validate_graph_partition` | parse / engine（消费 planned） |
+| `partition` | `PartitionGrid`, `PartitionAxis`, `PartitionCell`, `validate_graph_partition` | parse / engine（Hier 已消费） |
 | `port` | `Side`, `PortConstraint`（作者钉死）, `PortRef`（已决议） | engine |
 | `contract` | `AlgorithmRef`, `LayoutContract`（含 `node_sizes`） | **engine 入口** |
 | `sizes` | `NodeSizes`, `Size`（geometry） | 编排度量 → engine |

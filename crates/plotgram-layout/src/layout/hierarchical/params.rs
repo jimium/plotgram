@@ -52,6 +52,24 @@ impl GroupPolicy {
     }
 }
 
+/// What to do with nodes that have no `partition_cell` when a grid is present
+/// (partition-grid.md PG-4). Default [`Self::Free`] is the ADR-008 free zone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PartitionUnassigned {
+    #[default]
+    Free,
+    Reject,
+}
+
+impl PartitionUnassigned {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Free => "free",
+            Self::Reject => "reject",
+        }
+    }
+}
+
 /// Built-in edge geometry style when Hier owns ink (`edge_routing` absent).
 ///
 /// Distinct from diagram-level `edge_routing:` (independent EdgeRouter after layout).
@@ -217,6 +235,9 @@ pub struct HierarchicalParams {
     /// Soft bend budget; exceeding emits a relaxation (P5-5).
     pub max_bends_budget: u32,
     pub group_policy: GroupPolicy,
+    /// Nodes without a cell when a partition grid is present: free zone
+    /// (default) or hard reject (partition-grid.md PG-4).
+    pub partition_unassigned: PartitionUnassigned,
     /// StrongMacro only: weight of the cross-group edge alignment term
     /// `Σ w_ab × ((o_a + cx_a) − (o_b + cx_b))²` on macro row offsets
     /// (strong-macro.md §6 SM-3). `0` = pure centering (SM-2 shape). The
@@ -251,6 +272,7 @@ impl Default for HierarchicalParams {
             route_w_cross: 3.0,
             max_bends_budget: 6,
             group_policy: GroupPolicy::Weak,
+            partition_unassigned: PartitionUnassigned::Free,
             macro_align_weight: 1.0,
         }
     }
@@ -468,6 +490,18 @@ impl HierarchicalParams {
         {
             params.group_policy = p;
         }
+        if let Some(p) = binder
+            .get_enum(
+                "partition_unassigned",
+                &[
+                    ("free", PartitionUnassigned::Free),
+                    ("reject", PartitionUnassigned::Reject),
+                ],
+            )
+            .map_err(bind_err)?
+        {
+            params.partition_unassigned = p;
+        }
         if let Some(v) = binder
             .get_f64_any(&["macro_align_weight"])
             .map_err(bind_err)?
@@ -498,7 +532,7 @@ impl HierarchicalParams {
              routing_style={}|auto_edge_grouping={}|\
              min_first_segment={:e}|min_last_segment={:e}|port_stub={:e}|\
              route_w_bend={:e}|route_w_len={:e}|route_w_cross={:e}|max_bends_budget={}|\
-             group_policy={}|macro_align_weight={:e}",
+             group_policy={}|partition_unassigned={}|macro_align_weight={:e}",
             self.orientation.as_str(),
             self.node_gap,
             self.layer_gap,
@@ -523,6 +557,7 @@ impl HierarchicalParams {
             self.route_w_cross,
             self.max_bends_budget,
             self.group_policy.as_str(),
+            self.partition_unassigned.as_str(),
             self.macro_align_weight,
         );
         format!("{:016x}", fnv1a_64(canonical.as_bytes()))
@@ -590,6 +625,10 @@ mod tests {
             },
             HierarchicalParams {
                 group_policy: GroupPolicy::StrongMacro,
+                ..a
+            },
+            HierarchicalParams {
+                partition_unassigned: PartitionUnassigned::Reject,
                 ..a
             },
             HierarchicalParams {

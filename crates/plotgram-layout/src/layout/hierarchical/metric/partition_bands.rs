@@ -11,6 +11,9 @@
 //! metric stage stays the band coordinate source of truth; everything
 //! downstream (HierarchicalObs, debug trace, measure) is a projection.
 
+use plotgram_algo::orientation::Size;
+use plotgram_model::geometry::Rect;
+
 use crate::layout::hierarchical::model::{BoundarySide, ElemKey, PlanGraph};
 
 /// Minimum band width for a column with no assigned members anywhere — an
@@ -64,7 +67,7 @@ impl PartitionBandPlan {
     ) -> Option<usize> {
         plan.index_of
             .get(&ElemKey::PartitionBoundary {
-                column: column.to_string(),
+                axis: column.to_string(),
                 rank,
                 side,
             })
@@ -101,7 +104,7 @@ pub fn band_coords(plan: &PlanGraph, cross: &[f64]) -> Vec<PartitionBandCoords> 
         let mut end: Option<f64> = None;
         for elem in &plan.elems {
             let ElemKey::PartitionBoundary {
-                column: col, side, ..
+                axis: col, side, ..
             } = &elem.key
             else {
                 continue;
@@ -129,6 +132,202 @@ pub fn band_coords(plan: &PlanGraph, cross: &[f64]) -> Vec<PartitionBandCoords> 
         });
     }
     out
+}
+
+/// Solved main-axis band interval for one consumed row/column (PG-3),
+/// canonical coordinates (y in TB).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PartitionRowBandCoords {
+    pub row: String,
+    pub start: f64,
+    pub end: f64,
+    pub empty: bool,
+}
+
+/// Row bands from the stacked main axis (partition-grid.md PG-3).
+///
+/// Non-empty: bounding `[min layer top, max layer bottom]` of the row's rank
+/// interval. Empty: the LayerGap strip attached to the dummy rank.
+pub fn row_band_coords(
+    plan: &PlanGraph,
+    main: &[f64],
+    size_of: &dyn Fn(usize) -> Size,
+    layer_gaps: &[f64],
+) -> Vec<PartitionRowBandCoords> {
+    if plan.partition_rows.is_empty() {
+        return Vec::new();
+    }
+    let n_layers = plan.layers.len();
+    let mut layer_top = vec![0.0; n_layers];
+    let mut layer_bot = vec![0.0; n_layers];
+    for (r, layer) in plan.layers.iter().enumerate() {
+        let mut top = f64::INFINITY;
+        let mut bot = f64::NEG_INFINITY;
+        for &ei in layer {
+            let y = main.get(ei).copied().unwrap_or(0.0);
+            let h = size_of(ei).height;
+            top = top.min(y);
+            bot = bot.max(y + h);
+        }
+        if !top.is_finite() {
+            top = 0.0;
+            bot = 0.0;
+        }
+        layer_top[r] = top;
+        layer_bot[r] = bot;
+    }
+    let mut out = Vec::with_capacity(plan.partition_rows.len());
+    for (ri, row) in plan.partition_rows.iter().enumerate() {
+        let empty = !plan
+            .partition_elem_row
+            .iter()
+            .zip(plan.elems.iter())
+            .any(|(slot, elem)| *slot == Some(ri) && matches!(elem.key, ElemKey::Real(_)));
+        let (lo, hi) = plan
+            .partition_row_intervals
+            .get(ri)
+            .copied()
+            .unwrap_or((0, 0));
+        let (start, end) = if empty {
+            empty_row_strip(lo as usize, n_layers, &layer_top, layer_gaps)
+        } else {
+            // Ruling: y-union of the packed rank interval after main-axis
+            // stacking. Member Fit is unioned so a frame that extends past
+            // zero-height clamp extrema on that rank is still covered.
+            let mut start = f64::INFINITY;
+            let mut end = f64::NEG_INFINITY;
+            for r in lo as usize..=hi as usize {
+                if r < n_layers {
+                    start = start.min(layer_top[r]);
+                    end = end.max(layer_bot[r]);
+                }
+            }
+            for (ei, elem) in plan.elems.iter().enumerate() {
+                if plan.partition_elem_row.get(ei).copied().flatten() != Some(ri) {
+                    continue;
+                }
+                if !matches!(elem.key, ElemKey::Real(_)) {
+                    continue;
+                }
+                let y = main.get(ei).copied().unwrap_or(0.0);
+                let h = size_of(ei).height;
+                start = start.min(y);
+                end = end.max(y + h);
+            }
+            if start.is_finite() {
+                (start, end)
+            } else {
+                empty_row_strip(lo as usize, n_layers, &layer_top, layer_gaps)
+            }
+        };
+        out.push(PartitionRowBandCoords {
+            row: row.clone(),
+            start,
+            end,
+            empty,
+        });
+    }
+    out
+}
+
+fn empty_row_strip(
+    r: usize,
+    n_layers: usize,
+    layer_top: &[f64],
+    layer_gaps: &[f64],
+) -> (f64, f64) {
+    let y = layer_top.get(r).copied().unwrap_or(0.0);
+    if r + 1 < n_layers {
+        let gap = layer_gaps
+            .get(r)
+            .copied()
+            .unwrap_or(0.0)
+            .max(PARTITION_EMPTY_BAND_MIN);
+        (y, y + gap)
+    } else if r > 0 {
+        let gap = layer_gaps
+            .get(r - 1)
+            .copied()
+            .unwrap_or(0.0)
+            .max(PARTITION_EMPTY_BAND_MIN);
+        (y - gap, y)
+    } else {
+        (0.0, PARTITION_EMPTY_BAND_MIN)
+    }
+}
+
+/// Fit envelopes from already-written frames (StrongMacro: no clamp elems).
+/// `pad` is applied on the cross axis (same as Weak snap pad = node_gap).
+pub fn band_coords_from_member_frames(
+    plan: &PlanGraph,
+    frames: &[Rect],
+    pad: f64,
+) -> (Vec<PartitionBandCoords>, Vec<PartitionRowBandCoords>) {
+    let n_cross = plan.partition_columns.len();
+    let mut col_start = vec![f64::INFINITY; n_cross];
+    let mut col_end = vec![f64::NEG_INFINITY; n_cross];
+    let mut col_empty = vec![true; n_cross];
+    let n_main = plan.partition_rows.len();
+    let mut row_start = vec![f64::INFINITY; n_main];
+    let mut row_end = vec![f64::NEG_INFINITY; n_main];
+    let mut row_empty = vec![true; n_main];
+    for (ei, elem) in plan.elems.iter().enumerate() {
+        if !matches!(elem.key, ElemKey::Real(_)) {
+            continue;
+        }
+        let Some(f) = frames.get(ei) else {
+            continue;
+        };
+        if let Some(&ci) = plan.partition_elem_col.get(ei).and_then(|c| c.as_ref()) {
+            if ci < n_cross {
+                col_empty[ci] = false;
+                col_start[ci] = col_start[ci].min(f.x);
+                col_end[ci] = col_end[ci].max(f.right());
+            }
+        }
+        if let Some(&ri) = plan.partition_elem_row.get(ei).and_then(|c| c.as_ref()) {
+            if ri < n_main {
+                row_empty[ri] = false;
+                row_start[ri] = row_start[ri].min(f.y);
+                row_end[ri] = row_end[ri].max(f.bottom());
+            }
+        }
+    }
+    let mut cols = Vec::with_capacity(n_cross);
+    let mut cursor = 0.0;
+    for (ci, column) in plan.partition_columns.iter().enumerate() {
+        let (start, end) = if col_empty[ci] {
+            let start = cursor;
+            (start, start + PARTITION_EMPTY_BAND_MIN)
+        } else {
+            (col_start[ci] - pad, col_end[ci] + pad)
+        };
+        cursor = end + pad.max(0.0);
+        cols.push(PartitionBandCoords {
+            column: column.clone(),
+            start,
+            end,
+            empty: col_empty[ci],
+        });
+    }
+    let mut rows = Vec::with_capacity(n_main);
+    let mut y_cursor = 0.0;
+    for (ri, row) in plan.partition_rows.iter().enumerate() {
+        let (start, end) = if row_empty[ri] {
+            let start = y_cursor;
+            (start, start + PARTITION_EMPTY_BAND_MIN)
+        } else {
+            (row_start[ri], row_end[ri])
+        };
+        y_cursor = end;
+        rows.push(PartitionRowBandCoords {
+            row: row.clone(),
+            start,
+            end,
+            empty: row_empty[ri],
+        });
+    }
+    (cols, rows)
 }
 
 #[cfg(test)]
@@ -205,7 +404,7 @@ mod tests {
         x: f64,
     ) {
         let key = ElemKey::PartitionBoundary {
-            column: col.to_string(),
+            axis: col.to_string(),
             rank,
             side,
         };

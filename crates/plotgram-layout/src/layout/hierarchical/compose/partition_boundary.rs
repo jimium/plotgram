@@ -18,41 +18,55 @@
 use std::collections::BTreeMap;
 
 use super::super::model::{BoundarySide, Elem, ElemKey, PlanGraph, RealGraph, Segment};
+use super::partition_axes::{cell_on, ConsumedAxes};
 use plotgram_engine_api::LayoutError;
 
-/// Insert partition column clamps + cross-rank `pb:` segments into `plan`.
-///
-/// No-op unless `real_graph` carries a grid with at least one column (the
-/// caller already applied the consumption gate). Errors when a group's
-/// members span more than one column.
+/// TB convenience for tests: consume author columns as the cross axis.
+#[cfg(test)]
 pub fn insert_partition_boundaries(
     plan: &mut PlanGraph,
     real_graph: &RealGraph,
 ) -> Result<(), LayoutError> {
-    if !plan.partition_columns.is_empty() {
-        return Ok(()); // already inserted (retry path re-runs compose)
-    }
+    use plotgram_algo::orientation::Orientation;
     let Some(grid) = &real_graph.partition else {
         return Ok(());
     };
-    if grid.columns.is_empty() {
+    insert_partition_cross_boundaries(
+        plan,
+        real_graph,
+        &ConsumedAxes::from_grid(grid, Orientation::Tb),
+    )
+}
+
+/// Insert cross-axis clamps + cross-rank `pb:` segments into `plan`.
+///
+/// No-op when `axes.cross_ids` is empty (the §10 single gate). Errors when a
+/// group's members span more than one cross-axis cell.
+pub fn insert_partition_cross_boundaries(
+    plan: &mut PlanGraph,
+    real_graph: &RealGraph,
+    axes: &ConsumedAxes,
+) -> Result<(), LayoutError> {
+    if !plan.partition_columns.is_empty() {
+        return Ok(()); // already inserted (retry path re-runs compose)
+    }
+    if axes.cross_ids.is_empty() {
         return Ok(());
     }
-    let columns: Vec<String> = grid.columns.iter().map(|a| a.id.clone()).collect();
+    let columns = axes.cross_ids.clone();
     let col_index: BTreeMap<&str, usize> = columns
         .iter()
         .enumerate()
         .map(|(i, c)| (c.as_str(), i))
         .collect();
 
-    // dense real index -> column index (validated against the grid at the
-    // layout entry, so every column id resolves).
+    // dense real index -> cross-axis index (validated at layout entry).
     let dense_col: Vec<Option<usize>> = real_graph
         .partition_cell
         .iter()
         .map(|cell| {
             cell.as_ref()
-                .and_then(|c| c.column.as_deref())
+                .and_then(|c| cell_on(c, axes.cross))
                 .map(|c| col_index[c])
         })
         .collect();
@@ -81,9 +95,11 @@ pub fn insert_partition_boundaries(
             let mut names: Vec<&String> = cis.iter().map(|ci| &columns[*ci]).collect();
             names.sort();
             return Err(LayoutError::message(format!(
-                "hierarchical: group `{g}` members span partition columns {names:?} — \
-                 partition consumption (PG-1) supports only single-column groups \
-                 (partition-grid.md §7 PG-1)"
+                "hierarchical: group `{g}` members span partition {} {names:?} — \
+                 partition consumption supports only single-{} groups \
+                 (partition-grid.md §7 PG-1)",
+                axes.cross.as_noun(),
+                axes.cross.as_noun()
             )));
         }
     }
@@ -165,7 +181,7 @@ pub fn insert_partition_boundaries(
         for (ci, column) in columns.iter().enumerate() {
             for side in [BoundarySide::Left, BoundarySide::Right] {
                 let key = ElemKey::PartitionBoundary {
-                    column: column.clone(),
+                    axis: column.clone(),
                     rank: rank_u,
                     side,
                 };
@@ -181,6 +197,7 @@ pub fn insert_partition_boundaries(
                 boundary_elem.insert((ci, rank_u, side), idx);
                 // Clamps are block markers, never owned content.
                 partition_elem_col.push(None);
+                plan.partition_elem_row.push(None);
             }
         }
     }
@@ -235,7 +252,56 @@ pub fn insert_partition_boundaries(
     }
 
     plan.partition_columns = columns;
+    plan.partition_cross_kind = axes.cross;
     plan.partition_elem_col = partition_elem_col;
+    Ok(())
+}
+
+/// StrongMacro / pre-flight: groups may not span ≥2 cross-axis cells.
+pub fn check_groups_single_cross_cell(
+    real_graph: &RealGraph,
+    axes: &ConsumedAxes,
+) -> Result<(), LayoutError> {
+    if axes.cross_ids.is_empty() {
+        return Ok(());
+    }
+    let col_index: BTreeMap<&str, usize> = axes
+        .cross_ids
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.as_str(), i))
+        .collect();
+    let mut group_cols: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+    for (i, path) in real_graph.group_path.iter().enumerate() {
+        let Some(cell) = real_graph.partition_cell.get(i).and_then(|c| c.as_ref()) else {
+            continue;
+        };
+        let Some(id) = cell_on(cell, axes.cross) else {
+            continue;
+        };
+        let Some(&ci) = col_index.get(id) else {
+            continue;
+        };
+        for g in path {
+            let entry = group_cols.entry(g.clone()).or_default();
+            if !entry.contains(&ci) {
+                entry.push(ci);
+            }
+        }
+    }
+    for (g, cis) in &group_cols {
+        if cis.len() >= 2 {
+            let mut names: Vec<&String> = cis.iter().map(|ci| &axes.cross_ids[*ci]).collect();
+            names.sort();
+            return Err(LayoutError::message(format!(
+                "hierarchical: group `{g}` members span partition {} {names:?} — \
+                 partition consumption supports only single-{} groups \
+                 (partition-grid.md §7 PG-1)",
+                axes.cross.as_noun(),
+                axes.cross.as_noun()
+            )));
+        }
+    }
     Ok(())
 }
 
@@ -295,8 +361,8 @@ mod tests {
             .iter()
             .map(|&ei| match &plan.elems[ei].key {
                 ElemKey::Real(id) => id.clone(),
-                ElemKey::PartitionBoundary { column, side, .. } => format!(
-                    "pb:{column}:{}",
+                ElemKey::PartitionBoundary { axis, side, .. } => format!(
+                    "pb:{axis}:{}",
                     match side {
                         BoundarySide::Left => "L",
                         BoundarySide::Right => "R",

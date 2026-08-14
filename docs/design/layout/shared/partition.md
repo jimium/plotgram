@@ -1,6 +1,6 @@
 # PartitionGrid（正交分区）
 
-> 状态：现行契约（model/DSL 已定；引擎消费 **planned** → 实施方案见下）  
+> 状态：现行契约（model/DSL 已定；Hier 引擎消费 **已落地**，PG-0–PG-4；render 泳道底色后置）  
 > ADR：[008-partition-grid](../../adr/008-partition-grid.md)  
 > 实施方案：[hierarchical/phases/partition-grid.md](../hierarchical/phases/partition-grid.md)（PG-0–PG-4）  
 > Model：`plotgram_model::partition`  
@@ -52,7 +52,7 @@ TB 流向（rank 沿 y）
 |--------|------|
 | 轴声明序、轴 id/label | DSL → model（作者） |
 | `partition_cell` | DSL → lift（作者）；引擎只读 |
-| 列/行像素区间 | 度量相（planned） |
+| 列/行像素区间 | 度量相（已落地：列带 VPSC；行带 = 主轴层堆叠 y 并集） |
 | 组框 | 仍由 group 度量路径写；与列区间可对齐但真源不混 |
 
 ## 5. DSL / Model 摘要

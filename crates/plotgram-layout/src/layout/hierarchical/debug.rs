@@ -11,7 +11,7 @@
 use std::collections::BTreeMap;
 
 use plotgram_engine_api::{LayoutError, LayoutInput};
-use plotgram_model::diagnostics::PartitionBandObs;
+use plotgram_model::diagnostics::{PartitionBandObs, PartitionRowBandObs};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::graph::Graph;
 use serde::Serialize;
@@ -53,6 +53,8 @@ pub struct Captures<'a> {
     /// Consumed partition column bands, physical coordinates (partition-grid
     /// .md PG-2); empty when the grid is not consumed.
     pub partition_bands: Vec<PartitionBandObs>,
+    /// Consumed partition row bands, physical coordinates (PG-3).
+    pub partition_row_bands: Vec<PartitionRowBandObs>,
 }
 
 // ── Envelope (debug-inspector.md §5, debug-profile.md §2) ─────────
@@ -117,12 +119,24 @@ pub struct HierarchicalExtension {
     /// (partition-grid.md PG-2); absent when the grid is not consumed.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub partition_bands: Vec<PartitionBandDebug>,
+    /// Consumed partition row bands, physical main-axis intervals (PG-3).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub partition_row_bands: Vec<PartitionRowBandDebug>,
 }
 
 /// One consumed partition column band (partition-grid.md PG-2).
 #[derive(Debug, Clone, Serialize)]
 pub struct PartitionBandDebug {
     pub column: String,
+    pub band: Band,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub empty: bool,
+}
+
+/// One consumed partition row band (partition-grid.md PG-3).
+#[derive(Debug, Clone, Serialize)]
+pub struct PartitionRowBandDebug {
+    pub row: String,
     pub band: Band,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub empty: bool,
@@ -171,7 +185,7 @@ pub enum ElemKeyDebug {
     },
     #[serde(rename = "partition-boundary")]
     PartitionBoundary {
-        column: String,
+        axis: String,
         side: &'static str,
         rank: u32,
     },
@@ -311,9 +325,9 @@ fn project(layout_name: &str, cap: Captures<'_>) -> LayoutDebugTrace {
                     },
                     vec!["group-boundary"],
                 ),
-                ElemKey::PartitionBoundary { column, rank, side } => (
+                ElemKey::PartitionBoundary { axis, rank, side } => (
                     ElemKeyDebug::PartitionBoundary {
-                        column: column.clone(),
+                        axis: axis.clone(),
                         side: match side {
                             crate::layout::hierarchical::model::BoundarySide::Left => "left",
                             crate::layout::hierarchical::model::BoundarySide::Right => "right",
@@ -477,6 +491,18 @@ fn project(layout_name: &str, cap: Captures<'_>) -> LayoutDebugTrace {
                     empty: b.empty,
                 })
                 .collect(),
+            partition_row_bands: cap
+                .partition_row_bands
+                .iter()
+                .map(|b| PartitionRowBandDebug {
+                    row: b.row.clone(),
+                    band: Band {
+                        start: b.start,
+                        end: b.end,
+                    },
+                    empty: b.empty,
+                })
+                .collect(),
         },
         notes: vec![
             "hierarchical: D1.3 Channel (RouteOrder + Gate/ScopeMask + bounded rip-up)".to_string(),
@@ -500,8 +526,8 @@ fn elem_key_debug(key: &ElemKey) -> ElemKeyDebug {
             },
             rank: *rank,
         },
-        ElemKey::PartitionBoundary { column, rank, side } => ElemKeyDebug::PartitionBoundary {
-            column: column.clone(),
+        ElemKey::PartitionBoundary { axis, rank, side } => ElemKeyDebug::PartitionBoundary {
+            axis: axis.clone(),
             side: match side {
                 crate::layout::hierarchical::model::BoundarySide::Left => "left",
                 crate::layout::hierarchical::model::BoundarySide::Right => "right",

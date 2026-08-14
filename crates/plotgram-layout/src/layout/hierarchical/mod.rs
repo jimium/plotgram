@@ -31,15 +31,17 @@ use plotgram_algo::orientation::{self as algo_orient, Orientation as AlgoOrienta
 use plotgram_engine_api::{
     EdgeGeometryMode, LayoutAlgorithm, LayoutError, LayoutInput, LayoutOutput, LayoutWarning,
 };
-use plotgram_model::diagnostics::{HierarchicalObs, LayoutDiagnostics, PartitionBandObs};
+use plotgram_model::diagnostics::{
+    HierarchicalObs, LayoutDiagnostics, PartitionBandObs, PartitionRowBandObs,
+};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::port::{AlongSpec, PortRef};
 use plotgram_model::result::{EdgePath, EdgePlacement, GroupPlacement, NodePlacement};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub use params::{
-    BindResult, GroupPolicy, HierarchicalParams, HierarchicalPreset, Orientation, RoutingStyle,
-    SymmetryPlace,
+    BindResult, GroupPolicy, HierarchicalParams, HierarchicalPreset, Orientation,
+    PartitionUnassigned, RoutingStyle, SymmetryPlace,
 };
 
 use compose::ports::{EdgePorts, ResolvedPort};
@@ -76,7 +78,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
 
     // Diagnostics exit (roadmap phase C): bind warnings surface here instead
     // of being dropped; hard failures above/below stay hard failures.
-    let mut diagnostics = LayoutDiagnostics {
+    let diagnostics = LayoutDiagnostics {
         warnings: bound
             .warnings
             .iter()
@@ -102,45 +104,23 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         .validate_partition()
         .map_err(|e| LayoutError::message(format!("hierarchical: invalid partition grid: {e}")))?;
 
-    let orientation = orient::to_algo_orientation(params.orientation);
-
-    // PG-1 single consumption gate (partition-grid.md §7): a grid with
-    // columns is consumed only in canonical TB space (TB/BT) under Weak.
-    // Everything outside the gate is either a hard failure (never silent)
-    // or a declared non-consumption warning — no partition code path runs
-    // when the gate is closed (§10 discipline).
-    let has_partition_columns = input
-        .graph
-        .partition
-        .as_ref()
-        .map_or(false, |g| !g.columns.is_empty());
-    let vertical = params.orientation.is_vertical();
-    if has_partition_columns {
-        if params.group_policy == GroupPolicy::StrongMacro {
-            return Err(LayoutError::message(
-                "hierarchical: partition 暂不支持 strong-macro，见 partition-grid.md PG-4",
-            ));
-        }
-        if !vertical {
-            diagnostics.warnings.push(LayoutWarning {
-                message: "hierarchical: partition columns are not consumed in \
-                          left-to-right / right-to-left orientations (PG-4)"
-                    .to_string(),
-            });
-        }
-        if input
-            .graph
-            .partition
-            .as_ref()
-            .map_or(false, |g| !g.rows.is_empty())
-        {
-            diagnostics.warnings.push(LayoutWarning {
-                message: "hierarchical: partition rows are not consumed yet \
-                          (cell_row ignored, PG-3)"
-                    .to_string(),
-            });
+    if params.partition_unassigned == PartitionUnassigned::Reject {
+        if let Some(grid) = &input.graph.partition {
+            if !grid.is_empty() {
+                for n in input.graph.all_nodes() {
+                    if n.partition_cell.as_ref().map_or(true, |c| c.is_empty()) {
+                        return Err(LayoutError::message(format!(
+                            "hierarchical: node `{}` has no partition cell \
+                             (partition_unassigned=reject)",
+                            n.id
+                        )));
+                    }
+                }
+            }
         }
     }
+
+    let orientation = orient::to_algo_orientation(params.orientation);
 
     // FAS runs once per policy; the StrongMacro front branches right after
     // (its ranking happens per block / super-graph, never globally).
@@ -190,11 +170,27 @@ fn compute_weak<'g>(
     canonical_size: Vec<algo_orient::Size>,
 ) -> Result<(LayoutOutput, debug::Captures<'g>), LayoutError> {
     // --- Compose ---------------------------------------------------
-    let ranks = compose::rank::assign_ranks(&real_graph)?;
+    let mut ranks = compose::rank::assign_ranks(&real_graph)?;
+    let axes = real_graph
+        .partition
+        .as_ref()
+        .map(|g| compose::partition_axes::ConsumedAxes::from_grid(g, orientation));
+    let main_rank_plan = if let Some(axes) = &axes {
+        compose::partition_rank::clamp_partition_main_ranks(&real_graph, &mut ranks, axes)?
+    } else {
+        None
+    };
     // Undirected edges: zero-span ones bypass ordering/properify/channel into
     // `intra_layer` (Ink side-links); the rest flow as normal downward edges.
     compose::properify::split_intra_layer(&mut real_graph, &ranks);
     let mut plan = compose::properify::properify(&real_graph, &ranks);
+    if let Some(axes) = &axes {
+        plan.partition_cross_kind = axes.cross;
+        plan.partition_main_kind = axes.main;
+    }
+    if let (Some(axes), Some(rp)) = (axes.as_ref(), main_rank_plan.as_ref()) {
+        compose::partition_rank::apply_main_rank_plan(&mut plan, &real_graph, axes, rp);
+    }
     // Author edge weights feed P3 ordering (edge-parameters §2.5).
     let edge_weights: std::collections::BTreeMap<String, f64> = real_graph
         .edges
@@ -202,16 +198,14 @@ fn compute_weak<'g>(
         .map(|e| (e.edge_id.clone(), e.weight))
         .collect();
     compose::boundary::insert_group_boundaries(&mut plan);
-    // PG-1: partition column clamps ride on top of group clamps (group blocks
-    // nest inside column blocks; a group spanning ≥2 columns fails inside).
-    // Runs only in canonical TB space under Weak — the gate in `compute()`
-    // already rejected StrongMacro and warned LR/RL; no grid / no columns
+    // Cross-axis clamps (TB/BT → columns, LR/RL → rows). Empty cross_ids
     // early-exits inside (idempotent on the CHANNEL_FORCE_ROOT retry pass).
-    if matches!(
-        orientation,
-        algo_orient::Orientation::Tb | algo_orient::Orientation::Bt
-    ) {
-        compose::partition_boundary::insert_partition_boundaries(&mut plan, &real_graph)?;
+    if let Some(axes) = &axes {
+        compose::partition_boundary::insert_partition_cross_boundaries(
+            &mut plan,
+            &real_graph,
+            axes,
+        )?;
     }
     let reversed_edges: std::collections::BTreeSet<String> = real_graph
         .edges
@@ -358,6 +352,7 @@ fn compute_channel_ink_tail<'g>(
         layer_gaps: Vec::new(),
         gate_capacity_seams: 0,
         partition_bands: Vec::new(),
+        partition_row_bands: Vec::new(),
     });
     compose::verify::verify_plan(&plan, &real_graph, &ports, &route_plan)?;
 
@@ -426,6 +421,7 @@ fn compute_channel_ink_tail<'g>(
             {
                 demand::publish_partition_band_demand(&mut demand_board, &bands);
             }
+            demand::publish_partition_row_gap_demand(&mut demand_board, &plan);
             demand_board.freeze();
             let layer_gaps =
                 demand::resolved_layer_gaps(plan.layers.len(), params.layer_gap, &demand_board);
@@ -681,24 +677,44 @@ fn compute_channel_ink_tail<'g>(
             .collect(),
     };
 
-    // PG-2: project the solved partition band intervals into physical
-    // space (partition-grid.md). Pure observation — geometry is already
-    // final; the consumption gate guarantees TB/BT, so the physical cross
-    // axis is canonical x + the normalize shift. Unconsumed plans return
-    // an empty Vec (the §10 single gate), Strong never reaches here with a
-    // grid (entry hard-fails).
-    let partition_bands: Vec<PartitionBandObs> =
-        metric::partition_bands::band_coords(&plan, &cross)
-            .into_iter()
-            .map(|b| PartitionBandObs {
-                column: b.column,
-                start: b.start + shift.0,
-                end: b.end + shift.0,
-                empty: b.empty,
-            })
-            .collect();
+    // PG-2/PG-3: project solved partition band intervals into physical
+    // space. Column obs always physical x (left→right); row obs always
+    // physical y (top→bottom). Cross/main mapping follows orientation.
+    let layer_gaps_for_rows: &[f64] = diagnostics
+        .hierarchical
+        .as_ref()
+        .map(|h| h.layer_gaps.as_slice())
+        .unwrap_or(&[]);
+    let has_clamps = plan.elems.iter().any(|e| e.key.is_partition_boundary());
+    let (cross_bands, main_bands) = if has_clamps {
+        (
+            metric::partition_bands::band_coords(&plan, &cross),
+            metric::partition_bands::row_band_coords(
+                &plan,
+                &main,
+                &size_of,
+                layer_gaps_for_rows,
+            ),
+        )
+    } else if !plan.partition_columns.is_empty() || !plan.partition_rows.is_empty() {
+        metric::partition_bands::band_coords_from_member_frames(
+            &plan,
+            &canonical_frames,
+            params.node_gap,
+        )
+    } else {
+        (Vec::new(), Vec::new())
+    };
+    let (partition_bands, partition_row_bands) = project_partition_obs(
+        plan.partition_cross_kind,
+        &cross_bands,
+        &main_bands,
+        orientation,
+        shift,
+    );
     if let Some(obs) = diagnostics.hierarchical.as_mut() {
         obs.partition_bands = partition_bands.clone();
+        obs.partition_row_bands = partition_row_bands.clone();
     }
 
     let channel_track_count = route_plan.substrate.tracks().count();
@@ -728,6 +744,7 @@ fn compute_channel_ink_tail<'g>(
         channel_route_order,
         shift,
         partition_bands,
+        partition_row_bands,
     };
 
     Ok((
@@ -934,6 +951,123 @@ pub(crate) fn canonical_rect_to_physical(o: AlgoOrientation, r: Rect) -> Rect {
         .map(|p| p.y)
         .fold(f64::NEG_INFINITY, f64::max);
     Rect::new(min_x, min_y, max_x - min_x, max_y - min_y)
+}
+
+fn sorted_pair(a: f64, b: f64) -> (f64, f64) {
+    if a <= b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
+fn canonical_x_to_physical_x(
+    o: AlgoOrientation,
+    start: f64,
+    end: f64,
+    shift: (f64, f64),
+) -> (f64, f64) {
+    let p = canonical_rect_to_physical(o, Rect::new(start, 0.0, (end - start).max(0.0), 1.0));
+    sorted_pair(p.x + shift.0, p.right() + shift.0)
+}
+
+fn canonical_y_to_physical_y(
+    o: AlgoOrientation,
+    start: f64,
+    end: f64,
+    shift: (f64, f64),
+) -> (f64, f64) {
+    let p = canonical_rect_to_physical(o, Rect::new(0.0, start, 1.0, (end - start).max(0.0)));
+    sorted_pair(p.y + shift.1, p.bottom() + shift.1)
+}
+
+fn canonical_y_to_physical_x(
+    o: AlgoOrientation,
+    start: f64,
+    end: f64,
+    shift: (f64, f64),
+) -> (f64, f64) {
+    let p = canonical_rect_to_physical(o, Rect::new(0.0, start, 1.0, (end - start).max(0.0)));
+    sorted_pair(p.x + shift.0, p.right() + shift.0)
+}
+
+fn canonical_x_to_physical_y(
+    o: AlgoOrientation,
+    start: f64,
+    end: f64,
+    shift: (f64, f64),
+) -> (f64, f64) {
+    let p = canonical_rect_to_physical(o, Rect::new(start, 0.0, (end - start).max(0.0), 1.0));
+    sorted_pair(p.y + shift.1, p.bottom() + shift.1)
+}
+
+fn project_partition_obs(
+    cross_kind: model::PartitionAxisKind,
+    cross_bands: &[metric::partition_bands::PartitionBandCoords],
+    main_bands: &[metric::partition_bands::PartitionRowBandCoords],
+    orientation: AlgoOrientation,
+    shift: (f64, f64),
+) -> (Vec<PartitionBandObs>, Vec<PartitionRowBandObs>) {
+    match cross_kind {
+        model::PartitionAxisKind::Columns => {
+            let cols = cross_bands
+                .iter()
+                .map(|b| {
+                    let (start, end) =
+                        canonical_x_to_physical_x(orientation, b.start, b.end, shift);
+                    PartitionBandObs {
+                        column: b.column.clone(),
+                        start,
+                        end,
+                        empty: b.empty,
+                    }
+                })
+                .collect();
+            let rows = main_bands
+                .iter()
+                .map(|b| {
+                    let (start, end) =
+                        canonical_y_to_physical_y(orientation, b.start, b.end, shift);
+                    PartitionRowBandObs {
+                        row: b.row.clone(),
+                        start,
+                        end,
+                        empty: b.empty,
+                    }
+                })
+                .collect();
+            (cols, rows)
+        }
+        model::PartitionAxisKind::Rows => {
+            let cols = main_bands
+                .iter()
+                .map(|b| {
+                    let (start, end) =
+                        canonical_y_to_physical_x(orientation, b.start, b.end, shift);
+                    PartitionBandObs {
+                        column: b.row.clone(),
+                        start,
+                        end,
+                        empty: b.empty,
+                    }
+                })
+                .collect();
+            let rows = cross_bands
+                .iter()
+                .map(|b| {
+                    let (start, end) =
+                        canonical_x_to_physical_y(orientation, b.start, b.end, shift);
+                    PartitionRowBandObs {
+                        row: b.column.clone(),
+                        start,
+                        end,
+                        empty: b.empty,
+                    }
+                })
+                .collect();
+            (cols, rows)
+        }
+    }
 }
 
 /// `NormalizeStage`: uniform whole-graph translate so the drawing starts at
@@ -1160,8 +1294,8 @@ mod tests {
         }
     }
 
-    /// PG-1 gate rulings: StrongMacro + grid fails hard; LR orientation and
-    /// declared rows do not block layout — they surface as warnings only.
+    /// PG-4 gate: StrongMacro + grid lays out (bands after expand);
+    /// LR consumes rows as cross / columns as main; rows are consumed (PG-3).
     #[test]
     fn partition_consumption_gate_boundaries() {
         use plotgram_model::partition::{PartitionAxis, PartitionGrid};
@@ -1209,18 +1343,22 @@ mod tests {
                 .collect()
         };
 
-        // StrongMacro + grid → hard failure, never silent.
-        let err = run(
+        // StrongMacro + grid → lays out (PG-4); unassigned node is free zone.
+        let out = run(
             &graph_with_grid(false),
             opts(&[("group_policy", "strong-macro")]),
         )
-        .expect_err("strong-macro + partition must fail hard");
+        .expect("strong-macro + partition must lay out");
         assert!(
-            err.to_string().contains("strong-macro"),
-            "unexpected error: {err}"
+            out.diagnostics
+                .warnings
+                .iter()
+                .all(|w| !w.message.contains("not consumed")),
+            "strong-macro should consume: {:?}",
+            out.diagnostics.warnings
         );
 
-        // LR + grid → not consumed (columns are the main axis there), warning.
+        // LR + columns-only → columns consumed as main-axis; no warning.
         let out = run(
             &graph_with_grid(false),
             opts(&[("orientation", "left-to-right")]),
@@ -1230,20 +1368,34 @@ mod tests {
             out.diagnostics
                 .warnings
                 .iter()
-                .any(|w| w.message.contains("not consumed in")),
-            "missing LR non-consumption warning: {:?}",
+                .all(|w| !w.message.contains("not consumed")),
+            "LR should consume: {:?}",
             out.diagnostics.warnings
         );
 
-        // Rows declared → columns still consumed, cell_row warned (PG-3).
+        // Rows declared → consumed (PG-3), no warning.
         let out = run(&graph_with_grid(true), opts(&[])).expect("rows + TB weak must lay out");
         assert!(
             out.diagnostics
                 .warnings
                 .iter()
-                .any(|w| w.message.contains("rows are not consumed")),
-            "missing rows non-consumption warning: {:?}",
+                .all(|w| !w.message.contains("not consumed")),
+            "rows should be consumed: {:?}",
             out.diagnostics.warnings
+        );
+        let obs = out.diagnostics.hierarchical.as_ref().unwrap();
+        assert_eq!(obs.partition_row_bands.len(), 1);
+        assert!(obs.partition_row_bands[0].empty);
+
+        // partition_unassigned=reject with a free node fails hard.
+        let err = run(
+            &graph_with_grid(false),
+            opts(&[("partition_unassigned", "reject")]),
+        )
+        .expect_err("reject + unassigned node must fail");
+        assert!(
+            err.to_string().contains("partition_unassigned=reject"),
+            "unexpected: {err}"
         );
     }
 
@@ -1513,5 +1665,154 @@ mod tests {
             none.diagnostics, empty_grid.diagnostics,
             "diagnostics must be bit-identical"
         );
+    }
+
+    /// PG-3: a 2×2 matrix packs rows in declaration order and keeps columns
+    /// as cross-axis bands.
+    #[test]
+    fn matrix_row_bands_follow_declaration_order() {
+        use plotgram_model::partition::{PartitionAxis, PartitionCell, PartitionGrid};
+
+        let node = |id: &str, col: &str, row: &str| Node {
+            id: id.to_string(),
+            label: None,
+            shape: None,
+            role: NodeRole::Entity,
+            host_group: None,
+            anchor: None,
+            partition_cell: Some(PartitionCell::at(col, row)),
+            attrs: AttrMap::new(),
+        };
+        let graph = Graph {
+            nodes: vec![
+                node("a0", "left", "top"),
+                node("b0", "right", "top"),
+                node("a1", "left", "bot"),
+                node("b1", "right", "bot"),
+            ],
+            edges: vec![
+                edge("e0", "a0", "a1"),
+                edge("e1", "b0", "b1"),
+            ],
+            groups: vec![],
+            partition: Some(PartitionGrid {
+                columns: vec![PartitionAxis::new("left"), PartitionAxis::new("right")],
+                rows: vec![PartitionAxis::new("top"), PartitionAxis::new("bot")],
+            }),
+        };
+        let mut sizes = NodeSizes::new();
+        for id in ["a0", "b0", "a1", "b1"] {
+            sizes.insert(id, Size::new(60.0, 30.0));
+        }
+        let out = HierarchicalLayout
+            .layout(LayoutInput {
+                graph: &graph,
+                node_sizes: &sizes,
+                options: &AttrMap::new(),
+                edge_geometry: EdgeGeometryMode::Builtin,
+            })
+            .expect("matrix layout");
+        let obs = out.diagnostics.hierarchical.as_ref().unwrap();
+        assert_eq!(
+            obs.partition_bands
+                .iter()
+                .map(|b| b.column.as_str())
+                .collect::<Vec<_>>(),
+            vec!["left", "right"]
+        );
+        assert_eq!(
+            obs.partition_row_bands
+                .iter()
+                .map(|b| b.row.as_str())
+                .collect::<Vec<_>>(),
+            vec!["top", "bot"]
+        );
+        let frame = |id: &str| out.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        assert!(frame("a0").right() <= frame("b0").x + 1e-6);
+        assert!(frame("a0").bottom() <= frame("a1").y + 1e-6);
+        let top = &obs.partition_row_bands[0];
+        let bot = &obs.partition_row_bands[1];
+        assert!(top.end <= bot.start + 1e-6, "row bands must not invert");
+        for id in ["a0", "b0"] {
+            let f = frame(id);
+            assert!(f.y + 1e-6 >= top.start && f.bottom() <= top.end + 1e-6);
+        }
+        for id in ["a1", "b1"] {
+            let f = frame(id);
+            assert!(f.y + 1e-6 >= bot.start && f.bottom() <= bot.end + 1e-6);
+        }
+    }
+
+    /// PG-4: the same 2-column grid round-trips across four orientations —
+    /// members stay inside the physical column band (x) after OrientationOut.
+    #[test]
+    fn partition_four_orientation_round_trip() {
+        use plotgram_model::partition::{PartitionAxis, PartitionCell, PartitionGrid};
+
+        let node = |id: &str, col: &str| Node {
+            id: id.to_string(),
+            label: None,
+            shape: None,
+            role: NodeRole::Entity,
+            host_group: None,
+            anchor: None,
+            partition_cell: Some(PartitionCell::col(col)),
+            attrs: AttrMap::new(),
+        };
+        let graph = Graph {
+            nodes: vec![
+                node("l", "left"),
+                node("r", "right"),
+            ],
+            edges: vec![edge("e0", "l", "r")],
+            groups: vec![],
+            partition: Some(PartitionGrid {
+                columns: vec![PartitionAxis::new("left"), PartitionAxis::new("right")],
+                rows: vec![],
+            }),
+        };
+        let mut sizes = NodeSizes::new();
+        sizes.insert("l", Size::new(60.0, 30.0));
+        sizes.insert("r", Size::new(60.0, 30.0));
+        for ori in [
+            "top-to-bottom",
+            "bottom-to-top",
+            "left-to-right",
+            "right-to-left",
+        ] {
+            let mut options = AttrMap::new();
+            options.insert("orientation".into(), AttrValue::Str(ori.into()));
+            let out = HierarchicalLayout
+                .layout(LayoutInput {
+                    graph: &graph,
+                    node_sizes: &sizes,
+                    options: &options,
+                    edge_geometry: EdgeGeometryMode::Builtin,
+                })
+                .unwrap_or_else(|e| panic!("{ori}: {e}"));
+            let obs = out.diagnostics.hierarchical.as_ref().unwrap();
+            assert_eq!(
+                obs.partition_bands.len(),
+                2,
+                "{ori}: expected 2 column bands, got {:?}",
+                obs.partition_bands
+            );
+            assert_eq!(obs.partition_bands[0].column, "left");
+            assert_eq!(obs.partition_bands[1].column, "right");
+            let frame = |id: &str| out.nodes.iter().find(|n| n.id == id).unwrap().frame;
+            for (id, ci) in [("l", 0usize), ("r", 1)] {
+                let f = frame(id);
+                let b = &obs.partition_bands[ci];
+                assert!(
+                    f.x + 1e-4 >= b.start && f.right() <= b.end + 1e-4,
+                    "{ori}: node `{id}` x=[{:.3},{:.3}] escapes band {} [{:.3},{:.3}]",
+                    f.x,
+                    f.right(),
+                    b.column,
+                    b.start,
+                    b.end
+                );
+            }
+        }
     }
 }

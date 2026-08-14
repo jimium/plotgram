@@ -115,7 +115,7 @@
 | 密边、弯多、扇出扇入重的流程图 | `weak`（默认） | 软聚类 + D₁ 走廊；框由 Metric Fit 写真源（D₂ 已落地），不与 Strong 舞台争语义 |
 | Weak 下组框合法性可证（不穿组、兄弟分隔） | `weak`（**D₂ 已关闭**） | 框进 Metric + sibling 硬分隔 + 穿组硬门禁；存量穿组见 C 类 `d2-exempt`（[group-frame-d2](phases/group-frame-d2.md)）。**不是**再做 StrongMacro |
 | 架构图舞台感：子系统严格分区、上下叠放同轴 | `strong-macro`（已落地） | 宏收缩：框由 MacroBlockWriter 一次写定；跨组边走行缝 demand + 行对齐（[strong-macro.md](phases/strong-macro.md)）。泳道/矩阵另属 PartitionGrid（[partition-grid](phases/partition-grid.md)），勿用 group 冒充 |
-| 泳道 / 矩阵（全局列行、跨列 rank 对齐） | PartitionGrid（引擎消费进行中） | DSL `partition` + `cell_*`；方案 PG-0–PG-4；**禁止** group Horizontal 冒充 |
+| 泳道 / 矩阵（全局列行、跨列 rank 对齐） | PartitionGrid（引擎已消费） | DSL `partition` + `cell_*`；PG-0–PG-4 已落地；render 底色后置；**禁止** group Horizontal 冒充 |
 
 **用户应能指着说**：strong 图里每个子系统是一块独立舞台；weak 图里组跟着节点，但框包得住、兄弟不叠，穿组在回归里被硬拦（豁免须显式标注）。
 

@@ -38,7 +38,8 @@ HierarchicalExtension {
   ports: PortDebug[]
   channels: ChannelDebug?      # 未实现 → null，notes 说明
   metrics: MetricDebug?
-  partition_bands: PartitionBandDebug[]   # PG-2；未消费 partition → 不发键
+  partition_bands: PartitionBandDebug[]       # PG-2；未消费 partition → 不发键
+  partition_row_bands: PartitionRowBandDebug[] # PG-3；未消费 rows → 不发键
 }
 ```
 
@@ -126,9 +127,15 @@ MetricDebug {
 }
 
 PartitionBandDebug {           # 已消费列带（partition-grid.md PG-2）
-  column: string               # 声明序 = 几何左→右（TB）
-  band: { start: f64, end: f64 }  # physical cross-axis 区间
+  column: string               # 声明序 = 几何左→右
+  band: { start: f64, end: f64 }  # physical x 区间
   empty?: bool                 # 无成员列（最小宽保留），false 不发
+}
+
+PartitionRowBandDebug {        # 已消费行带（partition-grid.md PG-3）
+  row: string                  # 声明序 = 几何上→下
+  band: { start: f64, end: f64 }  # physical y 区间
+  empty?: bool
 }
 ```
 
@@ -162,6 +169,7 @@ Common 层 `product` / `groups` 由壳提供，本核不重复注册。
 | 组框 metric 真源 | M4 |
 | channels | M3 |
 | partition band（extension.partition_bands） | PG-2 已落地 |
+| partition row band（extension.partition_row_bands） | PG-3 已落地 |
 
 ---
 

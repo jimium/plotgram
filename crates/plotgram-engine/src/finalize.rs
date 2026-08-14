@@ -23,7 +23,7 @@ pub fn finalize(
     mut edges: Vec<EdgePlacement>,
     mut groups: Vec<GroupPlacement>,
     owns_group_frames: bool,
-    diagnostics: LayoutDiagnostics,
+    mut diagnostics: LayoutDiagnostics,
 ) -> LayoutResult {
     // Write authority (group-frame-d2.md §6.2 / §6.3): layouts that own group
     // geometry set `owns_group_frames` — pass through even when empty. Only
@@ -50,6 +50,18 @@ pub fn finalize(
         for g in &mut groups {
             g.frame.x += dx;
             g.frame.y += dy;
+        }
+        // Partition band obs is emitted in layout-normalized space; keep it
+        // in the same physical frame as node/group rects after canvas pad.
+        if let Some(obs) = diagnostics.hierarchical.as_mut() {
+            for b in &mut obs.partition_bands {
+                b.start += dx;
+                b.end += dx;
+            }
+            for b in &mut obs.partition_row_bands {
+                b.start += dy;
+                b.end += dy;
+            }
         }
     }
 

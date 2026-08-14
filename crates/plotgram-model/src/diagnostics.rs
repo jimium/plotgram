@@ -53,22 +53,40 @@ pub struct HierarchicalObs {
     #[serde(default)]
     pub layer_gaps: Vec<f64>,
     /// Consumed partition column bands (partition-grid.md PG-2). Cross-axis
-    /// intervals in **physical** coordinates (post normalize shift); empty
-    /// when the partition grid is not consumed (the §10 single gate).
+    /// intervals in **physical** coordinates, same space as node frames in
+    /// `LayoutResult` (layout normalize + engine canvas pad). Empty when the
+    /// partition grid is not consumed (the §10 single gate).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub partition_bands: Vec<PartitionBandObs>,
+    /// Consumed partition row (main-axis) bands (partition-grid.md PG-3).
+    /// Physical y intervals, same space as node frames in `LayoutResult`.
+    /// Empty when rows are not consumed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub partition_row_bands: Vec<PartitionRowBandObs>,
 }
 
 /// One consumed partition column's band (partition-grid.md PG-2).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartitionBandObs {
-    /// Column axis id, declaration order = geometric left→right (TB).
+    /// Column axis id, declaration order = geometric left→right.
     pub column: String,
     /// Cross-axis band interval, physical coordinates (post normalize shift).
     pub start: f64,
     pub end: f64,
     /// Column has no assigned member anywhere (kept via the empty-band
     /// minimum width).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub empty: bool,
+}
+
+/// One consumed partition row's band (partition-grid.md PG-3).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartitionRowBandObs {
+    /// Row axis id, declaration order = geometric top→bottom.
+    pub row: String,
+    /// Main-axis band interval, physical coordinates (post normalize shift).
+    pub start: f64,
+    pub end: f64,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub empty: bool,
 }

@@ -217,8 +217,8 @@ pub(super) fn expand(
                 ElemKey::GroupBoundary { .. }
                 | ElemKey::PartitionBoundary { .. }
                 | ElemKey::OrderPad { .. } => {
-                    // StrongMacro plans never insert boundaries / pads
-                    // (partition + strong-macro hard-fails at the entry gate).
+                    // StrongMacro plans do not insert boundary / pad elems
+                    // (bands are Fit envelopes after expand).
                     unreachable!("strong-macro plan carries no boundary elems");
                 }
             }

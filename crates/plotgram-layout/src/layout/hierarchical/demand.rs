@@ -306,6 +306,37 @@ pub fn publish_partition_band_demand(board: &mut DemandBoard, bands: &PartitionB
     }
 }
 
+/// Empty main-axis bands raise the dummy-rank seam to the empty-band floor
+/// (partition-grid.md PG-3). Non-empty rows do not publish — stacking already
+/// sizes them from member heights.
+pub fn publish_partition_row_gap_demand(board: &mut DemandBoard, plan: &PlanGraph) {
+    if plan.partition_rows.is_empty() {
+        return;
+    }
+    let n_layers = plan.layers.len();
+    for (ri, _) in plan.partition_rows.iter().enumerate() {
+        let empty = plan
+            .partition_elem_row
+            .iter()
+            .zip(plan.elems.iter())
+            .all(|(slot, elem)| *slot != Some(ri) || !matches!(elem.key, ElemKey::Real(_)));
+        if !empty {
+            continue;
+        }
+        let (lo, _) = plan
+            .partition_row_intervals
+            .get(ri)
+            .copied()
+            .unwrap_or((0, 0));
+        let r = lo as usize;
+        if r + 1 < n_layers {
+            board.publish(DemandKey::LayerGap(lo), PARTITION_EMPTY_BAND_MIN);
+        } else if r > 0 {
+            board.publish(DemandKey::LayerGap((r as u32) - 1), PARTITION_EMPTY_BAND_MIN);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

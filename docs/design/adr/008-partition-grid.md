@@ -24,7 +24,7 @@
    - 节点可同时属于某 group **且** 占据某 cell；**禁止**「group ⇒ 自动成列」作为 IR 语义
 5. **id 空间**：partition 轴 id 与 node / group id **同一空间，禁止冲突**。
 6. **校验**：无 grid 却写了 cell → 错；cell 引用未知轴 → 错；有 grid 但节点无 cell → **允许**（未分区自由区；Hier 算法未接线前可忽略其列约束）。
-7. **引擎消费**：标 **`planned`** 直至 Hierarchical 组合/度量相接线；未实现前不得崩溃，**禁止**用 group Horizontal 冒充 PartitionGrid。
+7. **引擎消费**：Hierarchical 组合/度量相 **已接线**（PG-0–PG-4）；**禁止**用 group Horizontal 冒充 PartitionGrid。render 泳道底色/标题后置。
 8. **ADR-001**：grid 在 `Graph` 内随 `LayoutContract` 进入引擎；不引入 profile/图种分支。
 
 ## 含义
@@ -33,9 +33,9 @@
 |----|------|
 | **model** | `partition` 模块；`Graph.partition`；`Node.partition_cell` + lift/校验 |
 | **dsl-spec** | partition 块 + `cell_col`/`cell_row`；§14 注册 |
-| **parse** | 待接（本 ADR 不阻塞 model）；接上后 lift + 轴/节点 id 冲突检查 |
-| **engine** | 消费前忽略；接线后：列→层内连续块，行→层区间（见 shared/partition） |
-| **render** | 分区标题/带背景可后置；不发明 cell |
+| **parse** | `partition { }` + `cell_*` lift + 轴/节点 id 冲突检查（已落地） |
+| **engine** | 列→层内连续块（cross VPSC band）；行→ rank 区间 + 主轴层堆叠 y 并集（见 shared/partition） |
+| **render** | 分区标题/带背景后置；不发明 cell |
 
 ## 非目标（首期）
 

@@ -354,8 +354,8 @@ fn snap_partition_clamps_to_members(
         }
     }
     for (e_idx, elem) in plan.elems.iter().enumerate() {
-        if let ElemKey::PartitionBoundary { column, side, .. } = &elem.key {
-            let Some(ci) = plan.partition_columns.iter().position(|c| c == column) else {
+        if let ElemKey::PartitionBoundary { axis, side, .. } = &elem.key {
+            let Some(ci) = plan.partition_columns.iter().position(|c| c == axis) else {
                 continue;
             };
             let Some(&(min_left, max_right)) = span[ci].as_ref() else {

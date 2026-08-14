@@ -33,7 +33,7 @@
 | `hierarchical/compose/graph_index.rs` | **缺口**：建 `RealGraph` 时丢掉 cell（未进 IR） |
 | `hierarchical/compose/boundary.rs` | 组边界 dummy 先例（列块可同构） |
 | `apps/showcase/hierarchical/partition/` | 仅 `.gitkeep` — 待加 showcase |
-| dsl-spec | `partition` / `cell_*` 语法 **active**；Hier 消费仍标 planned（落地后改） |
+| dsl-spec | `partition` / `cell_*` 语法 **active**；Hier 消费 **已落地**（PG-0–PG-4） |
 
 ---
 
@@ -239,11 +239,22 @@ LayoutOutput / LayoutResult:
 
 **目标**：`rows` + `columns`：行约束全局 rank 区间；列仍 cross 连续块。
 
-- [ ] Ranking：有 row cell 的节点 rank ∈ 该行分配的层区间（全局一层表，非整图每行独立分层）  
-- [ ] 行区间与 Network Simplex 的衔接：硬区间 vs soft（推荐：分层后投影/夹紧 + Demand，避免拆 NS）——**开 PG-3 前写一页短裁定**  
-- [ ] Metric：row band T/B；与 LayerGap / shell 共存  
-- [ ] hier_eval：`cell_row` 节点落在行 band；同列约束仍成立  
-- [ ] matrix showcase  
+- [x] Ranking：有 row cell 的节点 rank ∈ 该行分配的层区间（全局一层表，非整图每行独立分层）  
+- [x] 行区间与 Network Simplex 的衔接：**裁定如下（分层后投影/夹紧 + Demand，不拆 NS）**  
+- [x] Metric：row band T/B；与 LayerGap / shell 共存  
+- [x] hier_eval：`cell_row` 节点落在行 band；同列约束仍成立  
+- [x] matrix showcase  
+
+#### 行区间裁定（钉死，禁止每行独立分层）
+
+1. `assign_ranks`（Network Simplex）不变；全局一层表。  
+2. NS 之后、`properify` 之前做 **投影/夹紧**（`compose/partition_rank.rs`）：
+   - 有 main-axis cell 的节点，rank 落入该轴条目的 **连续层区间**；区间按 **声明序** 沿 main 排列且互不重叠。
+   - 若 NS 序里两行成员交错（序列 `[first,last]` 重叠）→ `LayoutError` 硬失败，禁止静默丢 cell。
+   - 夹紧后 working DAG 仍须 `rank(src) < rank(tgt)`；会反边 → 同样硬失败。
+3. 未指派 main-axis cell 的节点不进任何行区间（自由区；可与某行同层，但不被夹紧）。  
+4. 空行：在声明位置插入占位 rank（0 厚层 + 列 clamp）；`LayerGap` Demand 将该缝抬到 `PARTITION_EMPTY_BAND_MIN`（96）。  
+5. **主轴写者不变**：行带像素 = `assign_main_axis` 堆叠后该行 rank 区间的 y 并集。不在 y 上再开 VPSC。列带仍只走次轴 VPSC。
 
 **风险**：rank 区间与 FAS/跨行边张力大 → 不可行必须硬失败，禁止静默丢 cell。
 
@@ -255,13 +266,13 @@ LayoutOutput / LayoutResult:
 
 **目标**：四向 orientation 轴映射正确；与 Weak/Strong/group 同图不炸；产品门禁。
 
-- [ ] LR/RL：rows 作 cross、columns 作 main（表 §5.1）单测四向 round-trip  
-- [ ] Weak + partition、Strong + partition 各至少 1 fixture  
-- [ ] group∩cell 同图：containment 双约束；成环 Infeasible + 单测  
-- [ ] params：`partition_unassigned: free|reject`（默认 free）bind + hash  
+- [x] LR/RL：rows 作 cross、columns 作 main（表 §5.1）单测四向 round-trip  
+- [x] Weak + partition、Strong + partition 各至少 1 fixture  
+- [x] group∩cell 同图：单 cell 内可证；跨 ≥2 个 cross cell → `LayoutError`（不做联合 precedence）  
+- [x] params：`partition_unassigned: free|reject`（默认 free）bind + hash  
 - [ ]（可选）render 泳道标题/带背景——只读 band，不发明  
-- [ ] roadmap / scope / shared/partition：**引擎消费 planned → 已落地**  
-- [ ] architecture M5 验收句可勾  
+- [x] roadmap / scope / shared/partition：**引擎消费 planned → 已落地**  
+- [x] architecture M5 验收句可勾  
 
 **验收**：四向 smoke；同图 group+partition；文档状态同步；**§10 硬门槛**必过。
 
@@ -376,3 +387,5 @@ Partition 实施是**增量路径**：默认图不得因接线 / 连续块 / ban
 | 2026-08-11 | PG-0 落地：`RealGraph` 携 `partition: Option<PartitionGrid>` + `partition_cell`（dense 并行数组，§6.1 备选形式）；`compute()` 入口 `validate_partition` 硬失败；两幅 showcase 入 hier_eval baseline；无 partition 全量图对纯 HEAD bit-identical（§10 过）；dsl-spec §14 更新 |
 | 2026-08-12 | PG-1 落地（TB/BT + Weak，columns only）：单一消费闸（`plan.partition_columns` 空 = 未消费，restore/bands/snap 全 no-op）；`ElemKey::PartitionBoundary`（不复用 GroupBoundary）+ 每 column×rank L/R 零宽 clamp + `pb:` 跨 rank 高权段；`partition_bands` 列带硬约束进 symmetry 降级链（相邻列分离 ≥ node_gap、空列 ≥ 96.0），解后 clamp snap 到成员极值 ± pad；DemandBoard 发布 `PartitionBandMinSize`（观测/PG-2）。**group 共存策略裁定**：组成员全在一个列 → 组块嵌套进列块；跨 ≥2 列 → `LayoutError` 硬失败（不做联合 precedence，PG-4 再议）。**restore 归属修复**：`restore_partition_clamps` 中 owned 元素（已指派成员 + 单列组 clamp）无条件回本带，仅未归属元素走 in-block/eject/自由区。StrongMacro + grid 硬失败；LR/RL、rows 各出一条 warning 不消费。hier_eval 增列带全局分离硬门禁 + 两遍 bit-identical；§10 过（对纯 HEAD 逐条一致；baseline 随本次一并刷新 HEAD 既有的陈旧漂移）。dsl-spec §14 `cell_col` 消费状态更新 |
 | 2026-08-12 | PG-2 落地（纯观测切片，零几何写入）：**载体裁定**——band 坐标进 `HierarchicalObs.partition_bands`（`PartitionBandObs { column, start, end, empty }`，physical 坐标，ADR 倾向可观测；渲染底色归 PG-4+）；真源读取 `band_coords` 从解后 clamp 位置回读（Metric 仍是坐标真源，obs/debug/measure 均为投影）；空列常量 `PARTITION_EMPTY_BAND_MIN = 96.0` 定址 partition_bands.rs（partition 常量模块），经 hierarchical/mod.rs 与 crate 根 re-export；debug trace `extension.partition_bands` + measure JSON `observation.partition_bands`（未消费不发键，非 partition 序列化文本零变化）。**外轨裁定**：Channel outer rail 避让 column band 不做——`group_obstacles` 先例的语义是“组框不可穿”，列 band 非障碍（跨列边须穿行带间空隙，成员体已进节点障碍表），避让无良定义；设计文档该项标（可选），延后至 PG-4 再议。hier_eval 门禁扩展（obs 列数/声明序/成员落带/带间分离/空列宽下界）；§10 过（baseline 不重建零 delta，showcase 两遍 0 changed）；debug-profile.md 字段表同步 |
+| 2026-08-14 | PG-3 落地（矩阵行，仍仅 TB/BT + Weak 消费闸由 PG-4 扩）：NS 不变；`compose/partition_rank.rs` 在 properify 前按声明序夹紧 main-axis cell 到互不重叠连续 rank 区间（交错 / 反 working 边 → `LayoutError`）；空行占位 rank + `LayerGap` ≥ 96。行带 = 主轴层堆叠后该行 rank 区间 y 并集 ∪ 成员 Fit；**不**在 y 上再开 VPSC。`HierarchicalObs.partition_row_bands`；列-only 路径 `rows.is_empty()` 早退。engine finalize 把 band obs 与节点框同步平移 canvas pad。 |
+| 2026-08-14 | PG-4 落地：orientation 双射（TB/BT：columns=cross、rows=main；LR/RL 对调）；`ElemKey::PartitionBoundary.axis`；撤 Strong 入口硬失败，expand 后 Fit 包络写一次全局 band（组成员跨 ≥2 cross cell 仍硬失败）。`partition_unassigned: free\|reject` bind+hash。showcase：`demo.weak-group-in-lane` / `demo.strong-group-in-lane`。文档状态翻为引擎已消费；render 泳道底色/标题仍后置。 |

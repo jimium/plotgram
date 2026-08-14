@@ -623,7 +623,7 @@ fn restore_partition_clamps(plan: &mut PlanGraph, r: usize) {
     let clamp_of = |column: &str, side: BoundarySide| -> Option<usize> {
         plan.index_of
             .get(&ElemKey::PartitionBoundary {
-                column: column.to_string(),
+                axis: column.to_string(),
                 rank: r as u32,
                 side,
             })
@@ -661,11 +661,11 @@ fn restore_partition_clamps(plan: &mut PlanGraph, r: usize) {
     for &e in &old {
         match &plan.elems[e].key {
             ElemKey::PartitionBoundary {
-                column,
+                axis,
                 side: BoundarySide::Left,
                 ..
             } => {
-                current = col_pos.get(column).copied();
+                current = col_pos.get(axis).copied();
                 seen_block = true;
             }
             ElemKey::PartitionBoundary {
@@ -1490,8 +1490,8 @@ mod tests {
                 .position(|&e| {
                     matches!(
                         &plan.elems[e].key,
-                        ElemKey::PartitionBoundary { column, side: s, .. }
-                        if column.as_str() == col && *s == side
+                        ElemKey::PartitionBoundary { axis, side: s, .. }
+                        if axis.as_str() == col && *s == side
                     )
                 })
                 .unwrap_or_else(|| panic!("missing {col} {side:?} clamp in {layer:?}"))

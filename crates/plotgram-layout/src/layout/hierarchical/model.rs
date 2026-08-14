@@ -20,6 +20,24 @@ pub enum BoundarySide {
     Right,
 }
 
+/// Which author axis is currently bound to kernel cross or main
+/// (partition-grid.md §5.1). Default [`Self::Columns`] matches TB/BT.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PartitionAxisKind {
+    #[default]
+    Columns,
+    Rows,
+}
+
+impl PartitionAxisKind {
+    pub fn as_noun(self) -> &'static str {
+        match self {
+            Self::Columns => "columns",
+            Self::Rows => "rows",
+        }
+    }
+}
+
 /// Stable identity for a node-shaped element in the working graph: a real
 /// graph node, a long-edge properify dummy, or a group Left/Right clamp.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -38,14 +56,13 @@ pub enum ElemKey {
         rank: u32,
         side: BoundarySide,
     },
-    /// Zero-width Left/Right clamp for `(partition column × rank)`
-    /// (partition-grid.md PG-1). Columns are global full-height bands, so
-    /// every column owns L/R clamps on **every** rank (unlike groups, which
-    /// span only their member ranks). Same family as [`Self::GroupBoundary`]:
-    /// zero-width, high-weight `pb:` cross-rank segments, excluded from the
-    /// crossing index.
+    /// Zero-width Left/Right clamp for `(cross-axis id × rank)`
+    /// (partition-grid.md PG-1/PG-4). Cross-axis bands are global
+    /// full-height (canonical x); every id owns L/R clamps on **every**
+    /// rank (unlike groups, which span only their member ranks). `axis` is
+    /// the author column id (TB/BT) or row id (LR/RL).
     PartitionBoundary {
-        column: String,
+        axis: String,
         rank: u32,
         side: BoundarySide,
     },
@@ -187,16 +204,28 @@ pub struct PlanGraph {
     /// rank -> ordered element indices (order = declaration order pre-sort;
     /// [`crate::layout::hierarchical::compose::order`] rewrites this).
     pub layers: Vec<Vec<usize>>,
-    /// Consumed partition columns, declaration order (partition-grid.md
-    /// PG-1). Empty = partition NOT consumed: no `pb:` elems, no band
-    /// constraints, no ordering special-casing — the §10 single gate.
+    /// Consumed **cross-axis** ids, declaration order (partition-grid.md
+    /// PG-1/PG-4). TB/BT → author columns; LR/RL → author rows. Empty =
+    /// cross-axis NOT consumed: no `pb:` elems, no band constraints, no
+    /// ordering special-casing — the §10 single gate.
     pub partition_columns: Vec<String>,
+    /// Whether [`Self::partition_columns`] holds author columns or rows.
+    pub partition_cross_kind: PartitionAxisKind,
     /// elem index -> index into [`Self::partition_columns`] for elems owned
-    /// by a column block: assigned real nodes and every elem of a group
-    /// block whose members sit in exactly one column. `None` = free zone;
+    /// by a cross-axis block: assigned real nodes and every elem of a group
+    /// block whose members sit in exactly one cross cell. `None` = free zone;
     /// elems appended after consumption (order pads) read past the end and
     /// are free by construction.
     pub partition_elem_col: Vec<Option<usize>>,
+    /// Consumed **main-axis** ids, declaration order (PG-3/PG-4). TB/BT →
+    /// author rows; LR/RL → author columns. Empty = main-axis NOT consumed.
+    pub partition_rows: Vec<String>,
+    /// Whether [`Self::partition_rows`] holds author rows or columns.
+    pub partition_main_kind: PartitionAxisKind,
+    /// elem index -> index into [`Self::partition_rows`].
+    pub partition_elem_row: Vec<Option<usize>>,
+    /// Inclusive `[lo, hi]` rank interval per [`Self::partition_rows`] entry.
+    pub partition_row_intervals: Vec<(u32, u32)>,
 }
 
 impl RealGraph {

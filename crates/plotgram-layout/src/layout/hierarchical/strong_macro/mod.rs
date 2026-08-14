@@ -253,7 +253,21 @@ pub(super) fn layout(
     // SM-D: normalize to the global Plan schema. Port sides for intra-block
     // edges are owned by the local Metric solve; the global assign fills
     // cross-block edges and Ordered slots, then we restore those sides.
-    let expanded = expand::expand(real_graph, &blocks, &top_scope, &block_of_node)?;
+    let mut expanded = expand::expand(real_graph, &blocks, &top_scope, &block_of_node)?;
+    if let Some(grid) = &expanded.real_graph.partition {
+        let axes = super::compose::partition_axes::ConsumedAxes::from_grid(grid, orientation);
+        if axes.is_consumed() {
+            super::compose::partition_boundary::check_groups_single_cross_cell(
+                &expanded.real_graph,
+                &axes,
+            )?;
+            super::compose::partition_rank::stamp_partition_ownership(
+                &mut expanded.plan,
+                &expanded.real_graph,
+                &axes,
+            );
+        }
+    }
     let mut assignment = super::compose::ports::assign_ports(
         &expanded.real_graph,
         &expanded.plan,

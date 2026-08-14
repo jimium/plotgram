@@ -65,6 +65,7 @@ use plotgram_compile::{
     CrossAxis,
 };
 use plotgram_layout::{group_penetration_violations, GROUP_FRAME_GAP, PARTITION_EMPTY_BAND_MIN};
+use plotgram_layout::layout::hierarchical::GROUP_PAD;
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::graph::{Edge as ModelEdge, Group as ModelGroup};
 use plotgram_model::port::Side;
@@ -564,25 +565,15 @@ fn check_demand_floor(name: &str, result: &LayoutResult, failures: &mut Vec<Stri
     }
 }
 
-/// PG-1 hard gate (partition-grid.md §7): consumed TB/BT partition fixtures
-/// keep globally separated column bands — for every declaration-order column
-/// pair `i < j`, column `i`'s max right edge ≤ column `j`'s min left edge.
-/// Covers both band membership (members land inside their band) and column
-/// order (declaration order never inverts). Unassigned nodes are free to sit
-/// outside all bands (they are not band members). LR/RL and strong-macro
-/// fixtures do not consume columns (PG-4) and are skipped.
+/// PG-1/PG-3/PG-4 hard gate: consumed partition fixtures keep globally
+/// separated column bands (physical x, declaration order) and, when rows
+/// are consumed, row bands (physical y). Unassigned nodes are free.
 fn check_partition_band_separation(
     name: &str,
     source: &str,
     result: &LayoutResult,
     failures: &mut Vec<String>,
 ) {
-    if source.contains("left-to-right")
-        || source.contains("right-to-left")
-        || source.contains("group_policy: strong-macro")
-    {
-        return;
-    }
     let Ok(parsed) = plotgram_parse::parse(source) else {
         return;
     };
@@ -590,12 +581,24 @@ fn check_partition_band_separation(
     let Some(grid) = &graph.partition else {
         return;
     };
-    if grid.columns.is_empty() {
+    if grid.columns.is_empty() && grid.rows.is_empty() {
+        return;
+    }
+    // StrongMacro writes node frames via MacroBlockWriter; column bands are
+    // Fit envelopes after expand and may stack (not side-by-side). Membership
+    // / separation are Weak+partition invariants (partition-grid.md PG-4).
+    if source.contains("group_policy: strong-macro") {
         return;
     }
 
     let col_index: BTreeMap<&str, usize> = grid
         .columns
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.id.as_str(), i))
+        .collect();
+    let row_index: BTreeMap<&str, usize> = grid
+        .rows
         .iter()
         .enumerate()
         .map(|(i, c)| (c.id.as_str(), i))
@@ -643,33 +646,103 @@ fn check_partition_band_separation(
         }
     }
 
-    // PG-2: the observed band intervals must mirror the solved geometry —
-    // presence + declaration order, member containment, inter-band
-    // separation, and the empty-band width floor.
     let bands = result
         .diagnostics
         .hierarchical
         .as_ref()
         .map(|o| o.partition_bands.clone())
         .unwrap_or_default();
-    if bands.len() != n_cols {
+    if n_cols > 0 {
+        if bands.len() != n_cols {
+            failures.push(format!(
+                "{name}: partition obs bands count {} != declared columns {n_cols}",
+                bands.len()
+            ));
+        } else {
+            for (ci, band) in bands.iter().enumerate() {
+                if band.column != grid.columns[ci].id {
+                    failures.push(format!(
+                        "{name}: partition obs band {ci} column `{}` != declared `{}`",
+                        band.column, grid.columns[ci].id
+                    ));
+                }
+                if band.empty && band.end - band.start + EPS < PARTITION_EMPTY_BAND_MIN {
+                    failures.push(format!(
+                        "{name}: partition obs band `{}` width {:.3} < empty-band minimum {:.1}",
+                        band.column,
+                        band.end - band.start,
+                        PARTITION_EMPTY_BAND_MIN
+                    ));
+                }
+            }
+            for node in graph.all_nodes() {
+                let Some(cell) = &node.partition_cell else {
+                    continue;
+                };
+                let Some(col) = &cell.column else {
+                    continue;
+                };
+                let Some(&ci) = col_index.get(col.as_str()) else {
+                    continue;
+                };
+                let Some(&frame) = frame_of.get(node.id.as_str()) else {
+                    continue;
+                };
+                let band = &bands[ci];
+                if frame.x + GROUP_PAD + EPS < band.start || frame.right() - GROUP_PAD - EPS > band.end {
+                    failures.push(format!(
+                        "{name}: node `{}` frame [{:.3}, {:.3}] escapes partition band `{}` [{:.3}, {:.3}]",
+                        node.id,
+                        frame.x,
+                        frame.right(),
+                        band.column,
+                        band.start,
+                        band.end
+                    ));
+                }
+            }
+            for i in 0..n_cols {
+                for j in i + 1..n_cols {
+                    if bands[i].end + EPS > bands[j].start {
+                        failures.push(format!(
+                            "{name}: partition obs band separation violated — `{}` end {:.3} \
+                             exceeds `{}` start {:.3}",
+                            bands[i].column, bands[i].end, bands[j].column, bands[j].start
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    let n_rows = grid.rows.len();
+    let row_bands = result
+        .diagnostics
+        .hierarchical
+        .as_ref()
+        .map(|o| o.partition_row_bands.clone())
+        .unwrap_or_default();
+    if n_rows == 0 {
+        return;
+    }
+    if row_bands.len() != n_rows {
         failures.push(format!(
-            "{name}: partition obs bands count {} != declared columns {n_cols}",
-            bands.len()
+            "{name}: partition obs row bands count {} != declared rows {n_rows}",
+            row_bands.len()
         ));
         return;
     }
-    for (ci, band) in bands.iter().enumerate() {
-        if band.column != grid.columns[ci].id {
+    for (ri, band) in row_bands.iter().enumerate() {
+        if band.row != grid.rows[ri].id {
             failures.push(format!(
-                "{name}: partition obs band {ci} column `{}` != declared `{}`",
-                band.column, grid.columns[ci].id
+                "{name}: partition obs row band {ri} row `{}` != declared `{}`",
+                band.row, grid.rows[ri].id
             ));
         }
         if band.empty && band.end - band.start + EPS < PARTITION_EMPTY_BAND_MIN {
             failures.push(format!(
-                "{name}: partition obs band `{}` width {:.3} < empty-band minimum {:.1}",
-                band.column,
+                "{name}: partition obs row band `{}` height {:.3} < empty-band minimum {:.1}",
+                band.row,
                 band.end - band.start,
                 PARTITION_EMPTY_BAND_MIN
             ));
@@ -679,35 +752,35 @@ fn check_partition_band_separation(
         let Some(cell) = &node.partition_cell else {
             continue;
         };
-        let Some(col) = &cell.column else {
+        let Some(row) = &cell.row else {
             continue;
         };
-        let Some(&ci) = col_index.get(col.as_str()) else {
+        let Some(&ri) = row_index.get(row.as_str()) else {
             continue;
         };
         let Some(&frame) = frame_of.get(node.id.as_str()) else {
             continue;
         };
-        let band = &bands[ci];
-        if frame.x + EPS < band.start || frame.right() - EPS > band.end {
+        let band = &row_bands[ri];
+        if frame.y + GROUP_PAD + EPS < band.start || frame.bottom() - GROUP_PAD - EPS > band.end {
             failures.push(format!(
-                "{name}: node `{}` frame [{:.3}, {:.3}] escapes partition band `{}` [{:.3}, {:.3}]",
+                "{name}: node `{}` frame y [{:.3}, {:.3}] escapes partition row band `{}` [{:.3}, {:.3}]",
                 node.id,
-                frame.x,
-                frame.right(),
-                band.column,
+                frame.y,
+                frame.bottom(),
+                band.row,
                 band.start,
                 band.end
             ));
         }
     }
-    for i in 0..n_cols {
-        for j in i + 1..n_cols {
-            if bands[i].end + EPS > bands[j].start {
+    for i in 0..n_rows {
+        for j in i + 1..n_rows {
+            if row_bands[i].end + EPS > row_bands[j].start {
                 failures.push(format!(
-                    "{name}: partition obs band separation violated — `{}` end {:.3} \
+                    "{name}: partition obs row band separation violated — `{}` end {:.3} \
                      exceeds `{}` start {:.3}",
-                    bands[i].column, bands[i].end, bands[j].column, bands[j].start
+                    row_bands[i].row, row_bands[i].end, row_bands[j].row, row_bands[j].start
                 ));
             }
         }
@@ -723,7 +796,7 @@ fn check_partition_bit_identical(name: &str, source: &str, failures: &mut Vec<St
     let Some(grid) = &parsed.graph.partition else {
         return;
     };
-    if grid.columns.is_empty() {
+    if grid.columns.is_empty() && grid.rows.is_empty() {
         return;
     }
     let (first, second) = match (

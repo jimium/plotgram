@@ -194,6 +194,10 @@ fn run_measure(input: &PathBuf, json: bool) -> ExitCode {
                     observation["partition_bands"] =
                         serde_json::to_value(&obs.partition_bands).unwrap();
                 }
+                if !obs.partition_row_bands.is_empty() {
+                    observation["partition_row_bands"] =
+                        serde_json::to_value(&obs.partition_row_bands).unwrap();
+                }
             }
             json!({
                 "schema_version": METRICS_SCHEMA_VERSION,

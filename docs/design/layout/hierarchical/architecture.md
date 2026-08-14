@@ -571,8 +571,8 @@ Stage 只写自己拥有的变换自由度：核心写 component-local 坐标，
 
 | | |
 |--|--|
-| **已交付** | 契约 I/O · VPSC · 四向 Orientation · Channel + TrackOrder + rip-up · PortLane · `J(x)` 次轴 · Weak/Strong 单写者框 · 穿组 verifier |
-| **未交付** | PartitionGrid **引擎消费**（M5）· strong-port projection / label·loop reserve · 穿组构造清零 · 完整 integrated labeling |
+| **已交付** | 契约 I/O · VPSC · 四向 Orientation · Channel + TrackOrder + rip-up · PortLane · `J(x)` 次轴 · Weak/Strong 单写者框 · 穿组 verifier · PartitionGrid **引擎消费**（M5：列/行 band、四向、Weak/Strong 共址；render 底色后置） |
+| **未交付** | strong-port projection / label·loop reserve · 穿组构造清零 · 完整 integrated labeling |
 | **后置** | octilinear / 真 MCF / from-sketch |
 
 v1 Atlas 只作反例与形状启发（[anti-patterns](notes/anti-patterns.md)）；**不**拷贝三路径 `solve` 壳。
