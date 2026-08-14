@@ -176,6 +176,14 @@ pub fn apply_port_lanes(
 /// Faces the twin-corridor pass already wrote are skipped whole: a shared lane
 /// is a stronger statement than per-edge alignment, and re-projecting the face
 /// would let a neighbouring end push the twin columns apart again.
+///
+/// A single-end face joins the sweep too (yFiles PortAlignmentIds: a lone
+/// port slides within its box toward the partner's column — on
+/// `mech.layout-styles` yFiles drifts both ends of the disjoint n18→n25 pair
+/// ~7.5px toward each other). Corner-slamming never happens: for one slot
+/// [`face_inward_band`] collapses to the center and [`face_align_band`] only
+/// opens it by `min(width/4, pitch/2)` toward a near target, so a distant
+/// partner yields a bounded drift, not a box-edge port.
 fn align_ns_ports(
     plan: &PlanGraph,
     graph: &RealGraph,
@@ -191,19 +199,12 @@ fn align_ns_ports(
     // Corridor faces still contribute their columns as fixed targets — a twin
     // lane is exactly the kind of settled column a free end wants to meet.
     //
-    // A face carrying a single end is left alone: that port's column *is* the
-    // node's column, which belongs to the cross-axis solve. Sliding it would
-    // put the arrow head in a corner of the box to save a bend. Only a face
-    // that is already shared — where the slots are arbitrary to begin with —
-    // is PortLane's to redistribute.
-    //
     // The unit is the Compose slot, not the end: a bundled fan shares one
     // `Ordered` slot and therefore one port point, and must move as one.
     let mut faces: BTreeMap<(usize, Side), Vec<Vec<FaceEnd>>> = all_faces
         .iter()
         .filter(|(face, _)| !corridor_faces.contains(face))
         .map(|(face, ends)| (*face, slot_groups(ends)))
-        .filter(|(_, slots)| slots.len() >= 2)
         .collect();
     if faces.is_empty() {
         return;

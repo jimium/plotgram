@@ -2085,16 +2085,33 @@ fn adsorb_near_collinear(
         if pairs.is_empty() {
             break;
         }
-        let mut extra = hard.to_vec();
-        extra.reserve(pairs.len() * 2);
-        for &(a, b, d) in &pairs {
-            extra.push(Constraint::new(a, b, d));
-            extra.push(Constraint::new(b, a, -d));
-        }
+        let equalities = |subset: &[(usize, usize, f64)]| {
+            let mut extra = hard.to_vec();
+            extra.reserve(subset.len() * 2);
+            for &(a, b, d) in subset {
+                extra.push(Constraint::new(a, b, d));
+                extra.push(Constraint::new(b, a, -d));
+            }
+            extra
+        };
         let weights = vec![1.0; n];
-        match solve_once(n, &placed, &weights, &extra) {
+        // A conflicting subset makes the joint equality system infeasible.
+        // Dropping only the conflicting equalities (instead of aborting the
+        // whole pass) keeps every feasible weld: retry the pairs one at a
+        // time in sorted order, accumulating the ones that stay feasible.
+        match solve_once(n, &placed, &weights, &equalities(&pairs)) {
             Ok(v) => placed = v,
-            Err(VpscError::Infeasible { .. }) => break,
+            Err(VpscError::Infeasible { .. }) => {
+                let mut kept: Vec<(usize, usize, f64)> = Vec::new();
+                for pair in &pairs {
+                    let mut trial = kept.clone();
+                    trial.push(*pair);
+                    if let Ok(v) = solve_once(n, &placed, &weights, &equalities(&trial)) {
+                        placed = v;
+                        kept = trial;
+                    }
+                }
+            }
             Err(e) => return Err(e),
         }
     }

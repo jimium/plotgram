@@ -1,6 +1,5 @@
 ---
 source: crates/plotgram-layout/tests/hierarchical_coordinates.rs
-assertion_line: 78
 expression: "layout_json(graph, Size::new(120.0, 40.0))"
 ---
 {
@@ -42,9 +41,9 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "target": "b",
       "to_port": {
         "along": {
-          "Ordered": {
-            "count": 1,
-            "order": 0
+          "LocalOffset": {
+            "x": 60.0,
+            "y": 0.0
           }
         },
         "side": "north"
@@ -53,9 +52,9 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
     {
       "from_port": {
         "along": {
-          "Ordered": {
-            "count": 1,
-            "order": 0
+          "LocalOffset": {
+            "x": 60.0,
+            "y": 40.0
           }
         },
         "side": "south"
@@ -79,9 +78,9 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "target": "c",
       "to_port": {
         "along": {
-          "Ordered": {
-            "count": 1,
-            "order": 0
+          "LocalOffset": {
+            "x": 60.0,
+            "y": 0.0
           }
         },
         "side": "north"
@@ -90,9 +89,9 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
     {
       "from_port": {
         "along": {
-          "Ordered": {
-            "count": 1,
-            "order": 0
+          "LocalOffset": {
+            "x": 60.0,
+            "y": 40.0
           }
         },
         "side": "south"
