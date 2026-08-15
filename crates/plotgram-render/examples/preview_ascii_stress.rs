@@ -43,7 +43,10 @@ fn edge(id: &str, source: &str, target: &str, arrow: Arrow) -> Edge {
 }
 
 fn place(id: &str, x: f64, y: f64, w: f64, h: f64) -> NodePlacement {
-    NodePlacement { id: id.to_string(), frame: Rect::new(x, y, w, h) }
+    NodePlacement {
+        id: id.to_string(),
+        frame: Rect::new(x, y, w, h),
+    }
 }
 
 fn route(id: &str, source: &str, target: &str, pts: &[(f64, f64)]) -> EdgePlacement {
@@ -58,11 +61,21 @@ fn route(id: &str, source: &str, target: &str, pts: &[(f64, f64)]) -> EdgePlacem
 }
 
 fn node_label(id: &str, text: &str, frame: Rect) -> LabelSlot {
-    LabelSlot { owner: LabelOwner::Node(id.to_string()), role: None, text: text.to_string(), frame }
+    LabelSlot {
+        owner: LabelOwner::Node(id.to_string()),
+        role: None,
+        text: text.to_string(),
+        frame,
+    }
 }
 
 fn edge_label(id: &str, text: &str, frame: Rect) -> LabelSlot {
-    LabelSlot { owner: LabelOwner::Edge(id.to_string()), role: None, text: text.to_string(), frame }
+    LabelSlot {
+        owner: LabelOwner::Edge(id.to_string()),
+        role: None,
+        text: text.to_string(),
+        frame,
+    }
 }
 
 /// A deployment pipeline: 代码提交 → 构建 → 单元测试 → 集成测试 → 部署预发 → 部署生产
@@ -90,29 +103,53 @@ fn build_input() -> RenderInput {
             edge("e8", "notify", "commit", Arrow::Response),
         ],
         groups: vec![],
-            partition: None,
-        };
+        partition: None,
+    };
 
     // Layout: main pipeline vertical at x=120, branches to the right at x=360
-    let n_commit  = Rect::new(72.0, 12.0, 96.0, 36.0);
-    let n_build   = Rect::new(72.0, 84.0, 96.0, 36.0);
-    let n_unit    = Rect::new(72.0, 156.0, 96.0, 36.0);
-    let n_integ   = Rect::new(72.0, 228.0, 96.0, 36.0);
+    let n_commit = Rect::new(72.0, 12.0, 96.0, 36.0);
+    let n_build = Rect::new(72.0, 84.0, 96.0, 36.0);
+    let n_unit = Rect::new(72.0, 156.0, 96.0, 36.0);
+    let n_integ = Rect::new(72.0, 228.0, 96.0, 36.0);
     let n_staging = Rect::new(60.0, 300.0, 120.0, 36.0);
-    let n_prod    = Rect::new(60.0, 372.0, 120.0, 36.0);
-    let n_notify  = Rect::new(312.0, 156.0, 132.0, 36.0);
+    let n_prod = Rect::new(60.0, 372.0, 120.0, 36.0);
+    let n_notify = Rect::new(312.0, 156.0, 132.0, 36.0);
     let n_rollback = Rect::new(312.0, 228.0, 108.0, 36.0);
 
     let layout = LayoutResult {
         nodes: vec![
-            place("commit", n_commit.x, n_commit.y, n_commit.width, n_commit.height),
+            place(
+                "commit",
+                n_commit.x,
+                n_commit.y,
+                n_commit.width,
+                n_commit.height,
+            ),
             place("build", n_build.x, n_build.y, n_build.width, n_build.height),
             place("unit", n_unit.x, n_unit.y, n_unit.width, n_unit.height),
             place("integ", n_integ.x, n_integ.y, n_integ.width, n_integ.height),
-            place("staging", n_staging.x, n_staging.y, n_staging.width, n_staging.height),
+            place(
+                "staging",
+                n_staging.x,
+                n_staging.y,
+                n_staging.width,
+                n_staging.height,
+            ),
             place("prod", n_prod.x, n_prod.y, n_prod.width, n_prod.height),
-            place("notify", n_notify.x, n_notify.y, n_notify.width, n_notify.height),
-            place("rollback", n_rollback.x, n_rollback.y, n_rollback.width, n_rollback.height),
+            place(
+                "notify",
+                n_notify.x,
+                n_notify.y,
+                n_notify.width,
+                n_notify.height,
+            ),
+            place(
+                "rollback",
+                n_rollback.x,
+                n_rollback.y,
+                n_rollback.width,
+                n_rollback.height,
+            ),
         ],
         edges: vec![
             route("e1", "commit", "build", &[(120.0, 48.0), (120.0, 84.0)]),
@@ -125,9 +162,12 @@ fn build_input() -> RenderInput {
             // integ → rollback (horizontal right, dashed)
             route("e7", "integ", "rollback", &[(168.0, 246.0), (312.0, 246.0)]),
             // notify --> commit (elbow: up then left then down, dashed)
-            route("e8", "notify", "commit", &[
-                (378.0, 156.0), (378.0, 0.0), (120.0, 0.0), (120.0, 12.0),
-            ]),
+            route(
+                "e8",
+                "notify",
+                "commit",
+                &[(378.0, 156.0), (378.0, 0.0), (120.0, 0.0), (120.0, 12.0)],
+            ),
         ],
         groups: vec![],
         labels: vec![
@@ -145,6 +185,7 @@ fn build_input() -> RenderInput {
         canvas_width: 480.0,
         canvas_height: 420.0,
         diagnostics: Default::default(),
+        decorations: vec![],
     };
 
     RenderInput {

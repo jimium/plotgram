@@ -1,0 +1,33 @@
+// Rolling update：CI 到集群流量切换
+diagram {
+    profile: sequence,
+    title: "K8s 滚动发布链路"
+
+    node developer "开发者" actor
+    node ci "CI Pipeline" service
+    node registry "镜像仓库" database
+    node argo "Argo CD" service
+    node apiserver "K8s API Server" service
+    node scheduler "Scheduler" service
+    node kubelet "Kubelet" service
+    node pods "新 Pod 副本集" client
+    node ingress "Ingress Service" gateway
+    node monitor "监控告警" service
+
+    developer -> ci "push release tag"
+    ci -> registry "build and push image"
+    ci --> developer "build passed"
+    ci -> argo "update manifest"
+    argo -> apiserver "apply new deployment spec"
+    apiserver -> scheduler "request new pods"
+    scheduler -> kubelet "assign nodes"
+    kubelet -> pods "pull image and start"
+    pods --> kubelet "readiness probe ok"
+    kubelet --> apiserver "pod ready"
+    apiserver -> ingress "shift part of traffic"
+    ingress --> pods "live requests"
+    pods -> monitor "publish metrics"
+    monitor --> argo "canary healthy"
+    argo -> apiserver "scale down old pods"
+    apiserver --> developer "rollout complete"
+}

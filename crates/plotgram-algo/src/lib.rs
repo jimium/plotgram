@@ -17,6 +17,7 @@
 pub mod crossing;
 pub mod fas;
 pub mod interval_color;
+pub mod linear_arrange;
 pub mod orientation;
 pub mod path_ortho;
 pub mod vpsc;

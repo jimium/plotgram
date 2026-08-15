@@ -11,13 +11,11 @@
 本文钉死 Sequence 的**目标形态与跨相契约**，重点是**消息边几何（Builtin 路由）**：它与 Hier 的 Channel/OVG 不是同一条路径。
 相级细节：[phases/](phases/README.md)。姊妹页：[README](README.md) · [scope](scope.md)。
 
-> **前置依赖（落地前必读）**：
+> **前置依赖**：
 >
-> 1. **[ADR-009](../../adr/009-layout-result-decorations.md) 尚未在 model/engine-api 落地**。当前 [`LayoutResult`](../../../../crates/plotgram-model/src/result.rs) 没有 `decorations` 字段，[`LayoutOutput`](../../../../crates/plotgram-engine-api/src/traits.rs) 也没有。生命线 / 激活条 / 片段框等派生几何**无处可发**——见 §2.2 的二段式落地。
-> 2. [`LayoutError`](../../../../crates/plotgram-engine-api/src/error.rs) 当前变体不足以表达 §11 失败表所需类别（`Unsupported` / `InvalidInput` / `InternalInvariant` 均不存在）。落地前须扩展或全部塞 `Message(String)`（见 §11）。
+> 1. **[ADR-009](../../adr/009-layout-result-decorations.md) 已落地（方案 A）**。[`LayoutResult`](../../../../crates/plotgram-model/src/result.rs) 与 [`LayoutOutput`](../../../../crates/plotgram-engine-api/src/traits.rs) 均有 `decorations`；finalize 只 translate。片段框（`FragmentFrame`）已随 M4 落地。
+> 2. [`LayoutError`](../../../../crates/plotgram-engine-api/src/error.rs) 已含 `Unsupported` / `InvalidInput` / `InternalInvariant`。Sequence 经 `seq_err` 按消息前缀分类；失败表见 [message-routing §11](phases/message-routing.md)。
 > 3. [`model::port::Side`](../../../../crates/plotgram-model/src/port.rs) 是封闭四值枚举（`North/South/East/West`），无 `Center`。Sequence 的「附着侧」用本核私有 `LifelineSide`（见 §3.1），不污染 model。
->
-> 以上三项不解决，里程碑 M1 之后无法推进。M0 可在「只发 nodes+edges、暂不发生命线 decoration」的窗口内启动。
 
 ---
 
@@ -107,34 +105,26 @@ Domain / DSL ──────►│
 ```text
 LayoutResult
   nodes:       参与者头部框（Metric）
-  groups:      片段框 / 弱 group 框（finalize 从 Graph::groups 包络；本核不直写）
+  groups:      弱 group 框（finalize 从 Graph::groups 包络；本核不直写。片段框不走此通道）
   edges:       消息 EdgePlacement（path 必填）
   decorations: LifelineDecoration[] / ActivationBar[] / FragmentFrame[]
   diagnostics: LayoutDiagnostics
 ```
 
-**当前现实**（[`LayoutOutput`](../../../../crates/plotgram-engine-api/src/traits.rs) / [`LayoutResult`](../../../../crates/plotgram-model/src/result.rs)）：
+**当前现实**（M4）：
 
 ```text
-LayoutOutput { nodes, edges, diagnostics }   // 本核出口
-LayoutResult { nodes, edges, groups, labels, canvas_width, canvas_height, diagnostics }
-                                            // 门面 finalize 出口；groups 由 Graph::groups 包络
+LayoutOutput { nodes, edges, groups, owns_group_frames, diagnostics, decorations }
+LayoutResult { …, decorations }   // finalize 合并：只 translate decorations
 ```
 
-差异三处，决定**二段式落地**：
+| 通道 | 状态 |
+|------|------|
+| `groups`（弱 group 框） | finalize 仅在 `owns_group_frames = false` 时从 `Graph::groups` 包络。Sequence 置 `owns_group_frames = true` 且 `groups: []` |
+| `decorations`（生命线/激活条/片段框） | **已落地**。Metric 写 `Lifeline`（含 `gaps`）/ `Activation` / `FragmentFrame`；render 按 kind 消费，禁止按 `layout.name` 猜线 |
+| `LayoutOutput` → `LayoutResult` 合并 | finalize 透传并平移 decorations（方案 A） |
 
-| 通道 | 当前状态 | 落地路径 |
-|------|----------|----------|
-| `groups`（片段框） | `LayoutResult.groups` 存在，但**只能**从 [`Graph::groups`](../../../../crates/plotgram-model/src/graph.rs) 经 [`finalize`](../../../../crates/plotgram-engine/src/finalize.rs) 包络产生；`LayoutOutput` 不带 `groups`。 | 片段框若走 `Graph::groups` → finalize 自动包络；若不想进 `Graph`（组合片段非业务实体），**等 ADR-009 decorations**。M0 不做片段。 |
-| `decorations`（生命线/激活条） | **不存在**。ADR-009 状态 = planned。 | 阻塞 M1。见下方"二段式"。 |
-| `LayoutOutput` → `LayoutResult` 合并 | 门面 [`finalize`](../../../../crates/plotgram-engine/src/finalize.rs) 只接 `nodes/edges/diagnostics`，加 `groups/labels/canvas`。 | 若 ADR-009 让 `LayoutOutput` 携带 decorations，finalize 须新增合并逻辑。 |
-
-**二段式落地（M0 先行窗口）**：
-
-- **M0**：本核只产 `nodes`（参与者头部）+ `edges`（消息 path）+ `diagnostics`。**不发生命线、激活条、片段框**。Render 端可临时按 `layout.name == "sequence"` 画一根「从头部底到 canvas 底」的占位竖线——但这是 **M0 临时渲染降级**，不是 ADR-009 的几何真源，须在 render 源码注释标 `// M0 placeholder; replace by LayoutResult.decorations.lifeline`。
-- **M1 起**：ADR-009 落地后，本核 Metric/Ink 写 `Lifeline` / `Activation` decoration，render 改为消费 decorations，删除 M0 占位。
-
-生命线与激活条是**派生几何**，不进入 `Graph`；须有稳定 id（如 `lifeline:{node_id}`、`activation:{edge_id}:{ordinal}`），供 render 与 verifier 引用。
+生命线、激活条与片段框是**派生几何**，不进入 `Graph`；须有稳定 id（如 `lifeline:{node_id}`、`activation:{edge_id}:{ordinal}`、`fragment:{author_id}`），供 render 与 verifier 引用。
 契约真源：[ADR-009](../../adr/009-layout-result-decorations.md)（`LayoutResult.decorations`）；禁止仅靠 render 再猜激活区间。
 
 ### 2.3 模块边界（目标）
@@ -164,7 +154,7 @@ plotgram-algo/   # 1D arranger（复用）；非 sequence 私有第二宇宙
 |------|------|------|
 | `lifeline_order: NodeId[]` | 次轴排列（稳定） | LifelineOrderWriter |
 | `messages: EdgeId → MessagePlan` | 见下 | MessageWriter |
-| `fragments?` | 组合片段主轴/次轴覆盖（渐进） | FragmentWriter |
+| `fragments` | 组合片段主轴/次轴覆盖（**已落地** M4） | FragmentWriter |
 | `activation_spans` | 激活起止消息行（可在 Compose 派生） | ActivationWriter |
 
 ```text
@@ -332,7 +322,7 @@ Sequence **不得**把消息委托给 Hier Channel：时间轴与生命线穿越
 | Self | `self_loop_width` / `self_loop_row_policy` | 40 / DoubleRow |
 | Activation | `activation_inset` / `activation_width` | 4 / 10 |
 | Order | `lifeline_order` | declaration |
-| Crossing | `lifeline_gap_style` | notch \| none \| hop |
+| Crossing | `lifeline_gap_style` | **notch**（默认）\| none；`hop` 后置硬失败 |
 | Label | `label_to_gap` | true（标签宽回写间距） |
 
 `orientation`：首期只实现 **生命线水平展开、时间向下**；四向变换后置，禁止四套消息拓扑。
@@ -373,11 +363,11 @@ Sequence **不得**把消息委托给 Hier Channel：时间轴与生命线穿越
 
 | 里程碑 | 交付 | 验收 | 前置 |
 |--------|------|------|------|
-| **M0** | Params bind · 声明序生命线 · 声明序消息行 · Horizontal + SelfLoop Ink | 简单时序可出图；禁 Router；本核只产 nodes+edges+diagnostics（生命线 render 占位） | 无 |
-| **M1** | Demand（标签宽→间距、自调用行高）· Plan/Metric/Ink verifier · **ADR-009 落地：`LayoutOutput.decorations` + finalize 合并** · 生命线/激活条 decoration | 长标签不压邻线；render 删除 M0 占位、改消费 decorations | **ADR-009 model+engine-api 落地** |
-| **M2** | 激活条派生与附着 depth · lifeline crossings/notch | 嵌套调用可读 | M1 |
-| **M3** | 一维排列可选策略 · 显式 pin | 优化不破坏声明硬约束 | M0 |
-| **M4** | 组合片段框（走 decorations.FragmentFrame，**不**进 `Graph::groups`） | 嵌套包含、无非法交叠 | M1 |
+| **M0（已落地）** | Params bind · 声明序生命线 · 声明序消息行 · Horizontal + SelfLoop Ink | 简单时序可出图；禁 Router | 无 |
+| **M1（已落地）** | Demand（标签宽→间距、自调用行高）· Plan/Metric/Ink verifier · **ADR-009：`LayoutOutput.decorations` + finalize 合并** · 生命线/激活条 decoration | 长标签不压邻线；render 消费 decorations | ADR-009 |
+| **M2（已落地）** | 激活条派生与附着 depth · lifeline crossings/notch | 嵌套调用可读 | M1 |
+| **M3（已落地）** | 一维排列可选策略 · 显式 pin | 优化不破坏声明硬约束 | M0 |
+| **M4（已落地）** | 组合片段框（走 decorations.FragmentFrame，**不**进 `Graph::groups`） | 嵌套包含、无非法交叠 | M1 |
 | **后置** | Async slanted · Lost/Found · 甘特连续轴 | 显式 `LayoutError` 直至落地 | — |
 
 ---

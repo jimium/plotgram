@@ -1,0 +1,23 @@
+// 短信验证码登录：请求验证码 → 校验 → 签发登录态
+diagram {
+    profile: sequence,
+    title: "短信验证码登录时序"
+
+    node user "用户" actor
+    node app "移动 App" client
+    node auth "认证服务" service
+    node otp_store "验证码缓存" cache
+    node sms "短信网关" gateway
+
+    user -> app "输入手机号"
+    app -> auth "请求验证码"
+    auth -> otp_store "生成并缓存验证码"
+    auth -> sms "调用短信下发"
+    sms --> user "收到短信验证码"
+    user -> app "输入验证码"
+    app -> auth "提交手机号与验证码"
+    auth -> otp_store "比对验证码"
+    otp_store --> auth "校验通过"
+    auth --> app "签发登录 Token"
+    app --> user "登录成功"
+}

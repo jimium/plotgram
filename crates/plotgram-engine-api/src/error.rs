@@ -23,6 +23,18 @@ pub enum LayoutError {
     #[error("unsupported route scene: {reason}")]
     UnsupportedRouteScene { reason: String },
 
+    /// Feature named but not implemented (honest hard-fail, never silent).
+    #[error("unsupported: {feature}")]
+    Unsupported { feature: String },
+
+    /// Author / constraint input cannot be realized.
+    #[error("{message}")]
+    InvalidInput { message: String },
+
+    /// Layout invariant broken (bug, not author error).
+    #[error("{message}")]
+    InternalInvariant { message: String },
+
     #[error("{0}")]
     Message(String),
 }
@@ -30,5 +42,23 @@ pub enum LayoutError {
 impl LayoutError {
     pub fn message(msg: impl Into<String>) -> Self {
         Self::Message(msg.into())
+    }
+
+    pub fn unsupported(feature: impl Into<String>) -> Self {
+        Self::Unsupported {
+            feature: feature.into(),
+        }
+    }
+
+    pub fn invalid_input(message: impl Into<String>) -> Self {
+        Self::InvalidInput {
+            message: message.into(),
+        }
+    }
+
+    pub fn invariant(message: impl Into<String>) -> Self {
+        Self::InternalInvariant {
+            message: message.into(),
+        }
     }
 }

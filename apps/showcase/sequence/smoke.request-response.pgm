@@ -1,0 +1,11 @@
+// 经典请求-响应：Client ↔ Server
+diagram {
+    profile: sequence,
+    title: "请求-响应"
+
+    node client "客户端" client
+    node server "服务端" service
+
+    client -> server "GET /api/health"
+    server --> client "200 OK"
+}

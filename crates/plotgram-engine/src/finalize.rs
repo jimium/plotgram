@@ -7,13 +7,14 @@
 //! group-frame writer.
 
 use plotgram_layout::layout::hierarchical::{GROUP_LABEL_TOP_PAD, GROUP_PAD};
-use plotgram_router::core::union_rects;
 use plotgram_model::diagnostics::LayoutDiagnostics;
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::graph::Graph;
 use plotgram_model::result::{
-    EdgePath, EdgePlacement, GroupPlacement, LabelOwner, LabelSlot, LayoutResult, NodePlacement,
+    Decoration, EdgePath, EdgePlacement, GroupPlacement, LabelOwner, LabelSlot, LayoutResult,
+    NodePlacement,
 };
+use plotgram_router::core::union_rects;
 
 const CANVAS_PAD: f64 = 24.0;
 
@@ -24,6 +25,7 @@ pub fn finalize(
     mut groups: Vec<GroupPlacement>,
     owns_group_frames: bool,
     mut diagnostics: LayoutDiagnostics,
+    mut decorations: Vec<Decoration>,
 ) -> LayoutResult {
     // Write authority (group-frame-d2.md §6.2 / §6.3): layouts that own group
     // geometry set `owns_group_frames` — pass through even when empty. Only
@@ -38,7 +40,7 @@ pub fn finalize(
     // Content includes edge paths (self-loops / outer corridors often stick
     // past node frames — omitting them makes the stroke sit on the canvas
     // edge when out_dist ≈ CANVAS_PAD).
-    let (dx, dy) = content_shift(&nodes, &groups, &edges);
+    let (dx, dy) = content_shift(&nodes, &groups, &edges, &decorations);
     if dx != 0.0 || dy != 0.0 {
         for n in &mut nodes {
             n.frame.x += dx;
@@ -50,6 +52,9 @@ pub fn finalize(
         for g in &mut groups {
             g.frame.x += dx;
             g.frame.y += dy;
+        }
+        for d in &mut decorations {
+            d.translate(dx, dy);
         }
         // Partition band obs is emitted in layout-normalized space; keep it
         // in the same physical frame as node/group rects after canvas pad.
@@ -65,8 +70,8 @@ pub fn finalize(
         }
     }
 
-    let labels = simple_labels(graph, &nodes, &groups);
-    let (canvas_width, canvas_height) = canvas_size(&nodes, &groups, &edges);
+    let labels = simple_labels(graph, &nodes, &groups, &edges);
+    let (canvas_width, canvas_height) = canvas_size(&nodes, &groups, &edges, &decorations);
 
     LayoutResult {
         nodes,
@@ -76,6 +81,7 @@ pub fn finalize(
         canvas_width,
         canvas_height,
         diagnostics,
+        decorations,
     }
 }
 
@@ -86,18 +92,20 @@ fn content_shift(
     nodes: &[NodePlacement],
     groups: &[GroupPlacement],
     edges: &[EdgePlacement],
+    decorations: &[Decoration],
 ) -> (f64, f64) {
-    match content_bbox(nodes, groups, edges) {
+    match content_bbox(nodes, groups, edges, decorations) {
         Some(u) => (CANVAS_PAD - u.x, CANVAS_PAD - u.y),
         None => (0.0, 0.0),
     }
 }
 
-/// Axis-aligned union of node frames, group frames, and edge path extents.
+/// Axis-aligned union of node frames, group frames, edge paths, and decorations.
 fn content_bbox(
     nodes: &[NodePlacement],
     groups: &[GroupPlacement],
     edges: &[EdgePlacement],
+    decorations: &[Decoration],
 ) -> Option<Rect> {
     let mut rects: Vec<Rect> = nodes.iter().map(|n| n.frame).collect();
     rects.extend(groups.iter().map(|g| g.frame));
@@ -105,6 +113,9 @@ fn content_bbox(
         if let Some(r) = path_bbox(&e.path) {
             rects.push(r);
         }
+    }
+    for d in decorations {
+        rects.push(d.bbox());
     }
     union_rects(&rects)
 }
@@ -234,6 +245,7 @@ fn simple_labels(
     graph: &Graph,
     nodes: &[NodePlacement],
     groups: &[GroupPlacement],
+    edges: &[EdgePlacement],
 ) -> Vec<LabelSlot> {
     let mut labels = Vec::new();
     for n in nodes {
@@ -245,6 +257,27 @@ fn simple_labels(
                     text: text.clone(),
                     frame: n.frame,
                 });
+            }
+        }
+    }
+    for e in edges {
+        if let Some(edge) = graph.find_edge(&e.id) {
+            if let Some(text) = edge.label.as_ref() {
+                if !text.is_empty() {
+                    let (tw, th) = estimate_label_frame(text);
+                    let (anchor, u_like) = edge_label_anchor(&e.path);
+                    let frame = if u_like {
+                        Rect::new(anchor.x + 4.0, anchor.y - th / 2.0, tw, th)
+                    } else {
+                        Rect::new(anchor.x - tw / 2.0, anchor.y - th - 2.0, tw, th)
+                    };
+                    labels.push(LabelSlot {
+                        owner: LabelOwner::Edge(e.id.clone()),
+                        role: Some("mid".into()),
+                        text: text.clone(),
+                        frame,
+                    });
+                }
             }
         }
     }
@@ -262,6 +295,39 @@ fn simple_labels(
         }
     }
     labels
+}
+
+fn estimate_label_frame(text: &str) -> (f64, f64) {
+    let mut w = 0.0;
+    for ch in text.chars() {
+        w += if (ch as u32) > 0x7f { 12.0 } else { 7.2 };
+    }
+    ((w + 8.0_f64).max(12.0), 16.0)
+}
+
+fn edge_label_anchor(path: &EdgePath) -> (Point, bool) {
+    let pts = path.samples();
+    if pts.is_empty() {
+        return (Point { x: 0.0, y: 0.0 }, false);
+    }
+    if pts.len() >= 4 {
+        let first = pts[0];
+        let last = pts[pts.len() - 1];
+        if (first.x - last.x).abs() < 1.0 {
+            let max_x = pts.iter().map(|p| p.x).fold(f64::NEG_INFINITY, f64::max);
+            let min_y = pts.iter().map(|p| p.y).fold(f64::INFINITY, f64::min);
+            return (Point { x: max_x, y: min_y }, true);
+        }
+    }
+    let a = pts[0];
+    let b = pts[pts.len() - 1];
+    (
+        Point {
+            x: (a.x + b.x) / 2.0,
+            y: a.y.min(b.y),
+        },
+        false,
+    )
 }
 
 fn find_group<'a>(graph: &'a Graph, id: &str) -> Option<&'a plotgram_model::graph::Group> {
@@ -291,8 +357,9 @@ fn canvas_size(
     nodes: &[NodePlacement],
     groups: &[GroupPlacement],
     edges: &[EdgePlacement],
+    decorations: &[Decoration],
 ) -> (f64, f64) {
-    match content_bbox(nodes, groups, edges) {
+    match content_bbox(nodes, groups, edges, decorations) {
         Some(u) => (u.right() + CANVAS_PAD, u.bottom() + CANVAS_PAD),
         None => (CANVAS_PAD * 2.0, CANVAS_PAD * 2.0),
     }
@@ -349,6 +416,7 @@ mod tests {
             groups,
             true, // layout owns frames — must not recompute
             LayoutDiagnostics::default(),
+            vec![],
         );
         assert_eq!(result.groups.len(), 1);
         let out = result.groups[0].frame;
@@ -401,6 +469,7 @@ mod tests {
             vec![], // layout owned but emitted nothing
             true,
             LayoutDiagnostics::default(),
+            vec![],
         );
         assert!(
             result.groups.is_empty(),

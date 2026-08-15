@@ -50,6 +50,45 @@ pub(crate) fn take_string_attr(
     }
 }
 
+fn stamp_fragment_attrs(
+    attrs: &mut AttrMap,
+    path: &[(String, String)],
+    label: Option<&str>,
+    operand_path: &[Option<u32>],
+) {
+    let ids: Vec<&str> = path.iter().map(|(id, _)| id.as_str()).collect();
+    let kinds: Vec<&str> = path.iter().map(|(_, k)| k.as_str()).collect();
+    attrs.insert("fragment".into(), AttrValue::Atom(ids.join(".")));
+    if let Some((_, kind)) = path.last() {
+        attrs.insert("fragment_kind".into(), AttrValue::Atom(kind.clone()));
+    }
+    if !kinds.is_empty() {
+        attrs.insert(
+            "fragment_path_kinds".into(),
+            AttrValue::Atom(kinds.join(".")),
+        );
+    }
+    if let Some(l) = label {
+        if !attrs.contains_key("fragment_label") {
+            attrs.insert("fragment_label".into(), AttrValue::Str(l.to_string()));
+        }
+    }
+    if operand_path.iter().any(Option::is_some) {
+        let encoded = operand_path
+            .iter()
+            .map(|o| match o {
+                Some(n) => n.to_string(),
+                None => "-".into(),
+            })
+            .collect::<Vec<_>>()
+            .join(".");
+        attrs.insert("fragment_path_operands".into(), AttrValue::Atom(encoded));
+        if let Some(op) = operand_path.last().copied().flatten() {
+            attrs.insert("fragment_operand".into(), AttrValue::Num(f64::from(op)));
+        }
+    }
+}
+
 /// Lower AST to a graph + metadata.
 pub fn lower(ast: &FileAst) -> Result<Lowered, ParseError> {
     let mut ctx = LowerCtx::new();
@@ -61,8 +100,11 @@ pub fn lower(ast: &FileAst) -> Result<Lowered, ParseError> {
         graph.partition = Some(lower_partition(partition_ast));
     }
 
-    // Self-loop check
-    let allows_self_loop = meta.profile.map(|p| p.allows_self_loop()).unwrap_or(false);
+    // Self-loop check. Sequence SelfCall is a first-class message (scope.md);
+    // honour both the profile flag and an explicit `layout: sequence`.
+    let layout_is_sequence = meta.layout.as_ref().is_some_and(|l| l.name == "sequence");
+    let allows_self_loop =
+        meta.profile.map(|p| p.allows_self_loop()).unwrap_or(false) || layout_is_sequence;
     if !allows_self_loop {
         ctx.check_self_loops(&graph)?;
     }
@@ -98,6 +140,8 @@ struct LowerCtx {
     node_ids: HashSet<String>,
     /// All declared group ids.
     group_ids: HashSet<String>,
+    /// Combined-fragment ids (must be unique; not in the node/group namespace).
+    fragment_ids: HashSet<String>,
 }
 
 impl LowerCtx {
@@ -107,6 +151,7 @@ impl LowerCtx {
             pending_group_edges: Vec::new(),
             node_ids: HashSet::new(),
             group_ids: HashSet::new(),
+            fragment_ids: HashSet::new(),
         }
     }
 
@@ -127,6 +172,12 @@ impl LowerCtx {
                     self.group_ids.insert(g.id.clone());
                     self.collect_ids(&g.items);
                 }
+                DiagramItem::Fragment(f) => {
+                    self.collect_ids(&f.items);
+                    for op in &f.operands {
+                        self.collect_ids(&op.items);
+                    }
+                }
                 DiagramItem::Edge(_) => {}
             }
         }
@@ -143,6 +194,12 @@ impl LowerCtx {
                 }
                 DiagramItem::Group(g) => {
                     ids.extend(Self::collect_descendant_node_ids(&g.items));
+                }
+                DiagramItem::Fragment(f) => {
+                    ids.extend(Self::collect_descendant_node_ids(&f.items));
+                    for op in &f.operands {
+                        ids.extend(Self::collect_descendant_node_ids(&op.items));
+                    }
                 }
                 DiagramItem::Edge(_) => {}
             }
@@ -194,6 +251,9 @@ impl LowerCtx {
                 DiagramItem::Edge(e) => {
                     // Top-level edges: validate against global node set
                     self.lower_edge_into(e, &mut graph.edges, &self.node_ids.clone())?;
+                }
+                DiagramItem::Fragment(f) => {
+                    self.lower_fragment(f, &mut graph.edges, &self.node_ids.clone(), &[], &[])?;
                 }
             }
         }
@@ -258,6 +318,11 @@ impl LowerCtx {
                 DiagramItem::Edge(e) => {
                     // Group edges: validate against this group's descendants only
                     self.lower_edge_into(e, &mut edges, &local_node_ids)?;
+                }
+                DiagramItem::Fragment(_) => {
+                    return Err(ParseError::Semantic(
+                        "fragment blocks cannot appear inside a group".into(),
+                    ));
                 }
             }
         }
@@ -359,6 +424,83 @@ impl LowerCtx {
         Ok(())
     }
 
+    fn lower_fragment(
+        &mut self,
+        frag: &FragmentAst,
+        edges: &mut Vec<Edge>,
+        scope: &HashSet<String>,
+        prefix: &[(String, String)],
+        prefix_ops: &[Option<u32>],
+    ) -> Result<(), ParseError> {
+        if !self.fragment_ids.insert(frag.id.clone()) {
+            return Err(ParseError::Semantic(format!(
+                "duplicate fragment id `{}`",
+                frag.id
+            )));
+        }
+        let mut path: Vec<(String, String)> = prefix.to_vec();
+        path.push((frag.id.clone(), frag.kind.clone()));
+        let has_else = !frag.operands.is_empty();
+        let label = frag
+            .attrs
+            .get("label")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let mut main_ops = prefix_ops.to_vec();
+        main_ops.push(if has_else { Some(0) } else { None });
+        self.lower_fragment_items(
+            &frag.items,
+            edges,
+            scope,
+            &path,
+            label.as_deref(),
+            &main_ops,
+        )?;
+        for (i, op) in frag.operands.iter().enumerate() {
+            let mut else_ops = prefix_ops.to_vec();
+            else_ops.push(Some((i + 1) as u32));
+            self.lower_fragment_items(&op.items, edges, scope, &path, None, &else_ops)?;
+        }
+        Ok(())
+    }
+
+    fn lower_fragment_items(
+        &mut self,
+        items: &[DiagramItem],
+        edges: &mut Vec<Edge>,
+        scope: &HashSet<String>,
+        path: &[(String, String)],
+        label: Option<&str>,
+        operand_path: &[Option<u32>],
+    ) -> Result<(), ParseError> {
+        for item in items {
+            match item {
+                DiagramItem::Edge(e) => {
+                    let mut stamped = e.clone();
+                    stamp_fragment_attrs(&mut stamped.attrs, path, label, operand_path);
+                    self.lower_edge_into(&stamped, edges, scope)?;
+                }
+                DiagramItem::Fragment(child) => {
+                    self.lower_fragment(child, edges, scope, path, operand_path)?;
+                }
+                DiagramItem::Node(n) => {
+                    let fid = path.last().map(|(id, _)| id.as_str()).unwrap_or("?");
+                    return Err(ParseError::Semantic(format!(
+                        "fragment `{fid}`: node `{}` is not allowed inside a fragment",
+                        n.id
+                    )));
+                }
+                DiagramItem::Group(g) => {
+                    return Err(ParseError::Semantic(format!(
+                        "fragment: group `{}` is not allowed inside a fragment",
+                        g.id
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn lower_meta(&self, diagram: &DiagramAst) -> Result<DiagramMeta, ParseError> {
         let mut meta = DiagramMeta::default();
 
@@ -366,11 +508,10 @@ impl LowerCtx {
             match key.as_str() {
                 "profile" => {
                     let atom = value.as_str().unwrap_or_default();
-                    let dt = DiagramType::from_str(atom).ok_or_else(|| {
-                        ParseError::UnknownProfile {
+                    let dt =
+                        DiagramType::from_str(atom).ok_or_else(|| ParseError::UnknownProfile {
                             value: atom.to_string(),
-                        }
-                    })?;
+                        })?;
                     meta.profile = Some(dt);
                 }
                 "title" => {
@@ -477,14 +618,16 @@ mod tests {
 
     #[test]
     fn group_with_members() {
-        let lowered = lower_ok(r#"diagram {
+        let lowered = lower_ok(
+            r#"diagram {
             group g1 {
                 label: "G1"
                 node a { label: "A" }
                 node b {}
                 a -> b
             }
-        }"#);
+        }"#,
+        );
         assert_eq!(lowered.graph.groups.len(), 1);
         let g = &lowered.graph.groups[0];
         assert_eq!(g.label.as_deref(), Some("G1"));
@@ -506,7 +649,8 @@ mod tests {
 
     #[test]
     fn layout_algorithm_config() {
-        let lowered = lower_ok("diagram { layout: hierarchical { direction: top-to-bottom } node a {} }");
+        let lowered =
+            lower_ok("diagram { layout: hierarchical { direction: top-to-bottom } node a {} }");
         let layout = lowered.meta.layout.unwrap();
         assert_eq!(layout.name, "hierarchical");
         assert_eq!(
@@ -517,7 +661,8 @@ mod tests {
 
     #[test]
     fn edge_label_lifted() {
-        let lowered = lower_ok(r#"diagram { node a {} node b {} a -> b { label: "req", head_label: "1" } }"#);
+        let lowered =
+            lower_ok(r#"diagram { node a {} node b {} a -> b { label: "req", head_label: "1" } }"#);
         let e = &lowered.graph.edges[0];
         assert_eq!(e.label.as_deref(), Some("req"));
         assert_eq!(e.head_label.as_deref(), Some("1"));
@@ -533,11 +678,13 @@ mod tests {
 
     #[test]
     fn group_edge_deferred() {
-        let lowered = lower_ok(r#"diagram {
+        let lowered = lower_ok(
+            r#"diagram {
             group fe { node web {} }
             group be { node api {} }
             @fe -> @be { from_side: east, to_side: west }
-        }"#);
+        }"#,
+        );
         assert_eq!(lowered.graph.edges.len(), 0);
         assert_eq!(lowered.pending_group_edges.len(), 1);
         let pe = &lowered.pending_group_edges[0];
@@ -556,6 +703,14 @@ mod tests {
     fn self_loop_allowed_flowchart() {
         let lowered = lower_ok("diagram { profile: flowchart node a {} a -> a }");
         assert_eq!(lowered.graph.edges.len(), 1);
+    }
+
+    #[test]
+    fn self_call_allowed_sequence() {
+        let lowered = lower_ok("diagram { profile: sequence node a {} a -> a }");
+        assert_eq!(lowered.graph.edges.len(), 1);
+        let explicit = lower_ok("diagram { layout: sequence node a {} a -> a }");
+        assert_eq!(explicit.graph.edges.len(), 1);
     }
 
     #[test]

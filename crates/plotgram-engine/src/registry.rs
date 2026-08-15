@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use plotgram_engine_api::{EdgeRouter, LayoutAlgorithm};
 
-use plotgram_layout::HierarchicalLayout;
+use plotgram_layout::{HierarchicalLayout, SequenceLayout, TreeLayout};
 use plotgram_router::{
     CurvedEdgeRouter, OctilinearEdgeRouter, OrthogonalEdgeRouter, PolylineEdgeRouter,
     StraightEdgeRouter,
@@ -19,8 +19,13 @@ pub struct Registry {
 impl Registry {
     pub fn standard() -> Self {
         let mut layouts: BTreeMap<&'static str, Arc<dyn LayoutAlgorithm>> = BTreeMap::new();
-        let hier: Arc<dyn LayoutAlgorithm> = Arc::new(HierarchicalLayout);
-        layouts.insert(hier.name(), hier);
+        for layout in [
+            Arc::new(HierarchicalLayout) as Arc<dyn LayoutAlgorithm>,
+            Arc::new(SequenceLayout),
+            Arc::new(TreeLayout),
+        ] {
+            layouts.insert(layout.name(), layout);
+        }
 
         let mut routers: BTreeMap<&'static str, Arc<dyn EdgeRouter>> = BTreeMap::new();
         for router in [

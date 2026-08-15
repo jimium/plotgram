@@ -14,9 +14,18 @@ use crate::lexer::{Lexer, Token, TokenKind};
 /// Reserved words that cannot be used as identifiers (dsl-spec §10).
 /// They remain valid as atom *values* (e.g. `profile: flowchart`).
 const RESERVED_WORDS: &[&str] = &[
-    "diagram", "node", "group", "partition",
-    "flowchart", "sequence", "architecture", "state", "er", "mindmap",
-    "true", "false",
+    "diagram",
+    "node",
+    "group",
+    "partition",
+    "flowchart",
+    "sequence",
+    "architecture",
+    "state",
+    "er",
+    "mindmap",
+    "true",
+    "false",
 ];
 
 /// Parse a full `.pgm` source into an AST.
@@ -81,7 +90,11 @@ impl Parser {
             Err(ParseError::syntax(
                 tok.line,
                 tok.column,
-                format!("expected {}, found {}", expected.display_name(), self.peek_kind().display_name()),
+                format!(
+                    "expected {}, found {}",
+                    expected.display_name(),
+                    self.peek_kind().display_name()
+                ),
             ))
         }
     }
@@ -106,7 +119,10 @@ impl Parser {
                 Err(ParseError::syntax(
                     tok.line,
                     tok.column,
-                    format!("expected identifier, found {}", self.peek_kind().display_name()),
+                    format!(
+                        "expected identifier, found {}",
+                        self.peek_kind().display_name()
+                    ),
                 ))
             }
         }
@@ -124,8 +140,11 @@ impl Parser {
                 Ok((name, tok.line, tok.column))
             }
             // Keywords can appear as atom values (e.g. profile: flowchart)
-            TokenKind::Diagram | TokenKind::Node | TokenKind::Group
-            | TokenKind::True | TokenKind::False => {
+            TokenKind::Diagram
+            | TokenKind::Node
+            | TokenKind::Group
+            | TokenKind::True
+            | TokenKind::False => {
                 let (name, line, col) = {
                     let tok = self.current();
                     let n = match tok.kind {
@@ -180,7 +199,9 @@ impl Parser {
 
     fn register_id(&mut self, id: &str, line: u32) -> Result<(), ParseError> {
         if self.declared_ids.contains(id) {
-            let first_line = self.id_lines.iter()
+            let first_line = self
+                .id_lines
+                .iter()
                 .find(|(name, _)| name == id)
                 .map(|(_, l)| *l)
                 .unwrap_or(0);
@@ -215,7 +236,8 @@ impl Parser {
 
     /// Lookahead: next item is a diagram/group body attribute (`key: value`), not a member declaration.
     fn lookahead_is_body_attribute(&self) -> bool {
-        matches!(self.peek_kind(), TokenKind::Ident(_) | TokenKind::Atom(_)) && self.lookahead_is_colon()
+        matches!(self.peek_kind(), TokenKind::Ident(_) | TokenKind::Atom(_))
+            && self.lookahead_is_colon()
     }
 
     fn parse_diagram(&mut self) -> Result<DiagramAst, ParseError> {
@@ -282,6 +304,9 @@ impl Parser {
                     }
                     self.after_body_attribute("diagram")?;
                 }
+                TokenKind::Ident(ref name) if name == "fragment" && !self.lookahead_is_colon() => {
+                    items.push(DiagramItem::Fragment(self.parse_fragment()?));
+                }
                 TokenKind::Ident(_) | TokenKind::At => {
                     // Edge declaration
                     items.push(DiagramItem::Edge(self.parse_edge()?));
@@ -291,7 +316,10 @@ impl Parser {
                     return Err(ParseError::syntax(
                         tok.line,
                         tok.column,
-                        format!("unexpected {} in diagram body", self.peek_kind().display_name()),
+                        format!(
+                            "unexpected {} in diagram body",
+                            self.peek_kind().display_name()
+                        ),
                     ));
                 }
             }
@@ -318,7 +346,9 @@ impl Parser {
     }
 
     /// Parse diagram attribute with special algorithm_config handling for layout/edge_routing.
-    fn parse_diagram_attr_special(&mut self) -> Result<(String, Option<AlgorithmConfigAst>, Option<AttrValue>), ParseError> {
+    fn parse_diagram_attr_special(
+        &mut self,
+    ) -> Result<(String, Option<AlgorithmConfigAst>, Option<AttrValue>), ParseError> {
         let key = self.parse_attribute_key()?;
         self.expect(&TokenKind::Colon)?;
 
@@ -347,14 +377,21 @@ impl Parser {
         while !self.at_eof() && !matches!(self.peek_kind(), TokenKind::RBrace) {
             // Expect `column` or `row` as contextual keyword (lexed as Ident)
             let (is_column, kw_line, kw_col) = match self.peek_kind().clone() {
-                TokenKind::Ident(ref name) if name == "column" => (true, self.current().line, self.current().column),
-                TokenKind::Ident(ref name) if name == "row" => (false, self.current().line, self.current().column),
+                TokenKind::Ident(ref name) if name == "column" => {
+                    (true, self.current().line, self.current().column)
+                }
+                TokenKind::Ident(ref name) if name == "row" => {
+                    (false, self.current().line, self.current().column)
+                }
                 _ => {
                     let tok = self.current();
                     return Err(ParseError::syntax(
                         tok.line,
                         tok.column,
-                        format!("expected `column` or `row` in partition body, found {}", self.peek_kind().display_name()),
+                        format!(
+                            "expected `column` or `row` in partition body, found {}",
+                            self.peek_kind().display_name()
+                        ),
                     ));
                 }
             };
@@ -410,14 +447,19 @@ impl Parser {
             }
 
             let _ = (kw_line, kw_col); // used above for error context
-            axes.push(PartitionAxisAst { is_column, id, label });
+            axes.push(PartitionAxisAst {
+                is_column,
+                id,
+                label,
+            });
         }
 
         self.expect(&TokenKind::RBrace)?;
 
         if axes.is_empty() {
             return Err(ParseError::Semantic(
-                "partition block must declare at least one `column` or `row` (dsl-spec §11.10)".into(),
+                "partition block must declare at least one `column` or `row` (dsl-spec §11.10)"
+                    .into(),
             ));
         }
 
@@ -484,10 +526,7 @@ impl Parser {
 
     /// Check if current token can start an atom (for positional sugar).
     fn is_atom_start(&self) -> bool {
-        matches!(
-            self.peek_kind(),
-            TokenKind::Ident(_) | TokenKind::Atom(_)
-        )
+        matches!(self.peek_kind(), TokenKind::Ident(_) | TokenKind::Atom(_))
     }
 
     /// Check if current token is an atom AND on the same line as `line`.
@@ -537,6 +576,15 @@ impl Parser {
                     attrs.insert(key, value);
                     self.after_body_attribute(&format!("group {id}"))?;
                 }
+                TokenKind::Ident(ref name) if name == "fragment" && !self.lookahead_is_colon() => {
+                    let tok = self.current();
+                    return Err(ParseError::syntax(
+                        tok.line,
+                        tok.column,
+                        "fragment blocks belong at diagram top level (or nested in a fragment), \
+                         not inside `group`",
+                    ));
+                }
                 TokenKind::Ident(_) | TokenKind::At => {
                     // Edge within group
                     items.push(DiagramItem::Edge(self.parse_edge()?));
@@ -546,7 +594,10 @@ impl Parser {
                     return Err(ParseError::syntax(
                         tok.line,
                         tok.column,
-                        format!("unexpected {} in group body", self.peek_kind().display_name()),
+                        format!(
+                            "unexpected {} in group body",
+                            self.peek_kind().display_name()
+                        ),
                     ));
                 }
             }
@@ -555,6 +606,132 @@ impl Parser {
         self.expect(&TokenKind::RBrace)?;
 
         Ok(GroupAst { id, attrs, items })
+    }
+
+    // ── Combined fragment (sequence; contextual keyword) ─
+
+    fn parse_fragment(&mut self) -> Result<FragmentAst, ParseError> {
+        self.advance(); // consume `fragment`
+        let (kind, _, _) = self.expect_atom()?;
+        let (id, line, _col) = self.expect_ident()?;
+        self.register_id(&id, line)?;
+
+        let mut attrs = AttrMap::new();
+        if matches!(self.peek_kind(), TokenKind::StringLit(_)) {
+            let (label, _, _) = self.expect_string()?;
+            if !label.is_empty() {
+                attrs.insert("label".to_string(), AttrValue::Str(label));
+            }
+        }
+
+        self.expect(&TokenKind::LBrace)?;
+
+        let mut items: Vec<DiagramItem> = Vec::new();
+        let mut operands: Vec<FragmentOperandAst> = Vec::new();
+        let mut seen_else = false;
+
+        while !self.at_eof() && !matches!(self.peek_kind(), TokenKind::RBrace) {
+            if matches!(self.peek_kind(), TokenKind::Ident(ref n) if n == "else")
+                && self.lookahead_is_lbrace()
+            {
+                seen_else = true;
+                operands.push(self.parse_fragment_operand()?);
+                continue;
+            }
+            if seen_else {
+                let tok = self.current();
+                return Err(ParseError::syntax(
+                    tok.line,
+                    tok.column,
+                    "only `else { … }` blocks may follow the first `else` in a fragment",
+                ));
+            }
+            match self.peek_kind().clone() {
+                TokenKind::Ident(ref name) if name == "fragment" && !self.lookahead_is_colon() => {
+                    items.push(DiagramItem::Fragment(self.parse_fragment()?));
+                }
+                TokenKind::Ident(_) | TokenKind::Atom(_) if self.lookahead_is_colon() => {
+                    let (key, value) = self.parse_attribute()?;
+                    if attrs.contains_key(&key) {
+                        return Err(ParseError::DuplicateAttr {
+                            key: key.clone(),
+                            context: format!("fragment {id}"),
+                        });
+                    }
+                    attrs.insert(key, value);
+                    self.after_body_attribute(&format!("fragment {id}"))?;
+                }
+                TokenKind::Ident(_) | TokenKind::At => {
+                    items.push(DiagramItem::Edge(self.parse_edge()?));
+                }
+                TokenKind::Node | TokenKind::Group => {
+                    let tok = self.current();
+                    return Err(ParseError::syntax(
+                        tok.line,
+                        tok.column,
+                        "fragment body may only contain messages, nested fragments, \
+                         attributes, and `else` operands — participants stay at diagram top level",
+                    ));
+                }
+                _ => {
+                    let tok = self.current();
+                    return Err(ParseError::syntax(
+                        tok.line,
+                        tok.column,
+                        format!(
+                            "unexpected {} in fragment body",
+                            self.peek_kind().display_name()
+                        ),
+                    ));
+                }
+            }
+        }
+
+        self.expect(&TokenKind::RBrace)?;
+        Ok(FragmentAst {
+            id,
+            kind,
+            attrs,
+            items,
+            operands,
+        })
+    }
+
+    fn parse_fragment_operand(&mut self) -> Result<FragmentOperandAst, ParseError> {
+        self.advance(); // `else`
+        self.expect(&TokenKind::LBrace)?;
+        let mut items: Vec<DiagramItem> = Vec::new();
+        while !self.at_eof() && !matches!(self.peek_kind(), TokenKind::RBrace) {
+            match self.peek_kind().clone() {
+                TokenKind::Ident(ref name) if name == "fragment" && !self.lookahead_is_colon() => {
+                    items.push(DiagramItem::Fragment(self.parse_fragment()?));
+                }
+                TokenKind::Ident(_) | TokenKind::At => {
+                    items.push(DiagramItem::Edge(self.parse_edge()?));
+                }
+                _ => {
+                    let tok = self.current();
+                    return Err(ParseError::syntax(
+                        tok.line,
+                        tok.column,
+                        format!(
+                            "unexpected {} in fragment else block",
+                            self.peek_kind().display_name()
+                        ),
+                    ));
+                }
+            }
+        }
+        self.expect(&TokenKind::RBrace)?;
+        Ok(FragmentOperandAst { items })
+    }
+
+    fn lookahead_is_lbrace(&self) -> bool {
+        if self.pos + 1 < self.tokens.len() {
+            matches!(self.tokens[self.pos + 1].kind, TokenKind::LBrace)
+        } else {
+            false
+        }
     }
 
     // ── Edge ─────────────────────────────────────────────
@@ -619,7 +796,10 @@ impl Parser {
                 Err(ParseError::syntax(
                     tok.line,
                     tok.column,
-                    format!("expected endpoint (identifier or @group), found {}", self.peek_kind().display_name()),
+                    format!(
+                        "expected endpoint (identifier or @group), found {}",
+                        self.peek_kind().display_name()
+                    ),
                 ))
             }
         }
@@ -644,7 +824,10 @@ impl Parser {
                 Err(ParseError::syntax(
                     tok.line,
                     tok.column,
-                    format!("expected arrow ('->', '-->', '<->'), found {}", self.peek_kind().display_name()),
+                    format!(
+                        "expected arrow ('->', '-->', '<->'), found {}",
+                        self.peek_kind().display_name()
+                    ),
                 ))
             }
         }
@@ -689,7 +872,9 @@ impl Parser {
                     return Err(ParseError::syntax(
                         tok.line,
                         tok.column,
-                        format!("`{name}` is a reserved word and cannot be used as an attribute key"),
+                        format!(
+                            "`{name}` is a reserved word and cannot be used as an attribute key"
+                        ),
                     ));
                 }
                 self.advance();
@@ -710,7 +895,10 @@ impl Parser {
                 Err(ParseError::syntax(
                     tok.line,
                     tok.column,
-                    format!("expected attribute key, found {}", self.peek_kind().display_name()),
+                    format!(
+                        "expected attribute key, found {}",
+                        self.peek_kind().display_name()
+                    ),
                 ))
             }
         }
@@ -752,7 +940,10 @@ impl Parser {
                 Err(ParseError::syntax(
                     tok.line,
                     tok.column,
-                    format!("expected attribute value, found {}", self.peek_kind().display_name()),
+                    format!(
+                        "expected attribute value, found {}",
+                        self.peek_kind().display_name()
+                    ),
                 ))
             }
         }
@@ -825,9 +1016,7 @@ impl Parser {
 
         Ok(AlgorithmConfigAst { name, options })
     }
-
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -850,12 +1039,14 @@ mod tests {
 
     #[test]
     fn diagram_with_profile_and_attrs() {
-        let ast = parse_ok(r#"diagram {
+        let ast = parse_ok(
+            r#"diagram {
             profile: flowchart,
             title: "Test",
             theme: common.clean-light
             node a { label: "A" }
-        }"#);
+        }"#,
+        );
         assert_eq!(
             ast.diagram.attrs.get("profile"),
             Some(&AttrValue::Atom("flowchart".into()))
@@ -887,7 +1078,10 @@ mod tests {
         match &ast.diagram.items[0] {
             DiagramItem::Node(n) => {
                 assert_eq!(n.id, "login");
-                assert_eq!(n.attrs.get("label"), Some(&AttrValue::Str("用户登录".into())));
+                assert_eq!(
+                    n.attrs.get("label"),
+                    Some(&AttrValue::Str("用户登录".into()))
+                );
             }
             _ => panic!("expected node"),
         }
@@ -899,7 +1093,10 @@ mod tests {
         match &ast.diagram.items[0] {
             DiagramItem::Node(n) => {
                 assert_eq!(n.attrs.get("label"), Some(&AttrValue::Str("用户库".into())));
-                assert_eq!(n.attrs.get("archetype"), Some(&AttrValue::Atom("database".into())));
+                assert_eq!(
+                    n.attrs.get("archetype"),
+                    Some(&AttrValue::Atom("database".into()))
+                );
                 assert_eq!(n.attrs.get("icon"), Some(&AttrValue::Atom("mysql".into())));
             }
             _ => panic!("expected node"),
@@ -912,7 +1109,10 @@ mod tests {
         match &ast.diagram.items[0] {
             DiagramItem::Node(n) => {
                 assert!(!n.attrs.contains_key("label"));
-                assert_eq!(n.attrs.get("archetype"), Some(&AttrValue::Atom("database".into())));
+                assert_eq!(
+                    n.attrs.get("archetype"),
+                    Some(&AttrValue::Atom("database".into()))
+                );
             }
             _ => panic!("expected node"),
         }
@@ -924,8 +1124,14 @@ mod tests {
         match &ast.diagram.items[0] {
             DiagramItem::Node(n) => {
                 assert_eq!(n.attrs.get("label"), Some(&AttrValue::Str("库".into())));
-                assert_eq!(n.attrs.get("archetype"), Some(&AttrValue::Atom("database".into())));
-                assert_eq!(n.attrs.get("variant"), Some(&AttrValue::Atom("primary".into())));
+                assert_eq!(
+                    n.attrs.get("archetype"),
+                    Some(&AttrValue::Atom("database".into()))
+                );
+                assert_eq!(
+                    n.attrs.get("variant"),
+                    Some(&AttrValue::Atom("primary".into()))
+                );
             }
             _ => panic!("expected node"),
         }
@@ -952,17 +1158,22 @@ mod tests {
 
     #[test]
     fn group_canonical() {
-        let ast = parse_ok(r#"diagram {
+        let ast = parse_ok(
+            r#"diagram {
             group compute {
                 label: "计算层",
                 variant: muted
                 node spark { label: "Spark" }
             }
-        }"#);
+        }"#,
+        );
         match &ast.diagram.items[0] {
             DiagramItem::Group(g) => {
                 assert_eq!(g.attrs.get("label"), Some(&AttrValue::Str("计算层".into())));
-                assert_eq!(g.attrs.get("variant"), Some(&AttrValue::Atom("muted".into())));
+                assert_eq!(
+                    g.attrs.get("variant"),
+                    Some(&AttrValue::Atom("muted".into()))
+                );
             }
             _ => panic!("expected group"),
         }
@@ -982,15 +1193,20 @@ mod tests {
 
     #[test]
     fn edge_with_block() {
-        let ast = parse_ok(r#"diagram {
+        let ast = parse_ok(
+            r#"diagram {
             node a {} node b {}
             a --> b { label: "响应", variant: secondary }
-        }"#);
+        }"#,
+        );
         match &ast.diagram.items[2] {
             DiagramItem::Edge(e) => {
                 assert_eq!(e.arrow, Arrow::Response);
                 assert_eq!(e.attrs.get("label"), Some(&AttrValue::Str("响应".into())));
-                assert_eq!(e.attrs.get("variant"), Some(&AttrValue::Atom("secondary".into())));
+                assert_eq!(
+                    e.attrs.get("variant"),
+                    Some(&AttrValue::Atom("secondary".into()))
+                );
             }
             _ => panic!("expected edge"),
         }
@@ -998,16 +1214,21 @@ mod tests {
 
     #[test]
     fn edge_group_endpoint() {
-        let ast = parse_ok(r#"diagram {
+        let ast = parse_ok(
+            r#"diagram {
             group fe { node web {} }
             group be { node api {} }
             @fe -> @be { from_side: east, to_side: west }
-        }"#);
+        }"#,
+        );
         match &ast.diagram.items[2] {
             DiagramItem::Edge(e) => {
                 assert!(matches!(&e.source, EndpointAst::GroupFrame(id) if id == "fe"));
                 assert!(matches!(&e.target, EndpointAst::GroupFrame(id) if id == "be"));
-                assert_eq!(e.attrs.get("from_side"), Some(&AttrValue::Atom("east".into())));
+                assert_eq!(
+                    e.attrs.get("from_side"),
+                    Some(&AttrValue::Atom("east".into()))
+                );
             }
             _ => panic!("expected edge"),
         }
@@ -1016,7 +1237,9 @@ mod tests {
     #[test]
     fn node_bare_archetype_rejected() {
         let err = parse_err("diagram { node db database }");
-        assert!(matches!(&err, ParseError::Syntax { message, .. } if message.contains("bare atom")));
+        assert!(
+            matches!(&err, ParseError::Syntax { message, .. } if message.contains("bare atom"))
+        );
     }
 
     #[test]
@@ -1031,7 +1254,10 @@ mod tests {
         match &ast.diagram.items[0] {
             DiagramItem::Node(n) => {
                 assert_eq!(n.attrs.get("label"), Some(&AttrValue::Str("X".into())));
-                assert_eq!(n.attrs.get("archetype"), Some(&AttrValue::Atom("start".into())));
+                assert_eq!(
+                    n.attrs.get("archetype"),
+                    Some(&AttrValue::Atom("start".into()))
+                );
             }
             _ => panic!("expected node"),
         }
@@ -1054,7 +1280,10 @@ mod tests {
         let ast = parse_ok(r##"diagram { node a { style.fill: "#E3F2FD" } }"##);
         match &ast.diagram.items[0] {
             DiagramItem::Node(n) => {
-                assert_eq!(n.attrs.get("style.fill"), Some(&AttrValue::Str("#E3F2FD".into())));
+                assert_eq!(
+                    n.attrs.get("style.fill"),
+                    Some(&AttrValue::Str("#E3F2FD".into()))
+                );
             }
             _ => panic!("expected node"),
         }
@@ -1068,31 +1297,80 @@ mod tests {
 
     #[test]
     fn edge_port_attrs() {
-        let ast = parse_ok(r#"diagram {
+        let ast = parse_ok(
+            r#"diagram {
             node a {} node b {}
             a -> b { from_side: south, to_side: north }
-        }"#);
+        }"#,
+        );
         match &ast.diagram.items[2] {
             DiagramItem::Edge(e) => {
-                assert_eq!(e.attrs.get("from_side"), Some(&AttrValue::Atom("south".into())));
-                assert_eq!(e.attrs.get("to_side"), Some(&AttrValue::Atom("north".into())));
+                assert_eq!(
+                    e.attrs.get("from_side"),
+                    Some(&AttrValue::Atom("south".into()))
+                );
+                assert_eq!(
+                    e.attrs.get("to_side"),
+                    Some(&AttrValue::Atom("north".into()))
+                );
             }
             _ => panic!("expected edge"),
         }
+    }
+
+    #[test]
+    fn fragment_block_parses_alt_else() {
+        let ast = parse_ok(
+            r#"diagram {
+            node a {} node b {}
+            fragment alt checkout "ok?" {
+                a -> b { label: "try" }
+                else {
+                    b --> a { label: "fail" }
+                }
+            }
+        }"#,
+        );
+        match &ast.diagram.items[2] {
+            DiagramItem::Fragment(f) => {
+                assert_eq!(f.id, "checkout");
+                assert_eq!(f.kind, "alt");
+                assert_eq!(f.items.len(), 1);
+                assert_eq!(f.operands.len(), 1);
+            }
+            other => panic!("expected fragment, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn fragment_inside_group_is_rejected() {
+        let err = parse_err(
+            r#"diagram {
+            group g {
+                fragment alt x { a -> b }
+            }
+        }"#,
+        );
+        assert!(
+            matches!(&err, ParseError::Syntax { message, .. } if message.contains("fragment")),
+            "got {err:?}"
+        );
     }
 
     // ── Partition tests ─────────────────────────────────
 
     #[test]
     fn partition_columns_only() {
-        let ast = parse_ok(r#"diagram {
+        let ast = parse_ok(
+            r#"diagram {
             partition {
                 column customer { label: "客户" }
                 column sales { label: "销售" }
                 column warehouse { label: "仓库" }
             }
             node a {}
-        }"#);
+        }"#,
+        );
         let p = ast.diagram.partition.unwrap();
         assert_eq!(p.axes.len(), 3);
         assert!(p.axes.iter().all(|a| a.is_column));
@@ -1104,7 +1382,8 @@ mod tests {
 
     #[test]
     fn partition_matrix_columns_and_rows() {
-        let ast = parse_ok(r#"diagram {
+        let ast = parse_ok(
+            r#"diagram {
             partition {
                 column sales { label: "销售" }
                 column support { label: "支持" }
@@ -1112,7 +1391,8 @@ mod tests {
                 row process { label: "处理" }
             }
             node a {}
-        }"#);
+        }"#,
+        );
         let p = ast.diagram.partition.unwrap();
         assert_eq!(p.axes.len(), 4);
         let cols: Vec<_> = p.axes.iter().filter(|a| a.is_column).collect();
@@ -1125,13 +1405,15 @@ mod tests {
 
     #[test]
     fn partition_axis_without_label() {
-        let ast = parse_ok(r#"diagram {
+        let ast = parse_ok(
+            r#"diagram {
             partition {
                 column lane_a
                 column lane_b
             }
             node x {}
-        }"#);
+        }"#,
+        );
         let p = ast.diagram.partition.unwrap();
         assert_eq!(p.axes[0].label, None);
         assert_eq!(p.axes[1].id, "lane_b");
@@ -1139,64 +1421,84 @@ mod tests {
 
     #[test]
     fn partition_duplicate_block_error() {
-        let err = parse_err(r#"diagram {
+        let err = parse_err(
+            r#"diagram {
             partition { column a }
             partition { column b }
             node x {}
-        }"#);
-        assert!(matches!(&err, ParseError::Syntax { message, .. } if message.contains("duplicate `partition`")));
+        }"#,
+        );
+        assert!(
+            matches!(&err, ParseError::Syntax { message, .. } if message.contains("duplicate `partition`"))
+        );
     }
 
     #[test]
     fn partition_duplicate_axis_id_error() {
-        let err = parse_err(r#"diagram {
+        let err = parse_err(
+            r#"diagram {
             partition { column dup { label: "A" } column dup { label: "B" } }
             node x {}
-        }"#);
+        }"#,
+        );
         assert!(matches!(err, ParseError::DuplicateId { id, .. } if id == "dup"));
     }
 
     #[test]
     fn partition_axis_id_conflicts_with_node() {
-        let err = parse_err(r#"diagram {
+        let err = parse_err(
+            r#"diagram {
             partition { column sales }
             node sales {}
-        }"#);
+        }"#,
+        );
         assert!(matches!(err, ParseError::DuplicateId { id, .. } if id == "sales"));
     }
 
     #[test]
     fn partition_duplicate_label_key_error() {
-        let err = parse_err(r#"diagram {
+        let err = parse_err(
+            r#"diagram {
             partition { column a { label: "X", label: "Y" } }
             node x {}
-        }"#);
+        }"#,
+        );
         assert!(matches!(err, ParseError::DuplicateAttr { key, .. } if key == "label"));
     }
 
     #[test]
     fn partition_unknown_attr_error() {
-        let err = parse_err(r#"diagram {
+        let err = parse_err(
+            r#"diagram {
             partition { column a { color: red } }
             node x {}
-        }"#);
-        assert!(matches!(&err, ParseError::Semantic(msg) if msg.contains("unknown attribute `color`")));
+        }"#,
+        );
+        assert!(
+            matches!(&err, ParseError::Semantic(msg) if msg.contains("unknown attribute `color`"))
+        );
     }
 
     #[test]
     fn partition_empty_block_error() {
-        let err = parse_err(r#"diagram {
+        let err = parse_err(
+            r#"diagram {
             partition { }
             node x {}
-        }"#);
+        }"#,
+        );
         assert!(matches!(&err, ParseError::Semantic(msg) if msg.contains("at least one")));
     }
 
     #[test]
     fn partition_invalid_body_token_error() {
-        let err = parse_err(r#"diagram {
+        let err = parse_err(
+            r#"diagram {
             partition { node a {} }
-        }"#);
-        assert!(matches!(&err, ParseError::Syntax { message, .. } if message.contains("expected `column` or `row`")));
+        }"#,
+        );
+        assert!(
+            matches!(&err, ParseError::Syntax { message, .. } if message.contains("expected `column` or `row`"))
+        );
     }
 }

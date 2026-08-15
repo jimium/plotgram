@@ -1,0 +1,23 @@
+// 购物车结算：库存校验 → 下单 → 支付 → 扣减
+diagram {
+    profile: sequence,
+    title: "购物车结算时序"
+
+    node user "用户" actor
+    node cart "购物车页" client
+    node order "订单服务" service
+    node inventory "库存服务" service
+    node payment "支付服务" service
+
+    user -> cart "点击结算"
+    cart -> order "创建订单"
+    order -> inventory "校验并锁定库存"
+    inventory --> order "库存锁定成功"
+    order --> cart "返回待支付订单"
+    cart -> payment "发起支付"
+    payment --> cart "支付成功"
+    payment -> order "通知支付完成"
+    order -> inventory "扣减库存"
+    inventory --> order "扣减完成"
+    order --> user "下单成功"
+}

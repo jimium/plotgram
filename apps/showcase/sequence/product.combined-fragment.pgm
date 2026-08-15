@@ -1,0 +1,21 @@
+// 组合片段：alt 包住 loop 重试
+diagram {
+    profile: sequence,
+    title: "下单：alt 内嵌 loop"
+
+    node client "客户端" client
+    node api "API 网关" gateway
+    node db "数据库" database
+
+    fragment alt checkout {
+        client -> api { label: "下单" }
+        fragment loop retry "≤3" {
+            api -> db { label: "写入" }
+            db --> api { label: "ok" }
+        }
+        api --> client { label: "201" }
+        else {
+            api --> client { label: "503" }
+        }
+    }
+}

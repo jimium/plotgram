@@ -55,6 +55,26 @@ pub enum DiagramItem {
     Node(NodeAst),
     Group(GroupAst),
     Edge(EdgeAst),
+    /// Combined fragment (sequence). Lowered by stamping edge attrs — not a `Group`.
+    Fragment(FragmentAst),
+}
+
+/// `fragment <kind> <id> ["label"] { … [else { … }]* }`.
+///
+/// Contextual keyword (like partition `column`/`row`): `fragment` is not a
+/// reserved identifier, so `fragment:` remains a valid attribute key.
+#[derive(Debug, Clone)]
+pub struct FragmentAst {
+    pub id: String,
+    pub kind: String,
+    pub attrs: AttrMap,
+    pub items: Vec<DiagramItem>,
+    pub operands: Vec<FragmentOperandAst>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FragmentOperandAst {
+    pub items: Vec<DiagramItem>,
 }
 
 #[derive(Debug, Clone)]

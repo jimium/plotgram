@@ -49,7 +49,12 @@ fn node_sugar_combinations() {
             Some("redis"),
         ),
         // Empty string → no label
-        (r#"diagram { node a "" database }"#, None, Some("database"), None),
+        (
+            r#"diagram { node a "" database }"#,
+            None,
+            Some("database"),
+            None,
+        ),
         // Empty string + archetype + icon
         (
             r#"diagram { node a "" service aws }"#,
@@ -82,8 +87,14 @@ fn node_sugar_plus_block_merge() {
     let out = p(r#"diagram { node a "Label" database { status: healthy } }"#);
     let n = node(&out, "a");
     assert_eq!(n.label.as_deref(), Some("Label"));
-    assert_eq!(n.attrs.get("archetype").and_then(|v| v.as_str()), Some("database"));
-    assert_eq!(n.attrs.get("status").and_then(|v| v.as_str()), Some("healthy"));
+    assert_eq!(
+        n.attrs.get("archetype").and_then(|v| v.as_str()),
+        Some("database")
+    );
+    assert_eq!(
+        n.attrs.get("status").and_then(|v| v.as_str()),
+        Some("healthy")
+    );
 }
 
 #[test]
@@ -119,8 +130,14 @@ fn node_block_only_attrs() {
     let out = p(r##"diagram { node a { label: "Block", variant: primary, style.fill: "#FFF" } }"##);
     let n = node(&out, "a");
     assert_eq!(n.label.as_deref(), Some("Block"));
-    assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("primary"));
-    assert_eq!(n.attrs.get("style.fill").and_then(|v| v.as_str()), Some("#FFF"));
+    assert_eq!(
+        n.attrs.get("variant").and_then(|v| v.as_str()),
+        Some("primary")
+    );
+    assert_eq!(
+        n.attrs.get("style.fill").and_then(|v| v.as_str()),
+        Some("#FFF")
+    );
 }
 
 // ─── §5.5 + archetype expansion interplay ───────────────────────────────────
@@ -131,7 +148,10 @@ fn node_sugar_archetype_expands_axes() {
     let out = p(r#"diagram { node db "Users" database }"#);
     let n = node(&out, "db");
     assert_eq!(n.shape, Some(plotgram_model::NodeShape::Cylinder));
-    assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("info"));
+    assert_eq!(
+        n.attrs.get("variant").and_then(|v| v.as_str()),
+        Some("info")
+    );
     // database has no icon → not filled
     assert!(!n.attrs.contains_key("icon"));
 }
@@ -141,10 +161,16 @@ fn node_sugar_icon_blocks_archetype_icon() {
     // Positional icon (3rd atom) counts as "explicit" → archetype won't override
     let out = p(r#"diagram { node svc "S" service custom_icon }"#);
     let n = node(&out, "svc");
-    assert_eq!(n.attrs.get("icon").and_then(|v| v.as_str()), Some("custom_icon"));
+    assert_eq!(
+        n.attrs.get("icon").and_then(|v| v.as_str()),
+        Some("custom_icon")
+    );
     // shape/variant still filled from archetype
     assert_eq!(n.shape, Some(plotgram_model::NodeShape::RoundedRect));
-    assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("default"));
+    assert_eq!(
+        n.attrs.get("variant").and_then(|v| v.as_str()),
+        Some("default")
+    );
 }
 
 #[test]
@@ -153,7 +179,10 @@ fn node_explicit_shape_in_block_overrides_archetype() {
     let n = node(&out, "db");
     assert_eq!(n.shape, Some(plotgram_model::NodeShape::RoundedRect));
     // variant still filled
-    assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("info"));
+    assert_eq!(
+        n.attrs.get("variant").and_then(|v| v.as_str()),
+        Some("info")
+    );
 }
 
 // ─── §6.5 Group positional label sugar ──────────────────────────────────────
@@ -162,14 +191,21 @@ fn node_explicit_shape_in_block_overrides_archetype() {
 fn group_sugar_combinations() {
     let cases: &[(&str, Option<&str>)] = &[
         ("diagram { group g { node a {} } }", None),
-        (r#"diagram { group g "My Group" { node a {} } }"#, Some("My Group")),
+        (
+            r#"diagram { group g "My Group" { node a {} } }"#,
+            Some("My Group"),
+        ),
         (r#"diagram { group g "" { node a {} } }"#, None), // empty string → no label
     ];
 
     for (src, label) in cases {
         let out = p(src);
         let g = &out.graph.groups[0];
-        assert_eq!(g.label.as_deref(), *label, "group label mismatch for: {src}");
+        assert_eq!(
+            g.label.as_deref(),
+            *label,
+            "group label mismatch for: {src}"
+        );
     }
 }
 
@@ -187,7 +223,10 @@ fn group_block_attrs() {
     let out = p(r#"diagram { group g { label: "G", variant: secondary node a {} } }"#);
     let g = &out.graph.groups[0];
     assert_eq!(g.label.as_deref(), Some("G"));
-    assert_eq!(g.attrs.get("variant").and_then(|v| v.as_str()), Some("secondary"));
+    assert_eq!(
+        g.attrs.get("variant").and_then(|v| v.as_str()),
+        Some("secondary")
+    );
 }
 
 #[test]
@@ -215,7 +254,11 @@ fn group_nested() {
 fn edge_sugar_combinations() {
     // Table: (source, expected_label, expected_arrow)
     let cases: &[(&str, Option<&str>, Arrow)] = &[
-        ("diagram { node a {} node b {} a -> b }", None, Arrow::Forward),
+        (
+            "diagram { node a {} node b {} a -> b }",
+            None,
+            Arrow::Forward,
+        ),
         (
             r#"diagram { node a {} node b {} a -> b "Request" }"#,
             Some("Request"),
@@ -242,7 +285,11 @@ fn edge_sugar_combinations() {
             Arrow::Bidirectional,
         ),
         // Empty string → no label
-        (r#"diagram { node a {} node b {} a -> b "" }"#, None, Arrow::Forward),
+        (
+            r#"diagram { node a {} node b {} a -> b "" }"#,
+            None,
+            Arrow::Forward,
+        ),
     ];
 
     for (src, label, arrow) in cases {
@@ -258,7 +305,10 @@ fn edge_sugar_plus_block() {
     let out = p(r#"diagram { node a {} node b {} a -> b "Call" { from_side: east } }"#);
     let e = edge_at(&out, 0);
     assert_eq!(e.label.as_deref(), Some("Call"));
-    assert_eq!(e.from_port.as_ref().unwrap().pinned_side(), Some(Side::East));
+    assert_eq!(
+        e.from_port.as_ref().unwrap().pinned_side(),
+        Some(Side::East)
+    );
 }
 
 #[test]
@@ -272,7 +322,9 @@ fn edge_sugar_label_conflict() {
 
 #[test]
 fn edge_block_only() {
-    let out = p(r#"diagram { node a {} node b {} a -> b { label: "Block", head_label: "H", tail_label: "T" } }"#);
+    let out = p(
+        r#"diagram { node a {} node b {} a -> b { label: "Block", head_label: "H", tail_label: "T" } }"#,
+    );
     let e = edge_at(&out, 0);
     assert_eq!(e.label.as_deref(), Some("Block"));
     assert_eq!(e.head_label.as_deref(), Some("H"));
@@ -286,7 +338,11 @@ fn edge_port_lift_combinations() {
     let cases: &[(&str, Option<Side>, Option<Side>)] = &[
         ("from_side: north", Some(Side::North), None),
         ("to_side: south", None, Some(Side::South)),
-        ("from_side: east, to_side: west", Some(Side::East), Some(Side::West)),
+        (
+            "from_side: east, to_side: west",
+            Some(Side::East),
+            Some(Side::West),
+        ),
     ];
 
     for (attrs, fs, ts) in cases {
@@ -295,8 +351,16 @@ fn edge_port_lift_combinations() {
         let e = edge_at(&out, 0);
         let fp = e.from_port.as_ref();
         let tp = e.to_port.as_ref();
-        assert_eq!(fp.and_then(|p| p.pinned_side()), *fs, "from_side for: {attrs}");
-        assert_eq!(tp.and_then(|p| p.pinned_side()), *ts, "to_side for: {attrs}");
+        assert_eq!(
+            fp.and_then(|p| p.pinned_side()),
+            *fs,
+            "from_side for: {attrs}"
+        );
+        assert_eq!(
+            tp.and_then(|p| p.pinned_side()),
+            *ts,
+            "to_side for: {attrs}"
+        );
         assert!(fp.map(|p| p.order_key().is_none()).unwrap_or(true));
         assert!(tp.map(|p| p.order_key().is_none()).unwrap_or(true));
     }
@@ -426,7 +490,8 @@ fn group_frame_with_sugar_label() {
 
 #[test]
 fn diagram_layout_with_options() {
-    let out = p("diagram { layout: hierarchical { direction: left-to-right, spacing: 20 } node a {} }");
+    let out =
+        p("diagram { layout: hierarchical { direction: left-to-right, spacing: 20 } node a {} }");
     assert_eq!(out.layout.name, "hierarchical");
     assert_eq!(
         out.layout.options.get("direction"),
@@ -441,7 +506,10 @@ fn diagram_layout_with_options() {
 #[test]
 fn diagram_profile_plus_layout_override() {
     let out = p("diagram { profile: sequence, layout: custom node a {} }");
-    assert_eq!(out.profile, Some(plotgram_model::profile::DiagramType::Sequence));
+    assert_eq!(
+        out.profile,
+        Some(plotgram_model::profile::DiagramType::Sequence)
+    );
     assert_eq!(out.layout.name, "custom"); // explicit overrides profile default
 }
 
@@ -491,7 +559,10 @@ fn attribute_block_commas() {
     let out = p(r#"diagram { node a { label: "开始", archetype: start } }"#);
     let n = node(&out, "a");
     assert_eq!(n.label.as_deref(), Some("开始"));
-    assert_eq!(n.attrs.get("archetype").and_then(|v| v.as_str()), Some("start"));
+    assert_eq!(
+        n.attrs.get("archetype").and_then(|v| v.as_str()),
+        Some("start")
+    );
 }
 
 #[test]
@@ -543,7 +614,9 @@ fn edge_declaration_order_preserved() {
         c -> a
         a <-> b
     }"#);
-    let ids: Vec<&str> = out.graph.edges_in_declaration_order()
+    let ids: Vec<&str> = out
+        .graph
+        .edges_in_declaration_order()
         .iter()
         .map(|e| e.id.as_str())
         .collect();
@@ -563,7 +636,9 @@ fn edges_inside_group_declaration_order() {
     }"#);
     // edges_in_declaration_order: top-level vector first, then groups depth-first.
     // Group edges a->b (e0), b->a (e1); top-level x->a (e2) → [e2, e0, e1].
-    let ids: Vec<&str> = out.graph.edges_in_declaration_order()
+    let ids: Vec<&str> = out
+        .graph
+        .edges_in_declaration_order()
         .iter()
         .map(|e| e.id.as_str())
         .collect();
@@ -580,7 +655,9 @@ fn group_frame_edges_keep_declaration_order() {
         a -> b
         b -> @g { to_side: east }
     }"#);
-    let ids: Vec<&str> = out.graph.edges_in_declaration_order()
+    let ids: Vec<&str> = out
+        .graph
+        .edges_in_declaration_order()
         .iter()
         .map(|e| e.id.as_str())
         .collect();
@@ -596,8 +673,14 @@ fn group_frame_edge_ports_lifted() {
         @fe -> @be { from_side: east, to_side: west }
     }"#);
     let e = &out.graph.edges[0];
-    assert_eq!(e.from_port.as_ref().and_then(|p| p.pinned_side()), Some(Side::East));
-    assert_eq!(e.to_port.as_ref().and_then(|p| p.pinned_side()), Some(Side::West));
+    assert_eq!(
+        e.from_port.as_ref().and_then(|p| p.pinned_side()),
+        Some(Side::East)
+    );
+    assert_eq!(
+        e.to_port.as_ref().and_then(|p| p.pinned_side()),
+        Some(Side::West)
+    );
 }
 
 #[test]
@@ -635,20 +718,12 @@ fn archetype_expansion_all_builtin() {
     use plotgram_model::archetype::ARCHETYPES;
 
     for def in ARCHETYPES {
-        let src = format!(
-            r#"diagram {{ node n {{ archetype: {} }} }}"#,
-            def.id
-        );
+        let src = format!(r#"diagram {{ node n {{ archetype: {} }} }}"#, def.id);
         let out = p(&src);
         let n = node(&out, "n");
 
         // Shape filled from archetype
-        assert_eq!(
-            n.shape,
-            def.shape,
-            "shape for archetype `{}`",
-            def.id
-        );
+        assert_eq!(n.shape, def.shape, "shape for archetype `{}`", def.id);
         // Variant filled
         assert_eq!(
             n.attrs.get("variant").and_then(|v| v.as_str()),
@@ -676,10 +751,15 @@ fn archetype_expansion_all_builtin() {
 #[test]
 fn archetype_fill_only_never_overrides() {
     // All three axes explicitly set → archetype changes nothing
-    let out = p(r#"diagram { node n { archetype: service, shape: circle, variant: primary, icon: custom } }"#);
+    let out = p(
+        r#"diagram { node n { archetype: service, shape: circle, variant: primary, icon: custom } }"#,
+    );
     let n = node(&out, "n");
     assert_eq!(n.shape, Some(plotgram_model::NodeShape::Circle));
-    assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("primary"));
+    assert_eq!(
+        n.attrs.get("variant").and_then(|v| v.as_str()),
+        Some("primary")
+    );
     assert_eq!(n.attrs.get("icon").and_then(|v| v.as_str()), Some("custom"));
 }
 
@@ -719,10 +799,22 @@ fn combined_real_world_flowchart() {
     assert_eq!(out.meta.title.as_deref(), Some("订单处理"));
 
     // Archetype expansion checks
-    assert_eq!(node(&out, "start").shape, Some(plotgram_model::NodeShape::Circle));
-    assert_eq!(node(&out, "check").shape, Some(plotgram_model::NodeShape::Diamond));
-    assert_eq!(node(&out, "db").shape, Some(plotgram_model::NodeShape::Cylinder));
-    assert_eq!(node(&out, "pay").shape, Some(plotgram_model::NodeShape::Diamond));
+    assert_eq!(
+        node(&out, "start").shape,
+        Some(plotgram_model::NodeShape::Circle)
+    );
+    assert_eq!(
+        node(&out, "check").shape,
+        Some(plotgram_model::NodeShape::Diamond)
+    );
+    assert_eq!(
+        node(&out, "db").shape,
+        Some(plotgram_model::NodeShape::Cylinder)
+    );
+    assert_eq!(
+        node(&out, "pay").shape,
+        Some(plotgram_model::NodeShape::Diamond)
+    );
 
     // Group structure
     assert_eq!(out.graph.groups.len(), 1);
@@ -735,9 +827,20 @@ fn combined_real_world_flowchart() {
     assert_eq!(out.graph.edges.len(), 6);
 
     // Port lift on ok->pay
-    let ok_pay = out.graph.edges.iter().find(|e| e.source == "ok" && e.target == "pay").unwrap();
-    assert_eq!(ok_pay.from_port.as_ref().unwrap().pinned_side(), Some(Side::South));
-    assert_eq!(ok_pay.to_port.as_ref().unwrap().pinned_side(), Some(Side::North));
+    let ok_pay = out
+        .graph
+        .edges
+        .iter()
+        .find(|e| e.source == "ok" && e.target == "pay")
+        .unwrap();
+    assert_eq!(
+        ok_pay.from_port.as_ref().unwrap().pinned_side(),
+        Some(Side::South)
+    );
+    assert_eq!(
+        ok_pay.to_port.as_ref().unwrap().pinned_side(),
+        Some(Side::North)
+    );
 }
 
 // ─── edge_routing 声明（§10.2）─────────────────────────────────────────────────────────
@@ -751,10 +854,7 @@ fn edge_routing_explicit_with_options() {
     }"#);
     let routing = out.edge_routing.expect("edge_routing should be set");
     assert_eq!(routing.name, "orthogonal");
-    assert_eq!(
-        routing.options.get("spacing"),
-        Some(&AttrValue::Num(8.0))
-    );
+    assert_eq!(routing.options.get("spacing"), Some(&AttrValue::Num(8.0)));
 }
 
 #[test]
@@ -766,7 +866,10 @@ fn edge_routing_overrides_profile_default() {
         node a {} node b {}
         a -> b
     }"#);
-    assert_eq!(out.edge_routing.map(|r| r.name), Some("straight".to_string()));
+    assert_eq!(
+        out.edge_routing.map(|r| r.name),
+        Some("straight".to_string())
+    );
 }
 
 // ─── 位置糖同行约束（§5.5.2）────────────────────────────────────────────────
@@ -812,4 +915,50 @@ fn profile_default_layout_all_six() {
             "profile `{profile}` should default to layout `{expected_layout}`"
         );
     }
+}
+
+#[test]
+fn fragment_block_stamps_edge_attrs_not_groups() {
+    let out = p(r#"diagram {
+            profile: sequence
+            node a {}
+            node b {}
+            fragment alt checkout "ok?" {
+                a -> b { label: "try" }
+                else {
+                    b --> a { label: "fail" }
+                }
+            }
+        }"#);
+    assert!(
+        out.graph.groups.is_empty(),
+        "fragments must not become groups"
+    );
+    assert_eq!(out.graph.edges.len(), 2);
+    let try_e = &out.graph.edges[0];
+    assert_eq!(
+        try_e.attrs.get("fragment").and_then(|v| v.as_str()),
+        Some("checkout")
+    );
+    assert_eq!(
+        try_e.attrs.get("fragment_kind").and_then(|v| v.as_str()),
+        Some("alt")
+    );
+    assert_eq!(
+        try_e.attrs.get("fragment_operand").and_then(|v| v.as_f64()),
+        Some(0.0)
+    );
+    assert_eq!(
+        try_e.attrs.get("fragment_label").and_then(|v| v.as_str()),
+        Some("ok?")
+    );
+    let else_e = &out.graph.edges[1];
+    assert_eq!(else_e.arrow, Arrow::Response);
+    assert_eq!(
+        else_e
+            .attrs
+            .get("fragment_operand")
+            .and_then(|v| v.as_f64()),
+        Some(1.0)
+    );
 }

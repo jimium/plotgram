@@ -96,6 +96,17 @@
 | **参考** | 15 §3 六步流水线 |
 | **模块** | [`src/path_ortho.rs`](src/path_ortho.rs) |
 
+### P3-1 · `linear_arrange` — 一维排列（MinLA + pin）
+
+| | |
+|--|--|
+| **为何重要** | Sequence 生命线次轴序：`greedy` / `local` 优化，显式 pin / before 硬约束不得被覆盖（architecture §6.1） |
+| **独立性** | 顶点 `0..n`（声明下标）+ 加权边 + pin/before；不看 Graph / DSL |
+| **稳定 API 直觉** | `arrange(LinearArrangement, LinearArrangeMethod) -> Result<Vec<usize>>`；`perm[slot] = vertex` |
+| **验收** | 表驱动：identity / greedy 拉近 / pin 不被 swap / 冲突 Infeasible；同输入双跑一致 |
+| **参考** | [`19-序列图与一维排列`](../../docs/reference/yfiles/19-序列图与一维排列.md) L2/L3 |
+| **模块** | [`src/linear_arrange.rs`](src/linear_arrange.rs) |
+
 ---
 
 ## 2. 建议落地节奏
@@ -139,6 +150,7 @@ Week 焦点
 | `orientation` | 取代多方向复制；LTR 不再是第二套坐标核 |
 | `interval_color` | Channel 出拓扑后的 track 真源 |
 | `path_ortho` | Ink 只展开：规范化 + 降半径，不发明端口 |
+| `linear_arrange` | Sequence 生命线次轴：greedy/local；pin/before 硬约束 |
 
 更多叙事见 [`docs/design/layout/hierarchical/from-yfiles-reference.md`](../../docs/design/layout/hierarchical/from-yfiles-reference.md)。
 

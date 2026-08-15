@@ -1,0 +1,10 @@
+// 自调用：参与者对自身发出消息（U 形）
+diagram {
+    profile: sequence,
+    title: "自调用"
+
+    node svc "校验服务" service
+
+    svc -> svc "校验参数"
+    svc -> svc "写审计日志"
+}

@@ -137,6 +137,19 @@ mod tests {
     }
 
     #[test]
+    fn build_svg_sequence_and_tree_profiles() {
+        let cases = [
+            "diagram {\n  profile: sequence\n  node a \"A\"\n  node b \"B\"\n  a -> b { label: \"hi\" }\n  b --> a\n  a -> a\n}",
+            "diagram {\n  profile: mindmap\n  node root \"R\"\n  node l \"L\"\n  node r \"R2\"\n  root -> l\n  root -> r\n}",
+        ];
+        for src in cases {
+            let svg = build_svg(src, &BuildOptions::default())
+                .unwrap_or_else(|e| panic!("build failed for {src}: {e}"));
+            assert!(svg.starts_with("<svg"), "{src}");
+        }
+    }
+
+    #[test]
     fn build_svg_surfaces_parse_error() {
         let err =
             build_svg("diagram { node a { label: 42 } }", &BuildOptions::default()).unwrap_err();

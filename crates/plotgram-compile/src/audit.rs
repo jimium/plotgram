@@ -225,6 +225,7 @@ mod tests {
             canvas_width: 100.0,
             canvas_height: 100.0,
             diagnostics: Default::default(),
+            decorations: vec![],
         }
     }
 

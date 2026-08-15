@@ -749,6 +749,7 @@ fn compute_channel_ink_tail<'g>(
             groups,
             owns_group_frames: true,
             diagnostics,
+            decorations: Vec::new(),
         },
         captures,
     ))

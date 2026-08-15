@@ -1,6 +1,6 @@
 # Plotgram DSL 规范
 
-> 版本：2.7-draft  
+> 版本：2.8-draft  
 > 状态：语法契约草案（相对 v1 `language-spec.md` 的瘦身重设计；该文档已删除）  
 > 定稿选择：node / group / edge **规范形态**为声明头 + `{ … }`（`label` / `variant` / `style.*` 等进花括号）；node 另有三轴 + `archetype`；边箭头 `->` / `-->` / `<->` 保留语法；边端口 `side` + `slot`；无声明式样式；ER 另文；自环默认禁  
 > 2.1：废弃 `kind`；三轴 + archetype  
@@ -9,7 +9,8 @@
 > 2.4：edge 标签一律进 `{}`；废除 `>"` / `<"` 端点糖；§7.5 仅保留中点 string 糖；允许省略空 `{}`  
 > 2.5：`group_anchor` 一等字段 + `@group` 组框边糖（ADR-004）  
 > 2.6：废除 `diagram <type>` 位置；改为属性 `profile:`（ADR-001）  
-> 2.7：`partition` / `cell_col` / `cell_row`（ADR-008 PartitionGrid）
+> 2.7：`partition` / `cell_col` / `cell_row`（ADR-008 PartitionGrid）  
+> 2.8：sequence 一等 `fragment` 块；节点 `lifeline_pin` / `lifeline_before`；边 `fragment*`
 
 **本文档定义**：DSL **语法形态**，以及 **属性注册表**（§14：写者/消费者/状态、shape / variant 封闭集）。  
 archetype 展开与 CSV 见 [`archetype-spec.md`](archetype-spec.md)；视觉属性词表见 [`style-sheet-spec.md`](style-sheet-spec.md) §5。
@@ -54,7 +55,8 @@ diagram {
 <diagram_body> ::= (<diagram_attribute>
                   | <node_declaration>
                   | <relation_declaration>
-                  | <group_declaration>)*
+                  | <group_declaration>
+                  | <fragment_declaration>)*
 ```
 
 - 元素顺序自由
@@ -74,7 +76,7 @@ diagram {
 - 小写字母开头，仅含小写字母、数字、下划线
 - 长度 1–64
 - 不允许连字符 `-` 和点号 `.`
-- 用于：node id、group id、属性键、算法配置 option 键
+- 用于：node id、group id、fragment id、属性键、算法配置 option 键
 
 ### 2.2 Atom
 
@@ -1049,8 +1051,32 @@ db -> api {
 - **不**提供 `seq:` / `Edge::seq`；调整时间 = 调整 DSL 中边的书写顺序。
 - 生命线、激活条等为 layout/render **派生几何**，不进入 `Graph`。
 - 产品上消息写在顶层；组内消息非一等时序能力。
+- 组合片段是 layout 派生几何（`Decoration::FragmentFrame`），**不**进入 `Graph::groups`。一等写法见 §8.2；边属性 `fragment*` 仍合法（工具 / 无块展开）。
 
-ER 字段表、fragment、tabular 等**另文**；本草案保证统一的 node / edge / group 骨架 + 端口/边组一等字段。
+### 8.2 组合片段（sequence）
+
+```
+fragment <kind> <id> [<string>] { … [else { … }]* }
+```
+
+- `fragment` / `else` 是**上下文关键字**（与 `partition` 里的 `column` / `row` 同类），**不是** §10 保留字，故 `fragment:` 仍是合法属性键。
+- `<kind>` 为 atom（`alt` / `loop` / `opt` / `par` / `critical` / …）；`<id>` 与 node / group 共用标识符命名空间。
+- 参与者仍写在 diagram 顶层；fragment 体内只允许消息、嵌套 fragment、属性、以及 `else { … }` 操作数。禁止 `node` / `group`。
+- `else` 只用于 `alt` / `par` 分区；主块为 operand 0，其后每个 `else` 依次 +1。
+- lower **不建 Group**：按声明序把边摊到 `graph.edges`，并盖章 `fragment` / `fragment_kind` / `fragment_label` / `fragment_operand`（多层时还有 `fragment_path_kinds` / `fragment_path_operands`）。
+- 嵌套由布局按区间包含推断；部分交叠硬失败。
+
+```plotgram
+fragment alt checkout {
+    client -> api { label: "下单" }
+    api --> client { label: "201" }
+    else {
+        api --> client { label: "503" }
+    }
+}
+```
+
+ER 字段表、tabular 等**另文**；本草案保证统一的 node / edge / group 骨架 + 端口/边组一等字段。
 
 ---
 
@@ -1087,6 +1113,8 @@ true, false
 
 `column` / `row` 仅在 `partition { … }` 块内为轴声明头（与 `node` / `group` 类似的结构关键字）；不作全局 identifier 禁词以外的额外保留——但轴 id 仍不得与 node/group 撞名。
 
+`fragment` / `else` 仅在 sequence 组合片段位置为结构关键字（§8.2）；同样不进本保留字表。
+
 箭头 token（`->` `-->` `<->`）不是 identifier。
 
 ---
@@ -1104,7 +1132,8 @@ true, false
                           | <partition_declaration>
                           | <node_declaration>
                           | <relation_declaration>
-                          | <group_declaration>)*
+                          | <group_declaration>
+                          | <fragment_declaration>)*
 <diagram_attribute>    ::= <attribute_key> ":" <attribute_value>
                           // 含 profile: <profile_id>（§1.2 / §4.2）
 <profile_id>           ::= "flowchart" | "sequence" | "architecture"
@@ -1123,6 +1152,15 @@ true, false
                           | <node_declaration>
                           | <relation_declaration>
                           | <group_declaration>)*
+
+<fragment_declaration> ::= "fragment" <atom> <identifier> [<string>] "{" <fragment_body> "}"
+                          // sequence 组合片段（§8.2）；不进入 Graph::groups
+<fragment_body>        ::= (<fragment_attribute> ("," <fragment_attribute>)*
+                          | <relation_declaration>
+                          | <fragment_declaration>
+                          | <fragment_operand>)*
+<fragment_attribute>   ::= <attribute>
+<fragment_operand>     ::= "else" "{" (<relation_declaration> | <fragment_declaration>)* "}"
 
 <relation_declaration> ::= <endpoint> <arrow> <endpoint> [<string>] [<attribute_block>]
                           // 规范：src arrow tgt { label / variant / … }
@@ -1157,7 +1195,7 @@ true, false
 | # | 约束 |
 |---|------|
 | 1 | 一个文件恰好一个 `diagram` |
-| 2 | node / group id 全局唯一，且不互相撞名 |
+| 2 | node / group / fragment id 全局唯一，且不互相撞名 |
 | 3 | 边端点（展开后）必须是已声明 node |
 | 4 | group 不可作 IR 边端点；组框连线用 `group_anchor` 或 `@group` 糖（§5.7 / §7.6） |
 | 5 | 组内边两端须为该组后代 node |
@@ -1177,7 +1215,8 @@ true, false
 | 19 | `role: group_anchor` 须有 `host_group` + `side`；提升为 `Node` 一等字段；锚点须为 host 组成员（§5.7） |
 | 20 | `@gid` 端点须对应已声明 group；该端缺少 `*_side` → 错；禁止无 `@` 的裸 group id 作端点（§7.6） |
 | 21 | `partition` 轴 id 与 node/group 不撞名；`cell_col`/`cell_row` 须引用已声明轴；无 grid 不得写 cell（§4.3 / ADR-008） |
-| 21 | diagram 规范为 `diagram { … }`；预设用属性 `profile:`；禁止位置 `diagram flowchart {`（§4） |
+| 22 | diagram 规范为 `diagram { … }`；预设用属性 `profile:`；禁止位置 `diagram flowchart {`（§4） |
+| 23 | `fragment` 块只出现在 diagram 顶层或嵌套 fragment 内，禁止写入 `group`；体内不得声明 node / group（§8.2） |
 
 ---
 
@@ -1312,6 +1351,8 @@ node legacy { label: "ERP", shape: rounded_rect, variant: muted, icon: external 
 | `icon` | atom：`none` / icon id / alias | `active` | DSL 作者 / archetype 展开 | `icons::resolve_icon`（`icons/mod.rs`） |
 | `status` | atom：`healthy` / `degraded` / `down` … | **`planned`** | DSL 作者 | **无**。与 `variant` 正交：variant 是静态强调，status 是运行态 |
 | `style.*` | 见 §14.9 | `active` | DSL 作者 | `apply_inline_node_styles` |
+| `lifeline_pin` | number（槽位 `0`…）或 atom `left` / `right` | `active` | DSL 作者 | Sequence Compose 生命线序；优化不得覆盖 |
+| `lifeline_before` | atom（另一参与者 id） | `active` | DSL 作者 | Sequence Compose：该生命线必须在指定 id 左侧 |
 | `meta.*` | 任意 | — | DSL 作者 | 无（约定如此） |
 
 **已废弃**：`kind`；声明后缀 `: shape`；把位置 string 当作规范标签写法（仍允许为糖，见 §5.5）。
@@ -1392,6 +1433,12 @@ variant **只**贡献 fill / stroke / font / dash / radius 等颜料；**不**�
 | `from_slot` / `to_slot` / `from_ratio` / `to_ratio` / `from_x`+`from_y` / `to_x`+`to_y` / `from_sides` / `to_sides` | — | **`removed`** | — | 写了 → 解析错误；边端口只留 side（见 §7.4） |
 | `weight` | `Option<f64>`（`critical: true` 糖 = `2.0`） | **`active`（模型字段）** | DSL 作者 | 提升为 `Edge.weight`；Hier 排序/对齐加权。`critical` 与 `weight` 同写 → 解析错误（`CriticalWeightConflict`） |
 | `undirected` | boolean | **`active`（模型字段 `Edge.undirected`）** | DSL 作者或 `<->` 糖 | hierarchical rank 建图跳过（FAS/rank 不施加层级）；同 rank 端点由 Ink `intralayer` 路由为 side-link（跨轴直连或避让 U 形）；非 bool → 解析错误（`InvalidUndirected`） |
+| `fragment` | atom / string（id 或 `a.b` / `"a/b"` 路径） | `active` | DSL 作者或 `fragment` 块 lower（§8.2） | Sequence Compose 成员收集；**不**进 `Graph::groups` |
+| `fragment_kind` | atom（`alt` / `loop` / `opt` / `par` / `critical` / `region` / …） | `active` | 同上 | 最内层片段 operator；缺省 `region` |
+| `fragment_label` | string | `active` | 同上 | 标题 pentagon：`kind [label]` |
+| `fragment_operand` | number（非负整数，0-based） | `active` | 同上（有 `else` 时主块 0、其后 +1） | `alt` / `par` 分区；分界虚线 |
+| `fragment_path_kinds` | atom（`.` 连接） | `active` | `fragment` 块 lower | 整条路径的 kinds；手写边属性可省略（只标最内层 `fragment_kind`） |
+| `fragment_path_operands` | atom（`.` 连接，`-` = 无分区） | `active` | `fragment` 块 lower | 嵌套时把祖先 operand 传给内层边；手写边属性可省略 |
 | `meta.*` | 任意 | — | DSL 作者 | 无 |
 
 `source` / `target` / 箭头语义（`->` / `-->` / `<->`）是**语法**，落在 `Edge::source` / `target` / `arrow`；**不得**在属性块用 `source:` / `target:` / `arrow:` 覆盖。三处标签只经 `label` / `head_label` / `tail_label`（或 §7.5 中点糖）；**已废弃** `>"` / `<"` 端点标记。
@@ -1620,3 +1667,10 @@ style-sheet-spec  视觉属性词表 + 主题 JSON + cascade
 | diagram 头 | `diagram <type> { … }` | **`diagram { … }`** |
 | 图种预设 | 位置 type | 属性 **`profile:`**（封闭集同旧 type） |
 | 位置糖 | — | **不做** `diagram flowchart {` |
+
+### A.7 2.7 → 2.8
+
+| 项 | 2.7 | 2.8 |
+|----|-----|-----|
+| 组合片段 | 边属性 `fragment*`（M4） | 一等 **`fragment <kind> <id> { … else { … } }`**（§8.2）；仍不进 `Graph::groups` |
+| 生命线序约束 | 未登记 | 节点 **`lifeline_pin`** / **`lifeline_before`**（§14.3） |

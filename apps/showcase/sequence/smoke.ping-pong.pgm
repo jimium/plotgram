@@ -1,0 +1,11 @@
+// Ping-Pong：双向消息交换
+diagram {
+    profile: sequence,
+    title: "Ping-Pong"
+
+    node alice "Alice" actor
+    node bob "Bob" actor
+
+    alice -> bob "ping"
+    bob --> alice "pong"
+}

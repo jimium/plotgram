@@ -10,6 +10,7 @@
 //! - Icons from explicit `icon:` attribute only (no inference)
 
 pub mod ascii;
+pub mod decorations;
 pub mod edges;
 pub mod group;
 pub mod icons;
@@ -53,6 +54,9 @@ pub fn render_svg(input: &RenderInput) -> String {
     for i in group_order {
         group::render_group(&mut svg, &input.layout.groups[i], &resolved, &strategy);
     }
+
+    // Derived geometry (lifelines, activation bars, …). Paint by kind only.
+    decorations::render_decorations(&mut svg, &input.layout.decorations, &theme);
 
     // Edges (behind nodes)
     for ep in &input.layout.edges {
@@ -209,6 +213,7 @@ mod tests {
             canvas_width: 200.0,
             canvas_height: 200.0,
             diagnostics: Default::default(),
+            decorations: vec![],
         };
         RenderInput {
             graph,

@@ -45,7 +45,10 @@ fn edge(id: &str, source: &str, target: &str, arrow: Arrow) -> Edge {
 }
 
 fn place(id: &str, x: f64, y: f64, w: f64, h: f64) -> NodePlacement {
-    NodePlacement { id: id.to_string(), frame: Rect::new(x, y, w, h) }
+    NodePlacement {
+        id: id.to_string(),
+        frame: Rect::new(x, y, w, h),
+    }
 }
 
 fn route(id: &str, source: &str, target: &str, pts: &[(f64, f64)]) -> EdgePlacement {
@@ -98,8 +101,8 @@ fn build_input() -> RenderInput {
             edge("e6", "home", "session", Arrow::Bidirectional),
         ],
         groups: vec![],
-            partition: None,
-        };
+        partition: None,
+    };
 
     // ── Hand-laid geometry (px, 1 char ≈ 6×12) ──
     // Column centers: left branch x=90, right branch x=330.
@@ -117,7 +120,13 @@ fn build_input() -> RenderInput {
             place("check", n_check.x, n_check.y, n_check.width, n_check.height),
             place("home", n_home.x, n_home.y, n_home.width, n_home.height),
             place("err", n_err.x, n_err.y, n_err.width, n_err.height),
-            place("session", n_session.x, n_session.y, n_session.width, n_session.height),
+            place(
+                "session",
+                n_session.x,
+                n_session.y,
+                n_session.width,
+                n_session.height,
+            ),
         ],
         edges: vec![
             // start ↓ login
@@ -152,6 +161,7 @@ fn build_input() -> RenderInput {
         canvas_width: 420.0,
         canvas_height: 300.0,
         diagnostics: Default::default(),
+        decorations: vec![],
     };
 
     RenderInput {

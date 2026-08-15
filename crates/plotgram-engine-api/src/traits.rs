@@ -3,7 +3,7 @@
 use plotgram_model::attr::AttrMap;
 use plotgram_model::diagnostics::LayoutDiagnostics;
 use plotgram_model::graph::Graph;
-use plotgram_model::result::{EdgePlacement, GroupPlacement, NodePlacement};
+use plotgram_model::result::{Decoration, EdgePlacement, GroupPlacement, NodePlacement};
 use plotgram_model::sizes::NodeSizes;
 
 use crate::scene::RouteScene;
@@ -52,6 +52,8 @@ pub struct LayoutOutput {
     /// Structured observations (warnings / relaxations / params_hash).
     /// Never affects geometry; empty default for layouts without diagnostics.
     pub diagnostics: LayoutDiagnostics,
+    /// Layout-derived decorations (ADR-009). Hier/Tree emit `[]`.
+    pub decorations: Vec<Decoration>,
 }
 
 /// Places nodes (and optionally routes edges with built-in ink).

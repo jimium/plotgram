@@ -11,7 +11,7 @@ mod draw;
 
 use plotgram_model::graph::Arrow;
 use plotgram_model::render::RenderInput;
-use plotgram_model::result::LabelOwner;
+use plotgram_model::result::{Decoration, LabelOwner};
 
 use canvas::{text_width, truncate_string, DisplayCanvas, GridMapper, GridRect};
 use draw::{clean_label, draw_box, draw_edge_route, render_junctions, simplify_points, BoxChars};
@@ -49,6 +49,8 @@ pub fn render_ascii(input: &RenderInput) -> String {
     let width = ((input.layout.canvas_width / SCALE_X).ceil() as usize + PADDING * 2 + 4).max(40);
     let height = ((input.layout.canvas_height / SCALE_Y).ceil() as usize + PADDING * 2 + 4).max(20);
     let mut cv = DisplayCanvas::new(width, height);
+
+    paint_ascii_decorations(&mut cv, &mapper, &input.layout.decorations);
 
     // ── Nodes: every shape becomes a rectangular box ──
     // (box geometry is computed first so edges can skip interiors/boundaries)
@@ -180,6 +182,84 @@ pub fn render_ascii(input: &RenderInput) -> String {
     cv.render()
 }
 
+fn paint_ascii_decorations(
+    cv: &mut DisplayCanvas,
+    mapper: &GridMapper,
+    decorations: &[Decoration],
+) {
+    let box_chars = BoxChars {
+        tl: BOX_TL,
+        tr: BOX_TR,
+        bl: BOX_BL,
+        br: BOX_BR,
+        v: BOX_V,
+        h: BOX_H,
+    };
+    for d in decorations {
+        if let Decoration::FragmentFrame {
+            operator,
+            label,
+            frame,
+            operands,
+            ..
+        } = d
+        {
+            let (x0, y0) = mapper.to_grid(frame.x, frame.y);
+            let (x1, y1) = mapper.to_grid(frame.right(), frame.bottom());
+            let w = x1.saturating_sub(x0).max(3);
+            let h = y1.saturating_sub(y0).max(2);
+            draw_box(cv, x0, y0, w, h, &box_chars);
+            let title = match label.as_deref() {
+                Some(l) if !l.is_empty() => format!("{operator} [{l}]"),
+                _ => operator.clone(),
+            };
+            let max_w = w.saturating_sub(2);
+            let title = truncate_string(&title, max_w);
+            if !title.is_empty() {
+                cv.write_text(x0.saturating_add(1), y0, &title);
+            }
+            for y in operands {
+                let (_, gy) = mapper.to_grid(frame.x, *y);
+                if gy <= y0 || gy >= y0 + h.saturating_sub(1) {
+                    continue;
+                }
+                for i in 1..w.saturating_sub(1) {
+                    cv.set_char(x0 + i, gy, DASH_H);
+                }
+            }
+        }
+    }
+    for d in decorations {
+        if let Decoration::Lifeline {
+            x, y0, y1, gaps, ..
+        } = d
+        {
+            let (gx, gy0) = mapper.to_grid(*x, *y0);
+            let (_, gy1) = mapper.to_grid(*x, *y1);
+            let top = gy0.min(gy1);
+            let bot = gy0.max(gy1);
+            let gap_rows: Vec<usize> = gaps.iter().map(|gy| mapper.to_grid(*x, *gy).1).collect();
+            for y in top..=bot {
+                if gap_rows.iter().any(|g| y.abs_diff(*g) <= 1) {
+                    continue;
+                }
+                if y.saturating_sub(top) % 2 == 0 {
+                    cv.set_char(gx, y, DASH_V);
+                }
+            }
+        }
+    }
+    for d in decorations {
+        if let Decoration::Activation { frame, .. } = d {
+            let (x0, y0) = mapper.to_grid(frame.x, frame.y);
+            let (x1, y1) = mapper.to_grid(frame.right(), frame.bottom());
+            let w = x1.saturating_sub(x0).max(2);
+            let h = y1.saturating_sub(y0).max(2);
+            draw_box(cv, x0, y0, w, h, &box_chars);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268,6 +348,7 @@ mod tests {
             canvas_width: 360.0,
             canvas_height: 96.0,
             diagnostics: Default::default(),
+            decorations: vec![],
         };
         RenderInput {
             graph,
@@ -328,6 +409,40 @@ mod tests {
     }
 
     #[test]
+    fn sequence_decorations_draw_lifeline_and_fragment() {
+        let mut input = two_node_input(Arrow::Forward, ("A", "B"), None);
+        input.layout.decorations = vec![
+            Decoration::Lifeline {
+                id: "lifeline:a".into(),
+                participant: "a".into(),
+                x: 48.0,
+                y0: 60.0,
+                y1: 96.0,
+                gaps: vec![],
+            },
+            Decoration::Activation {
+                id: "activation:e1:0".into(),
+                lifeline_id: "a".into(),
+                frame: Rect::new(44.0, 64.0, 10.0, 24.0),
+                depth: 0,
+            },
+            Decoration::FragmentFrame {
+                id: "fragment:alt".into(),
+                operator: "alt".into(),
+                label: None,
+                frame: Rect::new(0.0, 12.0, 336.0, 80.0),
+                operands: vec![],
+            },
+        ];
+        let out = render_ascii(&input);
+        assert!(
+            out.contains(DASH_V),
+            "expected a dashed lifeline in:\n{out}"
+        );
+        assert!(out.contains("alt"), "expected fragment title in:\n{out}");
+    }
+
+    #[test]
     fn edge_label_written_at_slot() {
         let mut input = two_node_input(Arrow::Forward, ("A", "B"), None);
         input.layout.labels.push(LabelSlot {
@@ -364,6 +479,7 @@ mod tests {
             canvas_width: 96.0,
             canvas_height: 156.0,
             diagnostics: Default::default(),
+            decorations: vec![],
         };
         let input = RenderInput {
             graph,

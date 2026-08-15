@@ -49,8 +49,11 @@ impl DiagramType {
     }
 
     /// Whether self-loops are allowed by default for this diagram type.
+    ///
+    /// Sequence is `true` because `A -> A` is a SelfCall message on the time
+    /// axis, not a generic isolated loop (layout/sequence/scope.md).
     pub fn allows_self_loop(&self) -> bool {
-        matches!(self, Self::Flowchart | Self::State)
+        matches!(self, Self::Flowchart | Self::State | Self::Sequence)
     }
 }
 
@@ -100,7 +103,8 @@ impl Profile {
                 diagram_type: dt,
                 default_layout: AlgorithmRef::new("sequence"),
                 default_edge_routing: None,
-                allow_self_loop: false,
+                // Sequence `A -> A` is a SelfCall message, not a generic loop.
+                allow_self_loop: true,
             },
             DiagramType::Mindmap => Self {
                 diagram_type: dt,

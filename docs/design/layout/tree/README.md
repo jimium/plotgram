@@ -1,7 +1,8 @@
 # TreeLayout
 
-> 状态：占位（待展开）  
-> 引擎注册名（目标）：`tree`  
+> 状态：骨架（层式居中放置器；非 RT/Buchheim）  
+> 引擎注册名：`tree`  
+> 代码：`crates/plotgram-layout/src/layout/tree/`  
 > 模板：[_template.md](../_template.md)
 
 ## 签名
@@ -37,4 +38,4 @@
 
 - [ ] `architecture.md`（或并入 README）— placer 写权、根选择、非树边策略  
 - [ ] `scope.md` — radial vs 正交树 profile 表  
-- [ ] 与重建 `layout/tree` 模块对齐后补代码链
+- [x] 与重建 `layout/tree` 模块对齐（Compose 生成生成树 → Metric 层式居中 → Ink 正交/直线；radial/bus placer 显式 Unsupported）

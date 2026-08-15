@@ -161,6 +161,86 @@ pub struct GroupPlacement {
     pub frame: Rect,
 }
 
+/// Layout-derived drawable geometry that is **not** a Graph entity (ADR-009).
+///
+/// Written by layout Metric/Ink; render only paints. Default empty — Hier and
+/// other kernels that have nothing extra to say emit `[]`.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Decoration {
+    /// Vertical lifeline under a participant header (`lifeline:{node_id}`).
+    Lifeline {
+        id: String,
+        participant: String,
+        x: f64,
+        y0: f64,
+        y1: f64,
+        /// Crossing y values (notch/hop); empty until Sequence M2.
+        #[serde(default)]
+        gaps: Vec<f64>,
+    },
+    /// Activation bar on a lifeline (`activation:{edge_id}:{ordinal}`).
+    Activation {
+        id: String,
+        lifeline_id: String,
+        frame: Rect,
+        depth: u32,
+    },
+    /// Combined-fragment / region box (`fragment:{author_id}`). Sequence M4.
+    /// Not a `Graph::groups` member — layout writes this, render only paints.
+    FragmentFrame {
+        id: String,
+        /// UML operator (`alt`, `loop`, `opt`, `par`, `critical`, `region`, …).
+        operator: String,
+        label: Option<String>,
+        frame: Rect,
+        /// Operand divider y values (alt / par). Empty if a single operand.
+        #[serde(default)]
+        operands: Vec<f64>,
+    },
+}
+
+impl Decoration {
+    pub fn translate(&mut self, dx: f64, dy: f64) {
+        match self {
+            Self::Lifeline {
+                x, y0, y1, gaps, ..
+            } => {
+                *x += dx;
+                *y0 += dy;
+                *y1 += dy;
+                for g in gaps {
+                    *g += dy;
+                }
+            }
+            Self::Activation { frame, .. } => {
+                frame.x += dx;
+                frame.y += dy;
+            }
+            Self::FragmentFrame {
+                frame, operands, ..
+            } => {
+                frame.x += dx;
+                frame.y += dy;
+                for y in operands {
+                    *y += dy;
+                }
+            }
+        }
+    }
+
+    pub fn bbox(&self) -> Rect {
+        match self {
+            Self::Lifeline { x, y0, y1, .. } => {
+                let top = y0.min(*y1);
+                let h = (y1 - y0).abs().max(0.0);
+                Rect::new(*x, top, 0.0, h)
+            }
+            Self::Activation { frame, .. } | Self::FragmentFrame { frame, .. } => *frame,
+        }
+    }
+}
+
 /// Complete layout result — geometry only.
 ///
 /// Does **not** carry shape / kind / style / theme; pair with `Graph` + `RenderMeta`
@@ -177,4 +257,7 @@ pub struct LayoutResult {
     /// Never affects geometry; `#[serde(default)]` keeps older JSON readable.
     #[serde(default)]
     pub diagnostics: LayoutDiagnostics,
+    /// Derived geometry (lifelines, activation bars, …). Empty default.
+    #[serde(default)]
+    pub decorations: Vec<Decoration>,
 }

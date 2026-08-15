@@ -2,11 +2,11 @@
 
 > 状态：现行设计档（重建中；目标架构已立）
 > 引擎注册名：`sequence`
-> 代码（目标）：`crates/plotgram-layout/src/layout/sequence/`（与 Hier 同 crate）
+> 代码：`crates/plotgram-layout/src/layout/sequence/`（与 Hier 同 crate；**M4 已落地**）
 > 参考实现：`crates/v1/plotgram-core/src/layout/recipes/sequence.rs`
 > **目标架构真源**：[architecture.md](architecture.md)
 
-> **落地前置**：M1 起的生命线/激活条/片段框依赖 [ADR-009](../../adr/009-layout-result-decorations.md) 在 `plotgram-model` / `plotgram-engine-api` 落地 `decorations` 通道；M0 可在「只发 nodes+edges」窗口启动。详见 architecture.md 顶部「前置依赖」。
+> **ADR-009**：`LayoutResult.decorations` / `LayoutOutput.decorations` 已落地（方案 A）。M1 写出 `Lifeline` / `Activation`；M2 写 `Lifeline.gaps`（notch）；M4 写 `FragmentFrame`（组合片段框，不进 `Graph::groups`）。
 
 ## 签名
 
@@ -39,7 +39,20 @@
 
 - **唯一主路径**：本核 Builtin Ink（`EdgeGeometryMode::Builtin`）。
 - **禁止**：`edge_routing: Some(...)`（目标：硬失败 `Unsupported`，与 dsl-spec 表一致）。
-- 穿越中间生命线**合法**；可选 notch/hop 装饰，不改路径拓扑。
+- 穿越中间生命线**合法**；`lifeline_gap_style: notch`（默认）在交叉 y 留缺口，`none` 连续画过；`hop` 仍 Unsupported。
+
+## M2–M4 参数（现行）
+
+| 键 | 默认 | 说明 |
+|----|------|------|
+| `lifeline_gap_style` | `notch` | `none` / `notch`；`hop` 硬失败 |
+| `lifeline_order` | `declaration` | `greedy` / `local` 走 `plotgram-algo` 一维排列 |
+| 节点 `lifeline_pin` | — | 槽位（`0`…）或 `left` / `right`；优化不得覆盖 |
+| 节点 `lifeline_before` | — | 该生命线必须在指定 id 左侧 |
+| 边 `fragment` | — | 片段 id；`a.b` / `"a/b"` / `"a,b"` = 同时属于多层。嵌套由区间包含推断；部分交叠硬失败。一等写法：`fragment <kind> <id> { … }`（dsl-spec §8.2） |
+| 边 `fragment_kind` | `region` | `alt` / `loop` / `opt` / `par` / `critical` / …（作用在该边路径的最内层） |
+| 边 `fragment_label` | — | 标题 pentagon 里 `kind [label]` |
+| 边 `fragment_operand` | 0 | `alt` / `par` 分区下标；分界虚线画在相邻 operand 之间 |
 
 ## 写权（本核）
 

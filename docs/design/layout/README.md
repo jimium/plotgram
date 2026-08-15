@@ -31,8 +31,8 @@
 | 内核 | 注册名（目标） | 一句话 | 文档 | 代码（重建） |
 |------|----------------|--------|------|----------------|
 | Hierarchical | `hierarchical` | 有向分层；主核 | [hierarchical/](hierarchical/) | `plotgram-layout` → `layout/hierarchical` |
-| Tree | `tree` | 树形递归放置 | [tree/](tree/) | 待建 |
-| Sequence | `sequence` | 参与者轴 + 消息时间序；Builtin 边 | [sequence/](sequence/) · [架构](sequence/architecture.md) | 待建（`plotgram-layout` → `layout/sequence`） |
+| Tree | `tree` | 树形递归放置 | [tree/](tree/) | `plotgram-layout` → `layout/tree`（骨架：层式居中放置器） |
+| Sequence | `sequence` | 参与者轴 + 消息时间序；Builtin 边 | [sequence/](sequence/) · [架构](sequence/architecture.md) | `plotgram-layout` → `layout/sequence`（M4） |
 | Circular | `circular` | 圆环 / 分量环 | [circular/](circular/) | 待建 |
 
 横切（按需生长，避免在每个内核里重复）：

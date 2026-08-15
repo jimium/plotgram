@@ -38,7 +38,7 @@ hierarchical/flat/smoke.decision-loop.pgm
 
 hierarchical/group-weak/product.cloud-native.pgm
 tree/plain/smoke.basic.pgm          # 将来；tree 自定 facet
-sequence/smoke.basic.pgm            # 将来；无 facet 亦可
+sequence/smoke.ping-pong.pgm     # 现行；无 facet
 ```
 
 - `layout` = 路径第一段  
@@ -64,7 +64,7 @@ manifest 写入 `layout` / `facet`（可 null）/ `role`；SVG 镜像源路径�
 | 内核 | 建议 facet | 说明 |
 |------|------------|------|
 | tree | `plain` / `compound` | 通常无 PartitionGrid |
-| sequence | `plain` / `fragment` | 生命线 + 消息 + 片段 |
+| sequence | （无；文件直接落在 `sequence/`） | M4 生命线 + 消息 + 组合片段框 |
 | circular | `single` / `components` | 单环 vs 多分量 |
 
 ---
@@ -79,7 +79,7 @@ showcase/
 │   ├── partition/            # PartitionGrid 占位（可空）
 │   └── README.md             # hier facet 说明（可选短注）
 ├── tree/                     # 将来
-├── sequence/                 # 将来
+├── sequence/                 # 现行；无 facet（M1 生命线 + 消息）
 ├── circular/                 # 将来
 ├── _backup/                  # 未支持内核的旧 DSL；永不进渲染 / 门禁
 ├── _out/                     # SVG + manifest.json（gitignore；render.sh 派生）

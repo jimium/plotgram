@@ -197,9 +197,9 @@ lifeline_crossings[L].push(row_or_segment_key)
 
 | 值 | 行为 |
 |----|------|
-| `none` | 生命线连续画过；消息画在上层（默认可接受） |
-| `notch` | 生命线在交叉 y ± gap_half 留空（v1 `LIFELINE_MESSAGE_GAP_HALF`） |
-| `hop` | 消息在交叉处小跳线（后置；与正交跳线零件可共享） |
+| `notch`（默认） | 生命线在交叉 y ± gap_half 留空（v1 `LIFELINE_MESSAGE_GAP_HALF`） |
+| `none` | 生命线连续画过；消息画在上层 |
+| `hop` | 后置；bind 硬失败。消息在交叉处小跳线（可与正交跳线零件共享） |
 
 装饰**不**改变 MessageRouteTopo，不新增 Compose 决策。
 
@@ -278,18 +278,20 @@ lifeline_crossings[L].push(row_or_segment_key)
 
 ## 11. 失败表
 
-对齐当前 [`LayoutError`](../../../../crates/plotgram-engine-api/src/error.rs) 变体。当前变体：`MissingNodeSize` / `UnknownLayout` / `UnknownRouter` / `LayoutCannotDeferEdges` / `UnsupportedRouteScene` / `Message(String)`。
+对齐当前 [`LayoutError`](../../../../crates/plotgram-engine-api/src/error.rs) 变体：`MissingNodeSize` / `UnknownLayout` / `UnknownRouter` / `LayoutCannotDeferEdges` / `UnsupportedRouteScene` / `Unsupported` / `InvalidInput` / `InternalInvariant` / `Message(String)`。
 
-| 情况 | 当前 `LayoutError` 变体 | 备注 |
-|------|--------------------------|------|
+Sequence 经 [`seq_err`](../../../../crates/plotgram-layout/src/layout/sequence/mod.rs) 把带前缀的诊断分到后三类（`invariant:` → `InternalInvariant`，`unsupported:` → `Unsupported`，其余 → `InvalidInput`）。`Message` 留给尚未迁移的其它内核。
+
+| 情况 | `LayoutError` 变体 | 备注 |
+|------|---------------------|------|
 | `edge_routing: Some(_)`（S6 禁 Router） | [`LayoutCannotDeferEdges { layout: "sequence" }`](../../../../crates/plotgram-engine-api/src/error.rs) | 本核 `layout()` 入口自检（见 [architecture §1.2](../architecture.md)），门面不替 layout 拦 |
-| 消息端点不是参与者节点（非顶层 Entity / 是 GroupAnchor） | `Message(String)` | 建议后续扩展为 `InvalidInput { .. }` 结构化变体 |
-| Self 但 route ≠ SelfLoop | `Message(String)` | 建议后续扩展为 `InternalInvariant { .. }` |
-| Sync 但 y 不共线（InkVerifier） | `Message(String)` | 同上 |
-| Async 未实现却 bind 开启 | `Message(String)` 或 `UnsupportedRouteScene { reason }` | Async 不走 RouteScene，倾向 `Message`；建议后续 `Unsupported { feature }` |
-| Lost/Found 未实现却触发 | `Message(String)` | 同上 |
-| 标签 Demand 未满足导致溢出 | `Message(String)` | 建议后续 `InternalInvariant { .. }`（预算相序错误） |
-| 激活 depth 负 / span 起止倒序 | `Message(String)` | 建议后续 `InternalInvariant { .. }` |
-| 生命线序 pin 冲突 | `Message(String)` | 建议后续 `InfeasibleConstraint { .. }` |
+| 消息端点不是参与者节点（非顶层 Entity / 是 GroupAnchor） | `InvalidInput` | Display 保留 `sequence: invalid: …` |
+| Self 但 route ≠ SelfLoop | `InternalInvariant` | verifier |
+| Sync 但 y 不共线（InkVerifier） | `InternalInvariant` | 同上 |
+| `lifeline_gap_style: hop` 等后置特性 | `Unsupported { feature }` | 诚实硬失败，不静默 |
+| Lost/Found 未实现却触发 | `Unsupported` | 后置 |
+| 标签 Demand 未满足导致溢出 | `InternalInvariant` | 预算相序错误 |
+| 激活 depth 负 / span 起止倒序 | `InternalInvariant` | |
+| 生命线序 pin 冲突 / 片段部分交叠 | `InvalidInput` | 作者约束不可行 |
 
-**落地建议**：M0 先全用 `Message(String)`（字符串里带稳定前缀，如 `"unsupported: async not implemented"`），verifier 按前缀分类断言。M1 起若 `LayoutError` 扩展（加 `Unsupported` / `InvalidInput` / `InternalInvariant` 变体），再迁移。**禁止**在文档里写不存在的设计类目当已落地。
+**禁止**在文档里写不存在的设计类目当已落地。

@@ -1,0 +1,22 @@
+// gRPC 服务网格：Sidecar 拦截 + mTLS
+diagram {
+    profile: sequence,
+    title: "gRPC 服务网格调用时序"
+
+    node client "客户端服务" service
+    node client_proxy "客户端 Sidecar" gateway
+    node server_proxy "服务端 Sidecar" gateway
+    node server "服务端服务" service
+    node control_plane "控制平面" service
+
+    control_plane -> client_proxy "下发路由规则"
+    control_plane -> server_proxy "下发 mTLS 证书"
+    client -> client_proxy "gRPC 调用"
+    client_proxy -> server_proxy "mTLS 加密转发"
+    server_proxy -> server "转发到业务"
+    server --> server_proxy "返回响应"
+    server_proxy --> client_proxy "加密回传"
+    client_proxy --> client "返回结果"
+    client_proxy --> control_plane "上报调用指标"
+    server_proxy --> control_plane "上报调用指标"
+}

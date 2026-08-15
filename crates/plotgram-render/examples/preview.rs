@@ -14,7 +14,12 @@ use plotgram_model::result::{
 use plotgram_model::NodeShape;
 use plotgram_render::render_svg;
 
-fn node(id: &str, label: &str, shape: Option<plotgram_model::NodeShape>, variant: Option<&str>) -> Node {
+fn node(
+    id: &str,
+    label: &str,
+    shape: Option<plotgram_model::NodeShape>,
+    variant: Option<&str>,
+) -> Node {
     let mut attrs = AttrMap::new();
     if let Some(v) = variant {
         attrs.insert("variant".to_string(), AttrValue::Atom(v.to_string()));
@@ -53,7 +58,10 @@ fn edge_with(id: &str, source: &str, target: &str, arrow: Arrow) -> Edge {
 }
 
 fn place(id: &str, x: f64, y: f64, w: f64, h: f64) -> NodePlacement {
-    NodePlacement { id: id.to_string(), frame: Rect::new(x, y, w, h) }
+    NodePlacement {
+        id: id.to_string(),
+        frame: Rect::new(x, y, w, h),
+    }
 }
 
 fn route(id: &str, source: &str, target: &str, pts: &[(f64, f64)]) -> EdgePlacement {
@@ -83,7 +91,12 @@ fn build_input(theme: Option<&str>, render_style: Option<&str>) -> RenderInput {
             // Row 1: a small flow
             node("start", "开始", Some(NodeShape::Stadium), None),
             node("check", "库存足够?", Some(NodeShape::Diamond), Some("info")),
-            node("svc", "订单服务", Some(NodeShape::RoundedRect), Some("primary")),
+            node(
+                "svc",
+                "订单服务",
+                Some(NodeShape::RoundedRect),
+                Some("primary"),
+            ),
             node("db", "订单库", Some(NodeShape::Cylinder), Some("secondary")),
             // Row 2: process-ish shapes
             node("doc", "对账单", Some(NodeShape::Document), None),
@@ -107,8 +120,8 @@ fn build_input(theme: Option<&str>, render_style: Option<&str>) -> RenderInput {
             edge_with("e6", "cdn", "plain", Arrow::Bidirectional),
         ],
         groups: vec![],
-            partition: None,
-        };
+        partition: None,
+    };
 
     // ── Hand layout ──
     let nodes = vec![
@@ -164,7 +177,12 @@ fn build_input(theme: Option<&str>, render_style: Option<&str>) -> RenderInput {
                 .unwrap_or_default();
             // person: label below the figure
             let frame = if np.id == "buyer" {
-                Rect::new(np.frame.x - 20.0, np.frame.bottom() + 4.0, np.frame.width + 40.0, 18.0)
+                Rect::new(
+                    np.frame.x - 20.0,
+                    np.frame.bottom() + 4.0,
+                    np.frame.width + 40.0,
+                    18.0,
+                )
             } else {
                 np.frame
             };
@@ -198,6 +216,7 @@ fn build_input(theme: Option<&str>, render_style: Option<&str>) -> RenderInput {
         canvas_width: 740.0,
         canvas_height: 420.0,
         diagnostics: Default::default(),
+        decorations: vec![],
     };
 
     RenderInput {

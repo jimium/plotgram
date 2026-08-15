@@ -1,0 +1,23 @@
+// 支付网关：下单 → 收银台 → 扣款 → 异步通知
+diagram {
+    profile: sequence,
+    title: "支付网关交互时序"
+
+    node user "用户" actor
+    node shop "电商前端" client
+    node order_svc "订单服务" service
+    node pay_gw "第三方支付网关" gateway
+    node bank "银行系统" database
+
+    user -> shop "点击支付"
+    shop -> order_svc "发起支付请求"
+    order_svc -> pay_gw "创建支付订单"
+    pay_gw --> order_svc "返回支付凭证"
+    order_svc --> shop "唤起支付收银台"
+    user -> pay_gw "确认支付并输入密码"
+    pay_gw -> bank "请求扣款"
+    bank --> pay_gw "扣款成功"
+    pay_gw --> user "展示支付成功页面"
+    pay_gw -> order_svc "异步通知支付结果"
+    order_svc --> shop "更新订单支付状态"
+}
