@@ -18,7 +18,8 @@ pub struct Transition {
 #[derive(Debug, Clone)]
 pub struct ChannelGraph<'s> {
     substrate: &'s Substrate,
-    adjacency: BTreeMap<TrackId, Vec<Transition>>,
+    /// Dense by `TrackId.0` (alloc ids are sequential; holes stay empty).
+    adjacency: Vec<Vec<Transition>>,
 }
 
 impl<'s> ChannelGraph<'s> {
@@ -58,9 +59,17 @@ impl<'s> ChannelGraph<'s> {
                 (t.to, via_key)
             });
         }
+        let n = adjacency
+            .last_key_value()
+            .map(|(k, _)| k.0 as usize + 1)
+            .unwrap_or(0);
+        let mut dense: Vec<Vec<Transition>> = (0..n).map(|_| Vec::new()).collect();
+        for (k, v) in adjacency {
+            dense[k.0 as usize] = v;
+        }
         Self {
             substrate,
-            adjacency,
+            adjacency: dense,
         }
     }
 
@@ -69,16 +78,20 @@ impl<'s> ChannelGraph<'s> {
     }
 
     pub fn neighbors(&self, track: TrackId) -> &[Transition] {
-        self.adjacency.get(&track).map_or(&[], Vec::as_slice)
+        self.adjacency
+            .get(track.0 as usize)
+            .map_or(&[], Vec::as_slice)
     }
 }
 
+/// Dense-by-id occupancy (TrackId/GateId are sequential alloc ids; reads of
+/// never-touched ids fall through to zero without allocating).
 #[derive(Debug, Clone, Default)]
 pub struct Occupancy {
-    track_usage: BTreeMap<TrackId, u32>,
-    gate_usage: BTreeMap<GateId, u32>,
+    track_usage: Vec<u32>,
+    gate_usage: Vec<u32>,
     /// Per-track occupied plan-grid intervals (from committed paths).
-    track_intervals: BTreeMap<TrackId, Vec<(usize, usize)>>,
+    track_intervals: Vec<Vec<(usize, usize)>>,
 }
 
 impl Occupancy {
@@ -87,12 +100,12 @@ impl Occupancy {
     }
 
     pub fn lane_demand(&self, track: TrackId) -> u32 {
-        self.track_usage.get(&track).copied().unwrap_or(0)
+        self.track_usage.get(track.0 as usize).copied().unwrap_or(0)
     }
 
     #[allow(dead_code)]
     pub fn gate_load(&self, gate: GateId) -> u32 {
-        self.gate_usage.get(&gate).copied().unwrap_or(0)
+        self.gate_usage.get(gate.0 as usize).copied().unwrap_or(0)
     }
 
     /// Gates are unbounded (P5-6 deleted `GateCapacity::Fixed`).
@@ -102,7 +115,7 @@ impl Occupancy {
 
     /// Count how many committed intervals on `track` properly overlap `ext`.
     pub fn crossing_count(&self, track: TrackId, ext: (usize, usize)) -> u32 {
-        let Some(ivs) = self.track_intervals.get(&track) else {
+        let Some(ivs) = self.track_intervals.get(track.0 as usize) else {
             return 0;
         };
         ivs.iter()
@@ -114,28 +127,44 @@ impl Occupancy {
             .count() as u32
     }
 
+    fn ensure_track_capacity(&mut self, i: usize) {
+        if i >= self.track_usage.len() {
+            self.track_usage.resize(i + 1, 0);
+        }
+        if i >= self.track_intervals.len() {
+            self.track_intervals.resize_with(i + 1, Vec::new);
+        }
+    }
+
     pub fn commit(&mut self, substrate: &Substrate, tracks: &[TrackId], gates: &[GateId]) {
         for &t in tracks {
-            *self.track_usage.entry(t).or_default() += 1;
+            let i = t.0 as usize;
+            self.ensure_track_capacity(i);
+            self.track_usage[i] += 1;
             if let Some(tr) = substrate.track(t) {
-                self.track_intervals.entry(t).or_default().push(tr.ext);
+                self.track_intervals[i].push(tr.ext);
             }
         }
         let mut seen: BTreeSet<GateId> = BTreeSet::new();
         for &g in gates {
             if seen.insert(g) {
-                *self.gate_usage.entry(g).or_default() += 1;
+                let i = g.0 as usize;
+                if i >= self.gate_usage.len() {
+                    self.gate_usage.resize(i + 1, 0);
+                }
+                self.gate_usage[i] += 1;
             }
         }
     }
 
     pub fn release(&mut self, substrate: &Substrate, tracks: &[TrackId], gates: &[GateId]) {
         for &t in tracks {
-            if let Some(u) = self.track_usage.get_mut(&t) {
+            let i = t.0 as usize;
+            if let Some(u) = self.track_usage.get_mut(i) {
                 *u = u.saturating_sub(1);
             }
             if let Some(tr) = substrate.track(t) {
-                if let Some(ivs) = self.track_intervals.get_mut(&t) {
+                if let Some(ivs) = self.track_intervals.get_mut(i) {
                     if let Some(pos) = ivs.iter().rposition(|&iv| iv == tr.ext) {
                         ivs.remove(pos);
                     }
@@ -145,7 +174,7 @@ impl Occupancy {
         let mut seen: BTreeSet<GateId> = BTreeSet::new();
         for &g in gates {
             if seen.insert(g) {
-                if let Some(u) = self.gate_usage.get_mut(&g) {
+                if let Some(u) = self.gate_usage.get_mut(g.0 as usize) {
                     *u = u.saturating_sub(1);
                 }
             }

@@ -83,49 +83,167 @@ struct Block {
     wd_sum: f64,
 }
 
-fn violation(c: &Constraint, pos: impl Fn(usize) -> f64) -> f64 {
-    pos(c.left) + c.gap - pos(c.right)
+/// Constraint set preprocessed for repeated solves: validation and
+/// feasibility are proven once, and the sorted processing order is frozen.
+/// `solve_prepared(&p, vars)` is bit-identical to `solve(vars, original)`.
+#[derive(Debug, Clone)]
+pub struct Prepared {
+    cons: Vec<Constraint>,
+}
+
+impl Prepared {
+    /// Sorted constraint list (the exact order `solve` would use).
+    pub fn constraints(&self) -> &[Constraint] {
+        &self.cons
+    }
+}
+
+/// Validate + feasibility-check + freeze the processing order of a
+/// constraint set. Reuse the returned [`Prepared`] across solves that share
+/// the same constraints (only desired/weights change) to skip the O(m log m)
+/// sort and the Bellman–Ford feasibility scan per solve.
+pub fn prepare(n_vars: usize, constraints: &[Constraint]) -> Result<Prepared, VpscError> {
+    // Variable-side validation happens per solve (desired/weights change);
+    // here we only check the constraint side against `n_vars`.
+    for (i, c) in constraints.iter().enumerate() {
+        if c.left >= n_vars || c.right >= n_vars {
+            return Err(VpscError::InvalidInput {
+                reason: "variable index out of range",
+                index: i,
+            });
+        }
+        if c.left == c.right {
+            return Err(VpscError::InvalidInput {
+                reason: "self-loop constraint",
+                index: i,
+            });
+        }
+        if !c.gap.is_finite() {
+            return Err(VpscError::InvalidInput {
+                reason: "gap must be finite",
+                index: i,
+            });
+        }
+    }
+    check_feasible(n_vars, constraints)?;
+    // Stable processing order: by (left, right, input index). Keys are
+    // unique (i is), so the unstable sort yields the identical order.
+    let mut order: Vec<usize> = (0..constraints.len()).collect();
+    order.sort_unstable_by_key(|&i| (constraints[i].left, constraints[i].right, i));
+    let cons: Vec<Constraint> = order.iter().map(|&i| constraints[i]).collect();
+    Ok(Prepared { cons })
+}
+
+/// Solve using a preprocessed constraint set. See [`prepare`].
+pub fn solve_prepared(p: &Prepared, vars: &[Variable]) -> Result<Vec<f64>, VpscError> {
+    solve_inner(vars, &p.cons)
+}
+
+/// Reusable working memory for repeated solves (see
+/// [`solve_prepared_with`]): variable/block state and traversal scratch,
+/// plus a pool of index vectors so the hot merge/split loop runs without
+/// per-solve allocations. Reset on every call; iteration orders and
+/// arithmetic are identical to [`solve_prepared`].
+#[derive(Default)]
+pub struct SolveBufs {
+    vs: Vec<Var>,
+    blocks: Vec<Block>,
+    scratch: Scratch,
+}
+
+/// [`solve_prepared`] over caller-owned buffers, for loops that solve the
+/// same (or different) prepared sets many times. Bit-identical results;
+/// only allocation behavior differs.
+pub fn solve_prepared_with(
+    p: &Prepared,
+    vars: &[Variable],
+    bufs: &mut SolveBufs,
+) -> Result<Vec<f64>, VpscError> {
+    solve_inner_with(vars, &p.cons, bufs)
 }
 
 /// Solve the VPSC problem. Returns final positions, one per variable.
 pub fn solve(vars: &[Variable], constraints: &[Constraint]) -> Result<Vec<f64>, VpscError> {
-    validate(vars, constraints)?;
-    check_feasible(vars.len(), constraints)?;
+    let p = prepare(vars.len(), constraints)?;
+    solve_inner(vars, &p.cons)
+}
 
-    // Stable processing order: by (left, right, input index).
-    let mut order: Vec<usize> = (0..constraints.len()).collect();
-    order.sort_by_key(|&i| (constraints[i].left, constraints[i].right, i));
-    let cons: Vec<Constraint> = order.iter().map(|&i| constraints[i]).collect();
+fn solve_inner(vars: &[Variable], cons: &[Constraint]) -> Result<Vec<f64>, VpscError> {
+    let mut bufs = SolveBufs {
+        vs: Vec::with_capacity(vars.len()),
+        blocks: Vec::with_capacity(vars.len()),
+        scratch: Scratch::new(vars.len()),
+    };
+    solve_inner_with(vars, cons, &mut bufs)
+}
 
-    let mut vs: Vec<Var> = vars
-        .iter()
-        .map(|v| Var {
+fn solve_inner_with(
+    vars: &[Variable],
+    cons: &[Constraint],
+    bufs: &mut SolveBufs,
+) -> Result<Vec<f64>, VpscError> {
+    for (i, v) in vars.iter().enumerate() {
+        if !v.weight.is_finite() || v.weight <= 0.0 {
+            return Err(VpscError::InvalidInput {
+                reason: "weight must be finite and > 0",
+                index: i,
+            });
+        }
+        if !v.desired.is_finite() {
+            return Err(VpscError::InvalidInput {
+                reason: "desired must be finite",
+                index: i,
+            });
+        }
+    }
+
+    let n = vars.len();
+    let SolveBufs {
+        vs,
+        blocks,
+        scratch,
+    } = bufs;
+    // Reset per-solve state, recycling the previous call's buffers:
+    // block var/active lists go back to the pool (cleared on reuse), the
+    // flat caches are zeroed for this call's variable count.
+    for b in blocks.drain(..) {
+        scratch.give_pool(b.vars);
+        scratch.give_pool(b.active);
+    }
+    vs.clear();
+    vs.reserve(n);
+    for v in vars {
+        vs.push(Var {
             desired: v.desired,
             weight: v.weight,
             block: usize::MAX,
             offset: 0.0,
-        })
-        .collect();
-    let mut blocks: Vec<Block> = Vec::with_capacity(vs.len());
-    for (i, v) in vs.iter_mut().enumerate() {
-        v.block = i;
-        blocks.push(Block {
-            vars: vec![i],
-            active: Vec::new(),
-            position: v.desired,
-            weight_sum: v.weight,
-            wd_sum: v.weight * v.desired,
         });
+    }
+    blocks.reserve(n);
+    for i in 0..n {
+        vs[i].block = i;
+        let mut vars_i = scratch.pool.pop().unwrap_or_default();
+        vars_i.clear();
+        vars_i.push(i);
+        let (desired, weight) = (vs[i].desired, vs[i].weight);
+        blocks.push(Block {
+            vars: vars_i,
+            active: Vec::new(),
+            position: desired,
+            weight_sum: weight,
+            wd_sum: weight * desired,
+        });
+    }
+    scratch.reset(n);
+    for i in 0..n {
+        scratch.pos[i] = blocks[i].position;
     }
 
     // Explicit budget: guards the merge/split loops against pathological
     // cycling (AGENTS: no silent infinite loops).
-    let budget = 8 * (vs.len() + cons.len()) * (cons.len() + 1) + 64;
+    let budget = 8 * (n + cons.len()) * (cons.len() + 1) + 64;
     let mut used = 0usize;
-    // TEMP profiling probe — remove after diagnosis.
-    let _t_on = std::env::var("PLOTGRAM_HIER_TIMINGS").is_ok();
-    let mut _rounds = 0usize;
-    let _t0 = std::time::Instant::now();
     const EPS: f64 = 1e-9;
 
     // Outer fixpoint: satisfy all constraints, then deactivate one active
@@ -133,33 +251,121 @@ pub fn solve(vars: &[Variable], constraints: &[Constraint]) -> Result<Vec<f64>, 
     // stretch there) and re-satisfy. No violation + no negative multiplier
     // ⇒ global optimum of the convex QP.
     loop {
-        _rounds += 1;
-        satisfy(&mut vs, &mut blocks, &cons, EPS, &mut used, budget)?;
-        match find_split(&vs, &blocks, &cons, EPS) {
+        satisfy(vs, blocks, cons, EPS, &mut used, budget, scratch)?;
+        match find_split(vs, blocks, cons, EPS, scratch) {
             Some((b, ai)) => {
-                split_block(&mut vs, &mut blocks, &cons, b, ai);
+                split_block(vs, blocks, cons, b, ai, scratch);
                 used += 1;
                 if used > budget {
                     return Err(VpscError::IterationLimit);
                 }
             }
             None => {
-                if _t_on {
-                    let mb = blocks.iter().map(|b| b.vars.len()).max().unwrap_or(0);
-                    eprintln!(
-                        "[vpsc] n={} m={} rounds={_rounds} used={used} max_block={mb} {:?}",
-                        vs.len(),
-                        cons.len(),
-                        _t0.elapsed()
-                    );
-                }
-                let mut out = vec![0.0; vs.len()];
+                let mut out = vec![0.0; n];
                 for (i, v) in vs.iter().enumerate() {
                     out[i] = blocks[v.block].position + v.offset;
                 }
                 return Ok(out);
             }
         }
+    }
+}
+
+/// Reusable per-solve buffers: adjacency lists, visited flags and traversal
+/// stacks. Shared across `satisfy` / `find_split` / `split_block` so the hot
+/// merge/split loop performs no per-round allocations. Semantics are
+/// untouched: every traversal walks the same neighbor order and every sum
+/// runs over the same sorted component as the from-scratch version.
+#[derive(Default)]
+struct Scratch {
+    adj: Vec<Vec<usize>>,
+    seen: Vec<bool>,
+    comp: Vec<usize>,
+    stack: Vec<usize>,
+    /// Temp for the sorted-merge in [`merge_blocks`].
+    merge_buf: Vec<usize>,
+    /// Cached per-var absolute position `block.position + offset`, kept in
+    /// sync by [`merge_blocks`] / [`split_block`] so the satisfy scan reads
+    /// flat memory instead of chasing two pointers per endpoint.
+    pos: Vec<f64>,
+    /// Per-block "verified negative-multiplier-free" flag (see
+    /// [`find_split`]). Cleared whenever the block's state changes.
+    clean: Vec<bool>,
+    /// Recycled index vectors (block `vars` / `active` lists). Buffers are
+    /// cleared on checkout ([`Scratch::take_pool`]) so reuse is invisible
+    /// to the algorithm.
+    pool: Vec<Vec<usize>>,
+}
+
+impl Scratch {
+    fn new(n: usize) -> Self {
+        Self {
+            adj: vec![Vec::new(); n],
+            seen: vec![false; n],
+            comp: Vec::new(),
+            stack: Vec::new(),
+            merge_buf: Vec::new(),
+            pos: vec![0.0; n],
+            clean: vec![false; n],
+            pool: Vec::new(),
+        }
+    }
+
+    /// Reset the per-call flat caches to `n` variables. Traversal buffers
+    /// (`comp` / `stack` / `merge_buf` / `adj`) are empty by exit invariant;
+    /// error paths can leave `adj` dirty, so clear defensively.
+    fn reset(&mut self, n: usize) {
+        // Error paths can leave `adj` lists filled; clear defensively and
+        // size every flat cache to this call's variable count.
+        self.adj.truncate(n);
+        self.adj.resize_with(n, Vec::new);
+        for slot in self.adj.iter_mut() {
+            slot.clear();
+        }
+        self.seen.clear();
+        self.seen.resize(n, false);
+        self.pos.clear();
+        self.pos.resize(n, 0.0);
+        self.clean.clear();
+        self.clean.resize(n, false);
+        self.comp.clear();
+        self.stack.clear();
+        self.merge_buf.clear();
+    }
+
+    fn take_pool(&mut self) -> Vec<usize> {
+        let mut v = self.pool.pop().unwrap_or_default();
+        v.clear();
+        v
+    }
+
+    fn give_pool(&mut self, v: Vec<usize>) {
+        if !v.is_empty() {
+            self.pool.push(v);
+        }
+    }
+}
+
+/// Fill `adj` for `block`'s active tree: per-variable lists of active
+/// constraint indices, pushed in `block.active`'s sorted order — exactly the
+/// neighbor order the legacy from-scratch build produced, keeping paths and
+/// multiplier values bit-identical while costing O(A) instead of O(n).
+/// Callers must [`clear_adj`] the same block when done.
+fn fill_adj(scratch: &mut Scratch, block: &Block, cons: &[Constraint]) {
+    for &ai in &block.active {
+        let c = &cons[ai];
+        scratch.adj[c.left].push(ai);
+        scratch.adj[c.right].push(ai);
+    }
+}
+
+/// Reset only the per-variable lists [`fill_adj`] touched (capacity is kept,
+/// so the hot merge/split loop runs allocation-free).
+fn clear_adj(adj: &mut [Vec<usize>], active: &[usize], cons: &[Constraint]) {
+    for &ai in active {
+        let c = &cons[ai];
+        adj[c.left].clear();
+        adj[c.right].clear();
     }
 }
 
@@ -171,6 +377,7 @@ fn satisfy(
     eps: f64,
     used: &mut usize,
     budget: usize,
+    scratch: &mut Scratch,
 ) -> Result<(), VpscError> {
     loop {
         *used += 1;
@@ -178,10 +385,11 @@ fn satisfy(
             return Err(VpscError::IterationLimit);
         }
         // Most-violated constraint (stable tie-break by sorted-order index).
-        let pos = |v: usize| blocks[vs[v].block].position + vs[v].offset;
+        // `pos` is the flat per-var cache — same values, same fold order.
+        let pos = &scratch.pos;
         let mut worst: Option<(f64, usize)> = None;
         for (ci, c) in cons.iter().enumerate() {
-            let viol = violation(c, pos);
+            let viol = pos[c.left] + c.gap - pos[c.right];
             if viol > eps && worst.map_or(true, |(w, _)| viol > w + eps) {
                 worst = Some((viol, ci));
             }
@@ -201,15 +409,18 @@ fn satisfy(
             // side would re-violate it and cycle forever. A forward edge
             // always exists here, otherwise the constraints would form a
             // positive-gap cycle already rejected by the feasibility check.
-            let n = vs.len();
-            let path = active_path(n, &blocks[bl], cons, c.left, c.right);
-            let adj = build_adjacency(n, &blocks[bl], cons);
+            let path = active_path(&blocks[bl], cons, c.left, c.right, scratch);
+            fill_adj(scratch, &blocks[bl], cons);
+            let Scratch {
+                adj, seen, stack, ..
+            } = scratch;
             let weakest = path
                 .into_iter()
                 .filter(|&(_, forward)| forward)
-                .map(|(ai, _)| (ai, multiplier(vs, &blocks[bl], cons, &adj, ai)))
+                .map(|(ai, _)| (ai, multiplier(vs, &blocks[bl], cons, adj, seen, stack, ai)))
                 .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap().then(a.0.cmp(&b.0)))
                 .map(|(ai, _)| ai);
+            clear_adj(adj, &blocks[bl].active, cons);
             let Some(weakest) = weakest else {
                 // A feasible system always has a forward edge here; reaching
                 // this branch means a positive-gap cycle below the 1e-12
@@ -217,55 +428,17 @@ fn satisfy(
                 // closed with an error instead of panicking.
                 return Err(VpscError::IterationLimit);
             };
-            split_block(vs, blocks, cons, bl, weakest);
+            split_block(vs, blocks, cons, bl, weakest, scratch);
             let (nbl, nbr) = (vs[c.left].block, vs[c.right].block);
             debug_assert_ne!(
                 nbl, nbr,
                 "splitting a path edge must separate the endpoints"
             );
-            merge_blocks(vs, blocks, cons, nbl, nbr, ci);
+            merge_blocks(vs, blocks, cons, nbl, nbr, ci, scratch);
         } else {
-            merge_blocks(vs, blocks, cons, bl, br, ci);
+            merge_blocks(vs, blocks, cons, bl, br, ci, scratch);
         }
     }
-}
-
-fn validate(vars: &[Variable], constraints: &[Constraint]) -> Result<(), VpscError> {
-    for (i, v) in vars.iter().enumerate() {
-        if !v.weight.is_finite() || v.weight <= 0.0 {
-            return Err(VpscError::InvalidInput {
-                reason: "weight must be finite and > 0",
-                index: i,
-            });
-        }
-        if !v.desired.is_finite() {
-            return Err(VpscError::InvalidInput {
-                reason: "desired must be finite",
-                index: i,
-            });
-        }
-    }
-    for (i, c) in constraints.iter().enumerate() {
-        if c.left >= vars.len() || c.right >= vars.len() {
-            return Err(VpscError::InvalidInput {
-                reason: "variable index out of range",
-                index: i,
-            });
-        }
-        if c.left == c.right {
-            return Err(VpscError::InvalidInput {
-                reason: "self-loop constraint",
-                index: i,
-            });
-        }
-        if !c.gap.is_finite() {
-            return Err(VpscError::InvalidInput {
-                reason: "gap must be finite",
-                index: i,
-            });
-        }
-    }
-    Ok(())
 }
 
 /// Detect positive-gap cycles (infeasible) via Bellman–Ford style longest-path
@@ -326,41 +499,29 @@ fn check_feasible(n: usize, constraints: &[Constraint]) -> Result<(), VpscError>
     Ok(())
 }
 
-/// Adjacency index over a block's active tree: per-variable list of active
-/// constraint indices. Built from `block.active` in its sorted order, so each
-/// per-variable list inherits that order — traversals discover neighbors in
-/// exactly the order the legacy full-scan did, keeping paths and multiplier
-/// values bit-identical while costing O(A+B) instead of O(A²) per traversal.
-fn build_adjacency(n: usize, block: &Block, cons: &[Constraint]) -> Vec<Vec<usize>> {
-    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
-    for &ai in &block.active {
-        let c = &cons[ai];
-        adj[c.left].push(ai);
-        adj[c.right].push(ai);
-    }
-    adj
-}
-
 /// Active constraints on the (unique) active-tree path between `from` and
 /// `to` inside `block`. Each entry is `(constraint index, forward)` where
 /// `forward` means the edge is traversed from its `left` to its `right`
-/// endpoint when walking `from` → `to`.
+/// endpoint when walking `from` → `to`. BFS discovery order (neighbors in
+/// `active` order) and the resulting path are identical to the legacy
+/// from-scratch version; the back-walk follows parent queue indices instead
+/// of re-scanning the queue (O(path) instead of O(path²)).
 fn active_path(
-    n: usize,
     block: &Block,
     cons: &[Constraint],
     from: usize,
     to: usize,
+    scratch: &mut Scratch,
 ) -> Vec<(usize, bool)> {
-    // BFS over active constraints as undirected edges, remembering the
-    // constraint used to reach each variable.
-    let adj = build_adjacency(n, block, cons);
-    let mut seen = vec![false; n];
+    fill_adj(scratch, block, cons);
+    let Scratch { adj, seen, .. } = scratch;
     seen[from] = true;
-    let mut via: Vec<(usize, usize, usize)> = vec![(from, usize::MAX, usize::MAX)]; // (var, prev var, via ai)
+    // (var, parent queue index, via ai); `from` sits at index 0.
+    let mut via: Vec<(usize, usize, usize)> = vec![(from, usize::MAX, usize::MAX)];
     let mut head = 0;
     while head < via.len() {
         let (v, _, _) = via[head];
+        let parent = head;
         head += 1;
         if v == to {
             break;
@@ -378,23 +539,47 @@ fn active_path(
                 continue;
             }
             seen[other] = true;
-            via.push((other, v, ai));
+            via.push((other, parent, ai));
         }
     }
-    // Walk back from `to`. Traversal direction on the path is prev → cur,
-    // so the edge is forward iff cons[ai].left == prev.
+    // Walk back from `to` by parent index. Traversal direction on the path
+    // is parent → child, so the edge is forward iff cons[ai].left == parent.
     let mut path = Vec::new();
     let mut cur = to;
     while cur != from {
-        let &(_, prev, ai) = via
+        let &(_, parent, ai) = via
             .iter()
             .find(|&&(v, _, _)| v == cur)
             .expect("path endpoint must be reachable in active tree");
-        path.push((ai, cons[ai].left == prev));
-        cur = prev;
+        path.push((ai, cons[ai].left == via[parent].0));
+        cur = via[parent].0;
     }
     path.reverse();
+    for &(v, _, _) in &via {
+        seen[v] = false;
+    }
+    clear_adj(adj, &block.active, cons);
     path
+}
+
+/// Merge two sorted, disjoint index lists into `buf` (left in arbitrary
+/// order). Identical result to concatenation + sort for unique elements,
+/// but linear.
+fn merge_sorted(buf: &mut Vec<usize>, a: &[usize], b: &[usize]) {
+    buf.clear();
+    buf.reserve(a.len() + b.len());
+    let (mut i, mut j) = (0usize, 0usize);
+    while i < a.len() && j < b.len() {
+        if a[i] < b[j] {
+            buf.push(a[i]);
+            i += 1;
+        } else {
+            buf.push(b[j]);
+            j += 1;
+        }
+    }
+    buf.extend_from_slice(&a[i..]);
+    buf.extend_from_slice(&b[j..]);
 }
 
 /// Merge blocks `bl` (containing c.left) and `br` (containing c.right) so
@@ -406,6 +591,7 @@ fn merge_blocks(
     bl: usize,
     br: usize,
     ci: usize,
+    scratch: &mut Scratch,
 ) {
     let c = &cons[ci];
     // Shift applied to br members' offsets so that the constraint is tight
@@ -422,19 +608,35 @@ fn merge_blocks(
     blocks[drop].weight_sum = 0.0;
     blocks[drop].wd_sum = 0.0;
 
-    let kb = &mut blocks[keep];
-    kb.vars.extend(drop_vars);
-    kb.vars.sort_unstable();
-    kb.active.extend(drop_active);
-    kb.active.push(ci);
-    kb.active.sort_unstable();
-    kb.weight_sum = 0.0;
-    kb.wd_sum = 0.0;
-    for &v in &kb.vars {
-        kb.weight_sum += vs[v].weight;
-        kb.wd_sum += vs[v].weight * (vs[v].desired - vs[v].offset);
+    // Both sides keep `vars` / `active` sorted (merge invariant; `ci` is a
+    // fresh index), so a linear merge reproduces the sorted order exactly.
+    {
+        let Scratch { merge_buf, .. } = scratch;
+        let kb = &mut blocks[keep];
+        merge_sorted(merge_buf, &kb.vars, &drop_vars);
+        kb.vars.clear();
+        kb.vars.extend_from_slice(merge_buf);
+        merge_sorted(merge_buf, &kb.active, &drop_active);
+        let at = merge_buf.partition_point(|&a| a < ci);
+        merge_buf.insert(at, ci);
+        kb.active.clear();
+        kb.active.extend_from_slice(merge_buf);
+        kb.weight_sum = 0.0;
+        kb.wd_sum = 0.0;
+        for &v in &kb.vars {
+            kb.weight_sum += vs[v].weight;
+            kb.wd_sum += vs[v].weight * (vs[v].desired - vs[v].offset);
+        }
+        kb.position = kb.wd_sum / kb.weight_sum;
     }
-    kb.position = kb.wd_sum / kb.weight_sum;
+    // Recycle the dropped block's buffers (cleared on next checkout).
+    scratch.give_pool(drop_vars);
+    scratch.give_pool(drop_active);
+    let keep_pos = blocks[keep].position;
+    for &v in &blocks[keep].vars {
+        scratch.pos[v] = keep_pos + vs[v].offset;
+    }
+    scratch.clean[keep] = false;
 }
 
 /// Lagrange multipliers of the active constraints in block `b`.
@@ -443,32 +645,46 @@ fn merge_blocks(
 /// component containing `right` (call it S). Optimality of x wrt the tree
 /// gives λ_ai = Σ_{k∈S} w_k (x_k − d_k) (up to sign convention): a negative
 /// value means the constraint "wants to stretch" and should be deactivated.
-/// `adj` is the shared adjacency index of the block (see [`build_adjacency`]);
-/// the sum walks the sorted component, so values are bit-identical to a
-/// from-scratch traversal.
+/// `adj` is the shared adjacency index of the block (see [`fill_adj`]); the
+/// sum walks the sorted component (pool order), so values are bit-identical
+/// to a from-scratch traversal. The pool pass fuses summation and
+/// seen-reset: no component list is materialized.
 fn multiplier(
     vs: &[Var],
     block: &Block,
     cons: &[Constraint],
     adj: &[Vec<usize>],
+    seen: &mut Vec<bool>,
+    stack: &mut Vec<usize>,
     ai: usize,
 ) -> f64 {
-    let side = component_of(adj, cons, ai, cons[ai].right);
+    mark_component(adj, cons, ai, cons[ai].right, seen, stack);
     let mut lambda = 0.0;
-    for &v in &side {
-        let x = block.position + vs[v].offset;
-        lambda += vs[v].weight * (x - vs[v].desired);
+    for &v in block.vars.iter() {
+        if seen[v] {
+            seen[v] = false;
+            let x = block.position + vs[v].offset;
+            lambda += vs[v].weight * (x - vs[v].desired);
+        }
     }
     lambda
 }
 
-/// Members reachable from `seed` through the adjacency index `adj`,
-/// excluding constraint `skip`. Returned sorted for deterministic summation.
-fn component_of(adj: &[Vec<usize>], cons: &[Constraint], skip: usize, seed: usize) -> Vec<usize> {
-    let mut seen = vec![false; adj.len()];
+/// Mark members reachable from `seed` through the adjacency index `adj`,
+/// excluding constraint `skip`, into `seen` (DFS). Callers must clear the
+/// marks they consume. Shared marking core of [`component_of`] and
+/// [`multiplier`].
+fn mark_component(
+    adj: &[Vec<usize>],
+    cons: &[Constraint],
+    skip: usize,
+    seed: usize,
+    seen: &mut Vec<bool>,
+    stack: &mut Vec<usize>,
+) {
+    stack.clear();
     seen[seed] = true;
-    let mut comp = vec![seed];
-    let mut stack = vec![seed];
+    stack.push(seed);
     while let Some(v) = stack.pop() {
         for &ai in &adj[v] {
             if ai == skip {
@@ -484,32 +700,76 @@ fn component_of(adj: &[Vec<usize>], cons: &[Constraint], skip: usize, seed: usiz
             };
             if !seen[other] {
                 seen[other] = true;
-                comp.push(other);
                 stack.push(other);
             }
         }
     }
-    comp.sort_unstable();
-    comp
+    stack.clear();
+}
+
+/// Members reachable from `seed` through the adjacency index `adj`,
+/// excluding constraint `skip`. Left sorted in `comp` for deterministic
+/// summation; visited marks are reset on exit so the buffers can be reused.
+///
+/// `pool` is the owning block's sorted `vars` list: every DFS-reachable
+/// member is a block member, so collecting by filtering the sorted pool
+/// yields the same sorted output as the old collect-then-sort without the
+/// O(k log k) sort.
+fn component_of(
+    adj: &[Vec<usize>],
+    cons: &[Constraint],
+    skip: usize,
+    seed: usize,
+    pool: &[usize],
+    comp: &mut Vec<usize>,
+    seen: &mut Vec<bool>,
+    stack: &mut Vec<usize>,
+) {
+    comp.clear();
+    mark_component(adj, cons, skip, seed, seen, stack);
+    for &v in pool {
+        if seen[v] {
+            seen[v] = false;
+            comp.push(v);
+        }
+    }
 }
 
 /// First (in stable order) active constraint with a negative multiplier.
+///
+/// Blocks carry a `clean` flag: a block whose vars/offsets/position/active
+/// set were verified negative-free is skipped until its next mutation
+/// (merge/split clear the flag). Multiplier values are a pure function of
+/// that state, so skipping cannot change which constraint is found first.
 fn find_split(
     vs: &[Var],
     blocks: &[Block],
     cons: &[Constraint],
     eps: f64,
+    scratch: &mut Scratch,
 ) -> Option<(usize, usize)> {
-    let n = vs.len();
+    if scratch.clean.len() < blocks.len() {
+        scratch.clean.resize(blocks.len(), false);
+    }
     for (b, block) in blocks.iter().enumerate() {
-        if block.active.is_empty() {
+        if block.active.is_empty() || scratch.clean[b] {
             continue;
         }
-        let adj = build_adjacency(n, block, cons);
+        fill_adj(scratch, block, cons);
+        let Scratch {
+            adj, seen, stack, ..
+        } = scratch;
+        let mut hit = None;
         for &ai in &block.active {
-            if multiplier(vs, block, cons, &adj, ai) < -eps {
-                return Some((b, ai));
+            if multiplier(vs, block, cons, adj, seen, stack, ai) < -eps {
+                hit = Some(ai);
+                break;
             }
+        }
+        clear_adj(adj, &block.active, cons);
+        match hit {
+            Some(ai) => return Some((b, ai)),
+            None => scratch.clean[b] = true,
         }
     }
     None
@@ -523,25 +783,37 @@ fn split_block(
     cons: &[Constraint],
     b: usize,
     ai: usize,
+    scratch: &mut Scratch,
 ) {
-    let adj = build_adjacency(vs.len(), &blocks[b], cons);
-    let right_side = component_of(&adj, cons, ai, cons[ai].right);
+    // Split lists come off the pool before `scratch` is destructured for
+    // the component walk; the distributed source buffers return below.
+    let mut left_vars = scratch.take_pool();
+    let mut right_vars = scratch.take_pool();
+    let mut left_active = scratch.take_pool();
+    let mut right_active = scratch.take_pool();
+    fill_adj(scratch, &blocks[b], cons);
+    let Scratch {
+        adj,
+        comp,
+        seen,
+        stack,
+        ..
+    } = scratch;
+    let pool = &blocks[b].vars;
+    component_of(adj, cons, ai, cons[ai].right, pool, comp, seen, stack);
+    let right_side: &[usize] = comp;
     let old_active = std::mem::take(&mut blocks[b].active);
     let all_vars = std::mem::take(&mut blocks[b].vars);
     let old_pos = blocks[b].position;
 
-    let mut left_vars = Vec::new();
-    let mut right_vars = Vec::new();
-    for v in all_vars {
-        if right_side.binary_search(&v).is_ok() {
-            right_vars.push(v);
+    for v in all_vars.iter() {
+        if right_side.binary_search(v).is_ok() {
+            right_vars.push(*v);
         } else {
-            left_vars.push(v);
+            left_vars.push(*v);
         }
     }
-    let mut left_active = Vec::new();
-    let mut right_active = Vec::new();
-    for a in old_active {
+    for a in old_active.iter().copied() {
         if a == ai {
             continue;
         }
@@ -551,6 +823,11 @@ fn split_block(
             left_active.push(a);
         }
     }
+    clear_adj(adj, &old_active, cons);
+    // The distributed source buffers go back to the pool; the halves'
+    // buffers return on the next solve reset (they live in the blocks).
+    scratch.give_pool(all_vars);
+    scratch.give_pool(old_active);
 
     let new_id = blocks.len();
     let rebuilt = |vars: Vec<usize>, active: Vec<usize>, vs: &[Var]| -> Block {
@@ -578,6 +855,20 @@ fn split_block(
     let right_block = rebuilt(right_vars, right_active, vs);
     blocks[b] = left_block;
     blocks.push(right_block);
+    let left_pos = blocks[b].position;
+    for &v in &blocks[b].vars {
+        scratch.pos[v] = left_pos + vs[v].offset;
+    }
+    let right_pos = blocks[new_id].position;
+    for &v in &blocks[new_id].vars {
+        scratch.pos[v] = right_pos + vs[v].offset;
+    }
+    scratch.clean[b] = false;
+    if scratch.clean.len() <= new_id {
+        scratch.clean.push(false);
+    } else {
+        scratch.clean[new_id] = false;
+    }
 }
 
 #[cfg(test)]

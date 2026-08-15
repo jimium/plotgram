@@ -9,7 +9,7 @@ use plotgram_model::diagnostics::Relaxation;
 use super::derive::derive_substrate;
 use super::graph::{ChannelGraph, Occupancy};
 use super::search::{
-    cross_covers_foreign_group, end_candidates, main_straddles_foreign_group,
+    cross_covers_foreign_in, end_candidates, foreign_groups, main_straddles_in,
     path_used_outer_overflow, route_edge, ChannelPath, CostWeights, EndCandidate, EscapeEnd,
     LexCost, RouteHints, ScopeMask, SpanAffinity,
 };
@@ -231,11 +231,14 @@ fn drop_redundant_ns_viagap(
     starts: &mut Vec<EndCandidate>,
     goals: &mut Vec<EndCandidate>,
 ) {
+    let foreign = foreign_groups(substrate, mask);
     let in_scope_cross = |c: &EndCandidate| {
         matches!(c.escape, EscapeEnd::AtPortNormal)
             && segment_is_cross(index, c.track)
             && segment_allowed(index, mask, c.track)
-            && !cross_covers_foreign_group(substrate, c.track, mask)
+            && !substrate
+                .track(c.track)
+                .is_some_and(|t| cross_covers_foreign_in(t, &foreign))
     };
     let start_host = starts.iter().find(|c| in_scope_cross(c)).map(|c| c.track);
     let goal_host = goals.iter().find(|c| in_scope_cross(c)).map(|c| c.track);
@@ -277,6 +280,7 @@ fn drop_straddling_mains(
     endpoint_rank: usize,
     cands: &mut Vec<EndCandidate>,
 ) {
+    let foreign = foreign_groups(substrate, mask);
     cands.retain(|c| {
         let Some(t) = substrate.track(c.track) else {
             return true;
@@ -284,7 +288,7 @@ fn drop_straddling_mains(
         if t.orient != TrackOrient::Main {
             return true;
         }
-        !main_straddles_foreign_group(substrate, mask, endpoint_order, endpoint_rank, t.line)
+        !main_straddles_in(&foreign, endpoint_order, endpoint_rank, t.line)
     });
 }
 

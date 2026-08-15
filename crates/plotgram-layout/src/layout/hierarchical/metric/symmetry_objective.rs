@@ -43,159 +43,174 @@ pub fn solve_symmetry_objective(
         return Ok(Vec::new());
     }
 
-    let bk = bk::bk_ideal(plan, size_of, params.node_gap);
-    let seg_offs = segment_port_offsets(plan, graph, ports, size_of);
-    let deltas = AlignDeltas::build(plan, &seg_offs);
-    let nbs = segment_neighbors(plan, graph, &seg_offs);
-    let (down_nbs, up_nbs) = forward_real_adjacency(plan, graph);
-    let down_deg = degrees_of(&down_nbs);
-    let up_deg = degrees_of(&up_nbs);
-    let twins = twin_plan_pairs(plan, graph);
-    let layer_pos = plan.layer_positions();
-    // Constraint degradation chain: full (twin hard + cross-rank clamp
-    // equalities) → twin soft → no clamp equalities. The gb equalities make
-    // each clamp column the cross-rank frame edge; they can only cycle when
-    // sibling group intervals swap order across ranks, in which case frames
-    // cannot be disjoint anyway and we degrade gracefully. Partition band
-    // separation rides EVERY level and never degrades — an infeasible mix
-    // surfaces as `Infeasible`, never silently (partition-grid.md PG-1).
-    //
-    // Real↔virtual BK collinear is intentionally soft (via median / J), not
-    // hard: hard RV equality lets a long side-leaf corridor yank the hub off
-    // a short exclusive stem. Collinearity stays soft — hard equalities
-    // bloat the canvas on dense layers.
-    let bands = PartitionBandPlan::build(plan, params.node_gap);
-    let bands = bands.as_ref();
-    // Linear segment (yfiles/01 §4.5): adjacent-dummy pairs of every long
-    // edge, rank order — one variable per chain. Deterministic: BTreeMap
-    // iteration + rank/elem sort.
-    let chain_pairs: Vec<(usize, usize)> = {
-        let mut by_edge: BTreeMap<String, Vec<usize>> = BTreeMap::new();
-        for (e_idx, elem) in plan.elems.iter().enumerate() {
-            if let ElemKey::Virtual { edge_id, .. } = &elem.key {
-                by_edge.entry(edge_id.clone()).or_default().push(e_idx);
+    let (
+        bk,
+        seg_offs,
+        deltas,
+        nbs,
+        down_nbs,
+        up_nbs,
+        down_deg,
+        up_deg,
+        twins,
+        layer_pos,
+        bands,
+        chain_pairs,
+        weights,
+        hubs,
+        chain_end_leaves,
+        segs_by_edge,
+        mass,
+        hop_boost,
+        chain_end,
+    ) = {
+        let bk = bk::bk_ideal(plan, size_of, params.node_gap);
+        let seg_offs = segment_port_offsets(plan, graph, ports, size_of);
+        let deltas = AlignDeltas::build(plan, &seg_offs);
+        let nbs = segment_neighbors(plan, graph, &seg_offs);
+        let (down_nbs, up_nbs) = forward_real_adjacency(plan, graph);
+        let down_deg = degrees_of(&down_nbs);
+        let up_deg = degrees_of(&up_nbs);
+        let twins = twin_plan_pairs(plan, graph);
+        let layer_pos = plan.layer_positions();
+        let bands = PartitionBandPlan::build(plan, params.node_gap);
+        let bands = bands;
+        let chain_pairs: Vec<(usize, usize)> = {
+            let mut by_edge: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+            for (e_idx, elem) in plan.elems.iter().enumerate() {
+                if let ElemKey::Virtual { edge_id, .. } = &elem.key {
+                    by_edge.entry(edge_id.clone()).or_default().push(e_idx);
+                }
             }
-        }
-        let mut pairs = Vec::new();
-        for mut v in by_edge.into_values() {
-            if v.len() < 2 {
-                continue;
+            let mut pairs = Vec::new();
+            for mut v in by_edge.into_values() {
+                if v.len() < 2 {
+                    continue;
+                }
+                v.sort_by_key(|&e| (plan.elems[e].rank, e));
+                for w in v.windows(2) {
+                    pairs.push((w[0], w[1]));
+                }
             }
-            v.sort_by_key(|&e| (plan.elems[e].rank, e));
-            for w in v.windows(2) {
-                pairs.push((w[0], w[1]));
-            }
-        }
-        pairs.sort_unstable();
-        pairs
+            pairs.sort_unstable();
+            pairs
+        };
+        let weights = vpsc_weights(plan, graph);
+        let hubs: Vec<usize> = (0..n)
+            .filter(|&e| {
+                !plan.elems[e].key.is_virtual()
+                    && !plan.elems[e].key.is_zero_width()
+                    && (down_deg[e] >= 2 || up_deg[e] >= 2)
+            })
+            .collect();
+        let chain_end_leaves = chain_end_leaves(plan, &down_deg, &up_deg, &down_nbs, &up_nbs);
+        let segs_by_edge = plan.segments_by_edge();
+        let mass = descendant_mass(plan, &down_nbs, &up_deg);
+        let spine = exclusive_spine_pairs(
+            plan,
+            &down_nbs,
+            &up_nbs,
+            &down_deg,
+            &up_deg,
+            &chain_end_leaves,
+        );
+        let hop_boost = stem_flow_hop_boost(
+            plan,
+            graph,
+            &down_nbs,
+            &down_deg,
+            &up_deg,
+            &spine,
+            &mass,
+            &segs_by_edge,
+            params,
+        );
+        let chain_end = chain_end_rv_pairs(plan, &chain_end_leaves);
+        (
+            bk,
+            seg_offs,
+            deltas,
+            nbs,
+            down_nbs,
+            up_nbs,
+            down_deg,
+            up_deg,
+            twins,
+            layer_pos,
+            bands,
+            chain_pairs,
+            weights,
+            hubs,
+            chain_end_leaves,
+            segs_by_edge,
+            mass,
+            hop_boost,
+            chain_end,
+        )
     };
+    let bands = bands.as_ref();
     // Chain identity rides every degradation level and only drops on the
     // final floor — a too-rigid corridor must not surface as Infeasible.
-    let chains = [
+    // Levels are built lazily: probing stops at the first feasible level and
+    // only that level's fallback is additionally constructed.
+    let build_chain = |chain_hard: bool, twin_hard: bool, gb_hard: bool| {
         hard_constraints(
             plan,
             size_of,
             params.node_gap,
             &bk.primary_blocks,
             &chain_pairs,
-            true,
+            chain_hard,
             &twins,
-            true,
-            true,
+            twin_hard,
+            gb_hard,
             bands,
-        ),
-        hard_constraints(
-            plan,
-            size_of,
-            params.node_gap,
-            &bk.primary_blocks,
-            &chain_pairs,
-            true,
-            &twins,
-            false,
-            true,
-            bands,
-        ),
-        hard_constraints(
-            plan,
-            size_of,
-            params.node_gap,
-            &bk.primary_blocks,
-            &chain_pairs,
-            true,
-            &twins,
-            false,
-            false,
-            bands,
-        ),
-        hard_constraints(
-            plan,
-            size_of,
-            params.node_gap,
-            &bk.primary_blocks,
-            &chain_pairs,
-            false,
-            &twins,
-            false,
-            false,
-            bands,
-        ),
+        )
+    };
+    // Degradation order (chain_hard, twin_hard, gb_hard):
+    // full → −twin-hard → −gb-hard → chain-soft floor.
+    let levels = [
+        (true, true, true),
+        (true, false, true),
+        (true, false, false),
+        (false, false, false),
     ];
-    let weights = vpsc_weights(plan, graph);
-    let hubs: Vec<usize> = (0..n)
-        .filter(|&e| {
-            !plan.elems[e].key.is_virtual()
-                && !plan.elems[e].key.is_zero_width()
-                && (down_deg[e] >= 2 || up_deg[e] >= 2)
-        })
-        .collect();
-    let chain_end_leaves = chain_end_leaves(plan, &down_deg, &up_deg, &down_nbs, &up_nbs);
-    let segs_by_edge = plan.segments_by_edge();
-    let mass = descendant_mass(plan, &down_nbs, &up_deg);
-    let spine = exclusive_spine_pairs(
-        plan,
-        &down_nbs,
-        &up_nbs,
-        &down_deg,
-        &up_deg,
-        &chain_end_leaves,
-    );
-    let hop_boost = stem_flow_hop_boost(
-        plan,
-        graph,
-        &down_nbs,
-        &down_deg,
-        &up_deg,
-        &spine,
-        &mass,
-        &segs_by_edge,
-        params,
-    );
-    let chain_end = chain_end_rv_pairs(plan, &chain_end_leaves);
 
     // Prefer the full chain; degrade only when it cycles with separation.
-    let mut chain_idx = 0usize;
+    // The probe's feasible solution is kept: `vpsc::solve` is deterministic,
+    // so re-solving `(bk.ideal, weights, hard)` would return the same vector.
+    // Feasibility is proven once at `prepare`; `solve_prepared` can no longer
+    // surface `Infeasible`, so the old solve-time fallback level is gone.
+    let mut built: Vec<vpsc::Prepared> = Vec::with_capacity(4);
     let mut last_infeasible: Option<VpscError> = None;
-    for (i, c) in chains.iter().enumerate() {
-        match solve_once(n, &bk.ideal, &weights, c) {
-            Ok(_) => {
-                chain_idx = i;
-                last_infeasible = None;
-                break;
+    let mut probe_x: Option<Vec<f64>> = None;
+    let mut solve_bufs = vpsc::SolveBufs::default();
+    for &(chain_hard, twin_hard, gb_hard) in levels.iter() {
+        let c = build_chain(chain_hard, twin_hard, gb_hard);
+        match vpsc::prepare(n, &c) {
+            Ok(p) => match solve_once(n, &bk.ideal, &weights, &p, &mut solve_bufs) {
+                Ok(v) => {
+                    probe_x = Some(v);
+                    built.push(p);
+                    last_infeasible = None;
+                    break;
+                }
+                Err(e) => return Err(e),
+            },
+            Err(e @ VpscError::Infeasible { .. }) => {
+                last_infeasible = Some(e);
             }
-            Err(e @ VpscError::Infeasible { .. }) => last_infeasible = Some(e),
             Err(e) => return Err(e),
         }
     }
     if let Some(e) = last_infeasible {
         return Err(e);
     }
-    let hard = &chains[chain_idx];
-    let hard_fallback = &chains[(chain_idx + 1).min(3)];
+    let hard = built.last().expect("feasible probe solved the hard level");
 
     // Feasible start: raw BK ideal may violate separation, so its J is not
     // comparable to post-VPSC iterates (would permanently win the snapshot).
-    let mut x = solve_once(n, &bk.ideal, &weights, hard)?;
+    let mut x = probe_x.expect("feasible probe solved the hard level");
     // A0 diagnostic (§12): BK ideal already projected through the hard set
     // (chain identity included). Skip median-desired packing and fan snap so
     // we can see whether layer slack comes back. Group/partition snaps stay
@@ -267,7 +282,14 @@ pub fn solve_symmetry_objective(
             SymmetryPlace::BkIdeal => unreachable!("bk returns before the iterate"),
         };
 
-        x = solve_once(n, &desired, &iter_weights, hard)?;
+        let next = solve_once(n, &desired, &iter_weights, hard, &mut solve_bufs)?;
+        // Exact fixpoint: desired is a pure function of x and solve is
+        // deterministic, so every later iterate (and its score) repeats
+        // bitwise — the remaining rounds cannot move `best`.
+        if next == x {
+            break;
+        }
+        x = next;
         let j = score(&x);
         if j < best_j - 1e-9 {
             best_j = j;
@@ -285,7 +307,7 @@ pub fn solve_symmetry_objective(
         &best,
         &weights,
         hard,
-        hard_fallback,
+        &mut solve_bufs,
         &deltas,
         &hubs,
         &down_nbs,
@@ -429,8 +451,8 @@ fn snap_fan_pack_style(
     params: &HierarchicalParams,
     best: &[f64],
     weights: &[f64],
-    hard: &[Constraint],
-    hard_fallback: &[Constraint],
+    hard: &vpsc::Prepared,
+    solve_bufs: &mut vpsc::SolveBufs,
     deltas: &AlignDeltas,
     hubs: &[usize],
     down_nbs: &[Vec<usize>],
@@ -605,7 +627,7 @@ fn snap_fan_pack_style(
             }
         }
     }
-    let placed = solve_or_fallback(n, &desired, &iter_weights, hard, hard_fallback)?;
+    let placed = solve_once(n, &desired, &iter_weights, hard, solve_bufs)?;
 
     // Second pass: followers + bottom-up spine reclaim.
     let mut desired = placed.clone();
@@ -739,7 +761,7 @@ fn snap_fan_pack_style(
             }
         }
     }
-    let placed = solve_or_fallback(n, &desired, &iter_weights, hard, hard_fallback)?;
+    let placed = solve_once(n, &desired, &iter_weights, hard, solve_bufs)?;
     adsorb_near_collinear(
         n,
         placed,
@@ -1262,7 +1284,8 @@ fn solve_once(
     n: usize,
     desired: &[f64],
     weights: &[f64],
-    constraints: &[Constraint],
+    prepared: &vpsc::Prepared,
+    bufs: &mut vpsc::SolveBufs,
 ) -> Result<Vec<f64>, VpscError> {
     let vars: Vec<Variable> = (0..n)
         .map(|e| Variable {
@@ -1270,25 +1293,7 @@ fn solve_once(
             weight: weights[e],
         })
         .collect();
-    vpsc::solve(&vars, constraints)
-}
-
-fn solve_or_fallback(
-    n: usize,
-    desired: &[f64],
-    weights: &[f64],
-    hard: &[Constraint],
-    hard_fallback: &[Constraint],
-) -> Result<Vec<f64>, VpscError> {
-    match solve_once(n, desired, weights, hard) {
-        Ok(v) => Ok(v),
-        Err(VpscError::Infeasible { .. })
-            if !std::ptr::eq(hard.as_ptr(), hard_fallback.as_ptr()) =>
-        {
-            solve_once(n, desired, weights, hard_fallback)
-        }
-        Err(e) => Err(e),
-    }
+    vpsc::solve_prepared_with(prepared, &vars, bufs)
 }
 
 fn vpsc_weights(plan: &PlanGraph, graph: &RealGraph) -> Vec<f64> {
@@ -2074,7 +2079,7 @@ fn adsorb_near_collinear(
     plan: &PlanGraph,
     deltas: &AlignDeltas,
     chain_end_leaves: &BTreeSet<usize>,
-    hard: &[Constraint],
+    hard: &vpsc::Prepared,
     node_gap: f64,
 ) -> Result<Vec<f64>, VpscError> {
     let eps = (node_gap * 0.25).max(1.0);
@@ -2086,7 +2091,7 @@ fn adsorb_near_collinear(
             break;
         }
         let equalities = |subset: &[(usize, usize, f64)]| {
-            let mut extra = hard.to_vec();
+            let mut extra = hard.constraints().to_vec();
             extra.reserve(subset.len() * 2);
             for &(a, b, d) in subset {
                 extra.push(Constraint::new(a, b, d));
@@ -2094,19 +2099,27 @@ fn adsorb_near_collinear(
             }
             extra
         };
-        let weights = vec![1.0; n];
+        let solve_raw = |cons: &[Constraint], placed: &[f64]| -> Result<Vec<f64>, VpscError> {
+            let vars: Vec<Variable> = (0..n)
+                .map(|e| Variable {
+                    desired: placed[e],
+                    weight: 1.0,
+                })
+                .collect();
+            vpsc::solve(&vars, cons)
+        };
         // A conflicting subset makes the joint equality system infeasible.
         // Dropping only the conflicting equalities (instead of aborting the
         // whole pass) keeps every feasible weld: retry the pairs one at a
         // time in sorted order, accumulating the ones that stay feasible.
-        match solve_once(n, &placed, &weights, &equalities(&pairs)) {
+        match solve_raw(&equalities(&pairs), &placed) {
             Ok(v) => placed = v,
             Err(VpscError::Infeasible { .. }) => {
                 let mut kept: Vec<(usize, usize, f64)> = Vec::new();
                 for pair in &pairs {
                     let mut trial = kept.clone();
                     trial.push(*pair);
-                    if let Ok(v) = solve_once(n, &placed, &weights, &equalities(&trial)) {
+                    if let Ok(v) = solve_raw(&equalities(&trial), &placed) {
                         placed = v;
                         kept = trial;
                     }

@@ -142,9 +142,10 @@ pub fn order_layers(
     let reversed = if grouped { &empty } else { reversed_edges };
     let adj = build_adjacency(plan, edge_weights, group_boundary_weight);
     let xidx = build_crossing_index(plan);
+    let rev_head = reversed_heads(plan, reversed);
 
     let mut best = plan.layers.clone();
-    let mut best_score = order_score(plan, &xidx, !grouped, reversed);
+    let mut best_score = order_score(plan, &xidx, !grouped, &rev_head);
     let mut no_improve = 0usize;
 
     for sweep in 0..MAX_SWEEPS {
@@ -163,10 +164,10 @@ pub fn order_layers(
             restore_group_clamps(plan, r);
         }
         if !grouped {
-            order_branch_source_pocket(plan, &xidx, reversed);
+            order_branch_source_pocket(plan, &xidx, &rev_head);
         }
 
-        let score = order_score(plan, &xidx, !grouped, reversed);
+        let score = order_score(plan, &xidx, !grouped, &rev_head);
         let lex_better = score.crossings == best_score.crossings
             && score.source_moment == best_score.source_moment
             && score.total_span == best_score.total_span
@@ -191,8 +192,8 @@ pub fn order_layers(
     if !grouped {
         // Crossing-minimal orders are flip-invariant; pick the side that
         // parks forward branch sources toward the reading-start (left in TB).
-        choose_layer_orientation(plan, &xidx, reversed);
-        order_branch_source_pocket(plan, &xidx, reversed);
+        choose_layer_orientation(plan, &xidx, &rev_head);
+        order_branch_source_pocket(plan, &xidx, &rev_head);
     }
     if !super::super::CHANNEL_FORCE_ROOT.get() {
         super::boundary::align_group_left_pads(plan);
@@ -201,15 +202,15 @@ pub fn order_layers(
     if !grouped {
         for _ in 0..8 {
             let before_layers = plan.layers.clone();
-            let before = order_score(plan, &xidx, true, reversed);
-            sift_pass(plan, &xidx, reversed);
-            chain_block_sift_pass(plan, &xidx, reversed);
+            let before = order_score(plan, &xidx, true, &rev_head);
+            sift_pass(plan, &xidx, &rev_head);
+            chain_block_sift_pass(plan, &xidx, &rev_head);
             for r in 0..plan.layers.len() {
                 restore_partition_clamps(plan, r);
                 restore_group_clamps(plan, r);
             }
-            order_branch_source_pocket(plan, &xidx, reversed);
-            let after = order_score(plan, &xidx, true, reversed);
+            order_branch_source_pocket(plan, &xidx, &rev_head);
+            let after = order_score(plan, &xidx, true, &rev_head);
             // Chain-block trials may keep crossings flat while trading a
             // little `total_span` for lower endpoint inversion.
             // Revert only when crossings rose; a span-only regression is the
@@ -222,8 +223,8 @@ pub fn order_layers(
                 break;
             }
         }
-        choose_layer_orientation(plan, &xidx, reversed);
-        order_branch_source_pocket(plan, &xidx, reversed);
+        choose_layer_orientation(plan, &xidx, &rev_head);
+        order_branch_source_pocket(plan, &xidx, &rev_head);
     }
 }
 
@@ -245,12 +246,12 @@ fn order_score(
     plan: &PlanGraph,
     xidx: &CrossingIndex,
     use_span: bool,
-    reversed_edges: &BTreeSet<String>,
+    rev_head: &[bool],
 ) -> OrderScore {
     OrderScore {
         crossings: total_crossings(plan, xidx),
         source_moment: if use_span {
-            source_moment(plan, xidx, reversed_edges)
+            source_moment(plan, xidx, rev_head)
         } else {
             0
         },
@@ -270,30 +271,36 @@ fn is_branch_source(plan: &PlanGraph, xidx: &CrossingIndex, e: usize) -> bool {
         && !xidx.down[e].is_empty()
 }
 
-/// Working head of a FAS-reversed edge (first real on the reversed spine).
-fn heads_reversed_edge(plan: &PlanGraph, e: usize, reversed_edges: &BTreeSet<String>) -> bool {
+/// Precomputed `heads_reversed_edge` per elem: one O(M) pass replacing the
+/// per-elem segment scans (O(N·M) per `source_moment` / pocket call).
+/// `plan.segments` and the reversed set are immutable while ordering runs.
+fn reversed_heads(plan: &PlanGraph, reversed_edges: &BTreeSet<String>) -> Vec<bool> {
+    let mut head = vec![false; plan.elems.len()];
     if reversed_edges.is_empty() {
-        return false;
+        return head;
     }
-    plan.segments
-        .iter()
-        .any(|s| s.from == e && reversed_edges.contains(&s.edge_id))
+    for s in &plan.segments {
+        if reversed_edges.contains(&s.edge_id) {
+            head[s.from] = true;
+        }
+    }
+    head
 }
 
 fn is_forward_branch_source(
     plan: &PlanGraph,
     xidx: &CrossingIndex,
     e: usize,
-    reversed_edges: &BTreeSet<String>,
+    rev_head: &[bool],
 ) -> bool {
-    is_branch_source(plan, xidx, e) && !heads_reversed_edge(plan, e, reversed_edges)
+    is_branch_source(plan, xidx, e) && !rev_head[e]
 }
 
-fn source_moment(plan: &PlanGraph, xidx: &CrossingIndex, reversed_edges: &BTreeSet<String>) -> u64 {
+fn source_moment(plan: &PlanGraph, xidx: &CrossingIndex, rev_head: &[bool]) -> u64 {
     let mut sum = 0u64;
     for layer in &plan.layers {
         for (i, &e) in layer.iter().enumerate() {
-            if is_forward_branch_source(plan, xidx, e, reversed_edges) {
+            if is_forward_branch_source(plan, xidx, e, rev_head) {
                 sum += i as u64;
             }
         }
@@ -305,11 +312,7 @@ fn source_moment(plan: &PlanGraph, xidx: &CrossingIndex, reversed_edges: &BTreeS
 /// FAS-reverse heads (stable within each class). Does not move sources
 /// across non-sources — preserves global orientation while preferring
 /// forward sources ahead of reverse-spine heads inside the source pocket.
-fn order_branch_source_pocket(
-    plan: &mut PlanGraph,
-    xidx: &CrossingIndex,
-    reversed_edges: &BTreeSet<String>,
-) {
+fn order_branch_source_pocket(plan: &mut PlanGraph, xidx: &CrossingIndex, rev_head: &[bool]) {
     for r in 0..plan.layers.len() {
         let layer = &plan.layers[r];
         if layer.len() < 2 {
@@ -323,7 +326,7 @@ fn order_branch_source_pocket(
                 continue;
             }
             idxs.push(i);
-            if heads_reversed_edge(plan, e, reversed_edges) {
+            if rev_head[e] {
                 reverse_heads.push(e);
             } else {
                 forward.push(e);
@@ -347,16 +350,12 @@ fn order_branch_source_pocket(
 /// Prefer the global left/right orientation with smaller `source_moment`.
 /// Bipartite crossings (and total span under a full mirror) are invariant;
 /// only the reading-direction of branch sources changes.
-fn choose_layer_orientation(
-    plan: &mut PlanGraph,
-    xidx: &CrossingIndex,
-    reversed_edges: &BTreeSet<String>,
-) {
+fn choose_layer_orientation(plan: &mut PlanGraph, xidx: &CrossingIndex, rev_head: &[bool]) {
     let has_branch = (0..plan.elems.len()).any(|e| is_branch_source(plan, xidx, e));
     if !has_branch {
         return;
     }
-    let normal = order_score(plan, xidx, true, reversed_edges);
+    let normal = order_score(plan, xidx, true, rev_head);
     let saved = plan.layers.clone();
     for layer in &mut plan.layers {
         layer.reverse();
@@ -365,27 +364,27 @@ fn choose_layer_orientation(
         restore_partition_clamps(plan, r);
         restore_group_clamps(plan, r);
     }
-    let mirrored = order_score(plan, xidx, true, reversed_edges);
+    let mirrored = order_score(plan, xidx, true, rev_head);
     // Equal score → keep the lexicographically smaller layer vector.
     if mirrored > normal || (mirrored == normal && plan.layers > saved) {
         plan.layers = saved;
     }
 }
 fn total_order_span(plan: &PlanGraph, xidx: &CrossingIndex) -> u64 {
+    let n = plan.elems.len();
     let mut span = 0u64;
     for (r, segs) in xidx.segs_by_pair.iter().enumerate() {
         if segs.is_empty() {
             continue;
         }
-        let pos_a = reference_positions(&plan.layers[r]);
-        let pos_b = reference_positions(&plan.layers[r + 1]);
+        let pos_a = reference_positions(n, &plan.layers[r]);
+        let pos_b = reference_positions(n, &plan.layers[r + 1]);
         for &(u, v) in segs {
-            let Some(&pa) = pos_a.get(&u) else {
+            let pa = pos_a[u];
+            let pb = pos_b[v];
+            if pa < 0 || pb < 0 {
                 continue;
-            };
-            let Some(&pb) = pos_b.get(&v) else {
-                continue;
-            };
+            }
             span += pa.abs_diff(pb) as u64;
         }
     }
@@ -461,8 +460,15 @@ enum Direction {
     Down,
 }
 
-fn reference_positions(layer: &[usize]) -> BTreeMap<usize, usize> {
-    layer.iter().enumerate().map(|(i, &e)| (e, i)).collect()
+/// elem → position lookup for one layer, dense over `plan.elems` (−1 = not
+/// in this layer). O(n) build, O(1) probes — same answers as the old
+/// `BTreeMap` build per call.
+fn reference_positions(n: usize, layer: &[usize]) -> Vec<i64> {
+    let mut pos = vec![-1i64; n];
+    for (i, &e) in layer.iter().enumerate() {
+        pos[e] = i as i64;
+    }
+    pos
 }
 
 struct Key {
@@ -528,13 +534,14 @@ fn weighted_barycenter(pairs: &[(f64, f64)]) -> Option<f64> {
 }
 
 fn reorder_layer(plan: &mut PlanGraph, adj: &Adjacency, r: usize, dir: Direction) {
+    let n = plan.elems.len();
     let primary_pos = match dir {
-        Direction::Up => reference_positions(&plan.layers[r - 1]),
-        Direction::Down => reference_positions(&plan.layers[r + 1]),
+        Direction::Up => reference_positions(n, &plan.layers[r - 1]),
+        Direction::Down => reference_positions(n, &plan.layers[r + 1]),
     };
     let fallback_pos = match dir {
-        Direction::Up => plan.layers.get(r + 1).map(|l| reference_positions(l)),
-        Direction::Down if r > 0 => Some(reference_positions(&plan.layers[r - 1])),
+        Direction::Up => plan.layers.get(r + 1).map(|l| reference_positions(n, l)),
+        Direction::Down if r > 0 => Some(reference_positions(n, &plan.layers[r - 1])),
         Direction::Down => None,
     };
     let (primary_n, fallback_n): (&[Vec<(usize, f64)>], &[Vec<(usize, f64)>]) = match dir {
@@ -554,13 +561,15 @@ fn reorder_layer(plan: &mut PlanGraph, adj: &Adjacency, r: usize, dir: Direction
                 if plan.elems[n].key.is_virtual() {
                     continue;
                 }
-                if let Some(&p) = primary_pos.get(&n) {
+                let p = primary_pos[n];
+                if p >= 0 {
                     pooled.push((p as f64, w));
                 }
             }
             if pooled.is_empty() {
                 for &(n, w) in &primary_n[e] {
-                    if let Some(&p) = primary_pos.get(&n) {
+                    let p = primary_pos[n];
+                    if p >= 0 {
                         pooled.push((p as f64, w));
                     }
                 }
@@ -571,13 +580,15 @@ fn reorder_layer(plan: &mut PlanGraph, adj: &Adjacency, r: usize, dir: Direction
                         if plan.elems[n].key.is_virtual() {
                             continue;
                         }
-                        if let Some(&p) = fpos.get(&n) {
+                        let p = fpos[n];
+                        if p >= 0 {
                             pooled.push((p as f64, w));
                         }
                     }
                     if pooled.is_empty() {
                         for &(n, w) in &fallback_n[e] {
-                            if let Some(&p) = fpos.get(&n) {
+                            let p = fpos[n];
+                            if p >= 0 {
                                 pooled.push((p as f64, w));
                             }
                         }
@@ -814,18 +825,21 @@ fn total_crossings(plan: &PlanGraph, xidx: &CrossingIndex) -> u64 {
 fn delta_swap(plan: &PlanGraph, xidx: &CrossingIndex, r: usize, i: usize) -> i64 {
     let u = plan.layers[r][i];
     let v = plan.layers[r][i + 1];
+    let n = plan.elems.len();
     let mut delta = 0i64;
 
     if r > 0 {
-        let pos = reference_positions(&plan.layers[r - 1]);
+        let pos = reference_positions(n, &plan.layers[r - 1]);
         for &a in &xidx.up[u] {
-            let Some(&pa) = pos.get(&a) else {
+            let pa = pos[a];
+            if pa < 0 {
                 continue;
-            };
+            }
             for &b in &xidx.up[v] {
-                let Some(&pb) = pos.get(&b) else {
+                let pb = pos[b];
+                if pb < 0 {
                     continue;
-                };
+                }
                 delta += match pa.cmp(&pb) {
                     Ordering::Greater => -1,
                     Ordering::Less => 1,
@@ -835,20 +849,61 @@ fn delta_swap(plan: &PlanGraph, xidx: &CrossingIndex, r: usize, i: usize) -> i64
         }
     }
     if r + 1 < plan.layers.len() {
-        let pos = reference_positions(&plan.layers[r + 1]);
+        let pos = reference_positions(n, &plan.layers[r + 1]);
         for &c in &xidx.down[u] {
-            let Some(&pc) = pos.get(&c) else {
+            let pc = pos[c];
+            if pc < 0 {
                 continue;
-            };
+            }
             for &d in &xidx.down[v] {
-                let Some(&pd) = pos.get(&d) else {
+                let pd = pos[d];
+                if pd < 0 {
                     continue;
-                };
+                }
                 delta += match pc.cmp(&pd) {
                     Ordering::Greater => -1,
                     Ordering::Less => 1,
                     Ordering::Equal => 0,
                 };
+            }
+        }
+    }
+    delta
+}
+
+/// Global `total_order_span` change from swapping adjacent `u = layers[r][i]`
+/// and `v = layers[r][i+1]`: only segments incident to u/v at the two
+/// neighboring interfaces contribute, and the arithmetic is integer-exact,
+/// so `delta < 0` decides exactly like the old before/after full recount.
+fn span_swap_delta(plan: &PlanGraph, xidx: &CrossingIndex, r: usize, i: usize) -> i64 {
+    let u = plan.layers[r][i];
+    let v = plan.layers[r][i + 1];
+    let n = plan.elems.len();
+    // Old positions: u→i, v→i+1; after the swap: u→i+1, v→i.
+    let (old_u, new_u) = (i as i64, i as i64 + 1);
+    let (old_v, new_v) = (i as i64 + 1, i as i64);
+    let mut delta = 0i64;
+    if r > 0 {
+        let pos = reference_positions(n, &plan.layers[r - 1]);
+        for &(e, old_p, new_p) in &[(u, old_u, new_u), (v, old_v, new_v)] {
+            for &a in &xidx.up[e] {
+                let pa = pos[a];
+                if pa < 0 {
+                    continue;
+                }
+                delta += (new_p - pa).abs() - (old_p - pa).abs();
+            }
+        }
+    }
+    if r + 1 < plan.layers.len() {
+        let pos = reference_positions(n, &plan.layers[r + 1]);
+        for &(e, old_p, new_p) in &[(u, old_u, new_u), (v, old_v, new_v)] {
+            for &c in &xidx.down[e] {
+                let pc = pos[c];
+                if pc < 0 {
+                    continue;
+                }
+                delta += (new_p - pc).abs() - (old_p - pc).abs();
             }
         }
     }
@@ -869,13 +924,9 @@ fn transpose_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, use_span: bool) {
                     plan.layers[r].swap(i, i + 1);
                     improved = true;
                 } else if d == 0 && use_span {
-                    let before = total_order_span(plan, xidx);
-                    plan.layers[r].swap(i, i + 1);
-                    let after = total_order_span(plan, xidx);
-                    if after < before {
-                        improved = true;
-                    } else {
+                    if span_swap_delta(plan, xidx, r, i) < 0 {
                         plan.layers[r].swap(i, i + 1);
+                        improved = true;
                     }
                 }
                 i += 1;
@@ -1001,13 +1052,9 @@ struct ChainBlockScore {
 /// not a shared absolute index). A trial is eligible when crossings do not
 /// increase; among eligible trials (including the start) pick by
 /// [`ChainBlockScore`], then lexicographic layer order.
-fn chain_block_sift_pass(
-    plan: &mut PlanGraph,
-    xidx: &CrossingIndex,
-    reversed_edges: &BTreeSet<String>,
-) {
+fn chain_block_sift_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, rev_head: &[bool]) {
     for chain in chain_blocks(plan) {
-        let base = order_score(plan, xidx, true, reversed_edges);
+        let base = order_score(plan, xidx, true, rev_head);
         let start = plan.layers.clone();
         let mut best_score = ChainBlockScore {
             crossings: base.crossings,
@@ -1044,7 +1091,7 @@ fn chain_block_sift_pass(
                 restore_partition_clamps(plan, r);
                 restore_group_clamps(plan, r);
             }
-            let score = order_score(plan, xidx, true, reversed_edges);
+            let score = order_score(plan, xidx, true, rev_head);
             if score.crossings > base.crossings {
                 continue;
             }
@@ -1065,7 +1112,7 @@ fn chain_block_sift_pass(
 
 /// Sifting: slide each non-zero-width elem through its layer, keep best `J_order`.
 /// Crosses zero-width dummies that block adjacent transpose.
-fn sift_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, reversed_edges: &BTreeSet<String>) {
+fn sift_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, rev_head: &[bool]) {
     let layer_count = plan.layers.len();
     for r in 0..layer_count {
         if plan.layers[r].len() < 2 {
@@ -1088,7 +1135,7 @@ fn sift_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, reversed_edges: &BTreeS
                 .filter(|&e| e != elem)
                 .collect();
             let mut best_layer = plan.layers[r].clone();
-            let mut best = order_score(plan, xidx, true, reversed_edges);
+            let mut best = order_score(plan, xidx, true, rev_head);
 
             for to in 0..=without.len() {
                 let mut trial = without.clone();
@@ -1096,7 +1143,7 @@ fn sift_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, reversed_edges: &BTreeS
                 plan.layers[r] = trial;
                 restore_partition_clamps(plan, r);
                 restore_group_clamps(plan, r);
-                let score = order_score(plan, xidx, true, reversed_edges);
+                let score = order_score(plan, xidx, true, rev_head);
                 if score < best || (score == best && plan.layers[r] < best_layer) {
                     best = score;
                     best_layer = plan.layers[r].clone();
@@ -1712,7 +1759,8 @@ mod tests {
         assert_eq!(single_move_crossings(2), 2, "d1 alone must be flat");
         assert!(single_move_crossings(4) > 2, "d2 alone must not improve");
 
-        chain_block_sift_pass(&mut plan, &xidx, &BTreeSet::new());
+        let no_rev = reversed_heads(&plan, &BTreeSet::new());
+        chain_block_sift_pass(&mut plan, &xidx, &no_rev);
 
         let xidx = build_crossing_index(&plan);
         assert_eq!(
@@ -1887,7 +1935,7 @@ mod tests {
         assert_eq!(plan.layers[1], vec![2, 3]);
         let xidx = build_crossing_index(&plan);
         assert_eq!(
-            order_score(&plan, &xidx, true, &BTreeSet::new()).total_span,
+            order_score(&plan, &xidx, true, &reversed_heads(&plan, &BTreeSet::new())).total_span,
             0
         );
     }

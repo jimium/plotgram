@@ -162,6 +162,10 @@ fn derive_group_substrate(
         m
     };
 
+    // Boundary clamps per group in one pass (was: a full layer scan per
+    // group per boundary_* query).
+    let spans = boundary_spans(plan);
+
     let mut group_rect: BTreeMap<String, (usize, usize, usize, usize)> = BTreeMap::new();
     let mut group_desc: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut boundary_backed: BTreeSet<String> = BTreeSet::new();
@@ -186,13 +190,11 @@ fn derive_group_substrate(
         }
         // Prefer shift-aligned boundary span when per-rank clamps are pure.
         // Try tight intersection first, then union.
+        let g_spans = spans.get(gname.as_str()).map(Vec::as_slice).unwrap_or(&[]);
         let mut took_boundary = false;
-        for span in [
-            boundary_order_span(plan, gname),
-            boundary_order_union(plan, gname),
-        ]
-        .into_iter()
-        .flatten()
+        for span in [boundary_order_span(g_spans), boundary_order_union(g_spans)]
+            .into_iter()
+            .flatten()
         {
             let (bo0, bo1) = span;
             let covers = descendants.iter().all(|m| {
@@ -200,7 +202,7 @@ fn derive_group_substrate(
                     .get(m)
                     .is_some_and(|s| s.order >= bo0 && s.order <= bo1)
             });
-            if covers && boundary_ranks_pure(plan, gname, nodes, &desc_set) {
+            if covers && boundary_ranks_pure(g_spans, nodes, &desc_set) {
                 o0 = bo0;
                 o1 = bo1;
                 took_boundary = true;
@@ -224,7 +226,9 @@ fn derive_group_substrate(
             let both_boundary =
                 boundary_backed.contains(a.as_str()) && boundary_backed.contains(b.as_str());
             if both_boundary {
-                if boundary_ranks_overlap(plan, a, b) {
+                let a_spans = spans.get(a.as_str()).map(Vec::as_slice).unwrap_or(&[]);
+                let b_spans = spans.get(b.as_str()).map(Vec::as_slice).unwrap_or(&[]);
+                if boundary_ranks_overlap(a_spans, b_spans) {
                     return Err(DeriveError::OverlappingGroups {
                         a: a.clone(),
                         b: b.clone(),
@@ -388,92 +392,78 @@ fn derive_group_substrate(
     Ok((s, index))
 }
 
-fn boundary_order_span(plan: &PlanGraph, group: &str) -> Option<(usize, usize)> {
-    let (lefts, rights) = boundary_side_orders(plan, group)?;
-    let o0 = *lefts.iter().max()?;
-    let o1 = *rights.iter().min()?;
-    if o0 <= o1 {
-        Some((o0, o1))
-    } else {
-        None
-    }
-}
-
-fn boundary_order_union(plan: &PlanGraph, group: &str) -> Option<(usize, usize)> {
-    let (lefts, rights) = boundary_side_orders(plan, group)?;
-    Some((*lefts.iter().min()?, *rights.iter().max()?))
-}
-
-fn boundary_side_orders(plan: &PlanGraph, group: &str) -> Option<(Vec<usize>, Vec<usize>)> {
+/// Per-group boundary clamp positions in ONE pass over the plan: group name
+/// -> per-rank `(left order, right order)`. A rank carries a usable span only
+/// when both sides are present with left <= right (`rank_span` below); that
+/// matches the old per-group layer scans exactly (ranks with left > right
+/// never gated anything: their `[l, r]` window is empty).
+fn boundary_spans(plan: &PlanGraph) -> BTreeMap<&str, Vec<(Option<usize>, Option<usize>)>> {
     use crate::layout::hierarchical::model::BoundarySide;
-    let mut lefts = Vec::new();
-    let mut rights = Vec::new();
-    for layer in &plan.layers {
-        let mut lpos = None;
-        let mut rpos = None;
+    let rank_count = plan.layers.len();
+    let mut spans: BTreeMap<&str, Vec<(Option<usize>, Option<usize>)>> = BTreeMap::new();
+    for (rank, layer) in plan.layers.iter().enumerate() {
         for (ord, &ei) in layer.iter().enumerate() {
-            match &plan.elems[ei].key {
-                ElemKey::GroupBoundary {
-                    group: g,
-                    side: BoundarySide::Left,
-                    ..
-                } if g == group => lpos = Some(ord),
-                ElemKey::GroupBoundary {
-                    group: g,
-                    side: BoundarySide::Right,
-                    ..
-                } if g == group => rpos = Some(ord),
-                _ => {}
-            }
-        }
-        if let (Some(l), Some(r)) = (lpos, rpos) {
-            if l <= r {
-                lefts.push(l);
-                rights.push(r);
+            let ElemKey::GroupBoundary { group, side, .. } = &plan.elems[ei].key else {
+                continue;
+            };
+            let v = spans
+                .entry(group.as_str())
+                .or_insert_with(|| vec![(None, None); rank_count]);
+            let slot = &mut v[rank];
+            match side {
+                BoundarySide::Left => slot.0 = Some(ord),
+                BoundarySide::Right => slot.1 = Some(ord),
             }
         }
     }
-    if lefts.is_empty() {
-        None
-    } else {
-        Some((lefts, rights))
+    spans
+}
+
+fn rank_span(slot: &(Option<usize>, Option<usize>)) -> Option<(usize, usize)> {
+    match slot {
+        (Some(l), Some(r)) if l <= r => Some((*l, *r)),
+        _ => None,
     }
+}
+
+fn boundary_order_span(spans: &[(Option<usize>, Option<usize>)]) -> Option<(usize, usize)> {
+    let mut o0: Option<usize> = None;
+    let mut o1: Option<usize> = None;
+    for slot in spans {
+        if let Some((l, r)) = rank_span(slot) {
+            o0 = Some(o0.map_or(l, |x: usize| x.max(l)));
+            o1 = Some(o1.map_or(r, |x: usize| x.min(r)));
+        }
+    }
+    match (o0, o1) {
+        (Some(o0), Some(o1)) if o0 <= o1 => Some((o0, o1)),
+        _ => None,
+    }
+}
+
+fn boundary_order_union(spans: &[(Option<usize>, Option<usize>)]) -> Option<(usize, usize)> {
+    let mut o0: Option<usize> = None;
+    let mut o1: Option<usize> = None;
+    for slot in spans {
+        if let Some((l, r)) = rank_span(slot) {
+            o0 = Some(o0.map_or(l, |x: usize| x.min(l)));
+            o1 = Some(o1.map_or(r, |x: usize| x.max(r)));
+        }
+    }
+    Some((o0?, o1?))
 }
 
 fn boundary_ranks_pure(
-    plan: &PlanGraph,
-    group: &str,
+    spans: &[(Option<usize>, Option<usize>)],
     nodes: &BTreeMap<String, NodeSpec>,
     descendants: &BTreeSet<String>,
 ) -> bool {
-    use crate::layout::hierarchical::model::BoundarySide;
-    for (rank, layer) in plan.layers.iter().enumerate() {
-        let mut lpos = None;
-        let mut rpos = None;
-        for (ord, &ei) in layer.iter().enumerate() {
-            match &plan.elems[ei].key {
-                ElemKey::GroupBoundary {
-                    group: g,
-                    side: BoundarySide::Left,
-                    ..
-                } if g == group => lpos = Some(ord),
-                ElemKey::GroupBoundary {
-                    group: g,
-                    side: BoundarySide::Right,
-                    ..
-                } if g == group => rpos = Some(ord),
-                _ => {}
-            }
-        }
-        let (Some(l), Some(r)) = (lpos, rpos) else {
+    for (rank, slot) in spans.iter().enumerate() {
+        let Some((l, r)) = rank_span(slot) else {
             continue;
         };
-        for (nname, slot) in nodes {
-            if slot.rank == rank
-                && l <= slot.order
-                && slot.order <= r
-                && !descendants.contains(nname)
-            {
+        for (nname, ns) in nodes {
+            if ns.rank == rank && l <= ns.order && ns.order <= r && !descendants.contains(nname) {
                 return false;
             }
         }
@@ -481,34 +471,12 @@ fn boundary_ranks_pure(
     true
 }
 
-fn boundary_ranks_overlap(plan: &PlanGraph, a: &str, b: &str) -> bool {
-    use crate::layout::hierarchical::model::BoundarySide;
-    let span_on = |group: &str, rank: usize| -> Option<(usize, usize)> {
-        let layer = &plan.layers[rank];
-        let mut lpos = None;
-        let mut rpos = None;
-        for (ord, &ei) in layer.iter().enumerate() {
-            match &plan.elems[ei].key {
-                ElemKey::GroupBoundary {
-                    group: g,
-                    side: BoundarySide::Left,
-                    ..
-                } if g == group => lpos = Some(ord),
-                ElemKey::GroupBoundary {
-                    group: g,
-                    side: BoundarySide::Right,
-                    ..
-                } if g == group => rpos = Some(ord),
-                _ => {}
-            }
-        }
-        match (lpos, rpos) {
-            (Some(l), Some(r)) if l <= r => Some((l, r)),
-            _ => None,
-        }
-    };
-    for rank in 0..plan.layers.len() {
-        let (Some((a0, a1)), Some((b0, b1))) = (span_on(a, rank), span_on(b, rank)) else {
+fn boundary_ranks_overlap(
+    a: &[(Option<usize>, Option<usize>)],
+    b: &[(Option<usize>, Option<usize>)],
+) -> bool {
+    for (sa, sb) in a.iter().zip(b.iter()) {
+        let (Some((a0, a1)), Some((b0, b1))) = (rank_span(sa), rank_span(sb)) else {
             continue;
         };
         if a0 <= b1 && b0 <= a1 {

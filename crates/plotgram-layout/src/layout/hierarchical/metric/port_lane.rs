@@ -219,71 +219,128 @@ fn align_ns_ports(
         });
     }
 
-    let frozen: BTreeSet<(String, bool)> = all_faces
-        .iter()
-        .filter(|(face, _)| !faces.contains_key(face))
-        .flat_map(|(_, ends)| ends.iter().map(|e| (e.edge_id.clone(), e.is_source)))
-        .collect();
+    // Dense end indices for the fixed-point sweep. The sweep is the layout
+    // hot path (hundreds of Jacobi rounds × every NS end); String-keyed
+    // BTreeMap get/insert/clone per end per round dominates it. Indices are
+    // assigned in `all_faces` order and the face walk stays the BTreeMap
+    // order, so the arithmetic sequence — and therefore the fixed point —
+    // is bit-identical to the map-based version.
+    let mut end_index: BTreeMap<(String, bool), usize> = BTreeMap::new();
+    let mut keys_by_idx: Vec<(String, bool)> = Vec::new();
+    for (_, ends) in &all_faces {
+        for e in ends {
+            if ports.contains_key(&e.edge_id) {
+                keys_by_idx.push((e.edge_id.clone(), e.is_source));
+                end_index.insert((e.edge_id.clone(), e.is_source), end_index.len());
+            }
+        }
+    }
+    let idx_of = |end: &FaceEnd| end_index[&(end.edge_id.clone(), end.is_source)];
 
-    let mut at: BTreeMap<(String, bool), f64> = BTreeMap::new();
+    let mut at: Vec<f64> = vec![0.0; end_index.len()];
     for (&(elem, _), ends) in &all_faces {
         for end in ends {
             let Some(ep) = ports.get(&end.edge_id) else {
                 continue;
             };
             let port = if end.is_source { ep.source } else { ep.target };
-            at.insert(
-                (end.edge_id.clone(), end.is_source),
-                port_anchor(frames[elem], port).x,
-            );
+            at[idx_of(end)] = port_anchor(frames[elem], port).x;
         }
     }
+
+    #[derive(Clone, Copy)]
+    enum SweepAnchor {
+        Fixed(f64),
+        Peer(usize),
+    }
+    let anchor_of: Vec<Option<SweepAnchor>> = keys_by_idx
+        .iter()
+        .map(|key| match anchors.get(key) {
+            Some(PartnerAnchor::Fixed(x)) => Some(SweepAnchor::Fixed(*x)),
+            Some(PartnerAnchor::Peer(peer)) => end_index.get(peer).map(|&p| SweepAnchor::Peer(p)),
+            None => None,
+        })
+        .collect();
+    let frozen: Vec<bool> = {
+        let mut f = vec![false; end_index.len()];
+        for (face, ends) in &all_faces {
+            if faces.contains_key(face) {
+                continue;
+            }
+            for e in ends {
+                if let Some(&i) = end_index.get(&(e.edge_id.clone(), e.is_source)) {
+                    f[i] = true;
+                }
+            }
+        }
+        f
+    };
+    // Face walk flattened to (elem, slot→end-indices) in BTreeMap order.
+    let sweep: Vec<(usize, Vec<Vec<usize>>)> = faces
+        .iter()
+        .map(|(&(elem, _), slots)| {
+            (
+                elem,
+                slots
+                    .iter()
+                    .map(|slot| slot.iter().map(&idx_of).collect())
+                    .collect(),
+            )
+        })
+        .collect();
 
     // One projection is not a fixed point: faces couple through their edges, so
     // a face that moves re-targets its neighbours. Each round is a contraction;
     // run to a fixed point, because a residue of even half a pixel still costs
     // the edge two bends.
+    //
+    // Hot loop: hundreds of Jacobi rounds × every NS face × every slot. All
+    // per-round temporaries (wants/targets per slot, PAVA scratch per face)
+    // live in reusable buffers; the arithmetic sequence is unchanged.
+    let max_slot = faces.values().map(|s| s.len()).max().unwrap_or(0);
+    let mut wants: Vec<f64> = Vec::with_capacity(8);
+    let mut targets: Vec<f64> = Vec::with_capacity(max_slot);
+    let mut proj = ProjScratch::with_slot_capacity(max_slot);
     for _ in 0..PORT_ALIGN_ROUNDS {
         let prev = at.clone();
-        for (&(elem, _), slots) in &faces {
-            let frame = &frames[elem];
-            let targets: Vec<f64> = slots
-                .iter()
-                .map(|slot| {
-                    let wants: Vec<f64> = slot
-                        .iter()
-                        .map(|end| {
-                            let key = (end.edge_id.clone(), end.is_source);
-                            let here = prev[&key];
-                            match anchors.get(&key) {
-                                Some(PartnerAnchor::Fixed(x)) => *x,
-                                Some(PartnerAnchor::Peer(peer)) => match prev.get(peer) {
-                                    // A frozen peer will not come to meet us, so
-                                    // go all the way; otherwise both ends aim at
-                                    // the midpoint — chasing the partner's last
-                                    // position just swaps them.
-                                    Some(&x) if frozen.contains(peer) => x,
-                                    Some(&x) => 0.5 * (here + x),
-                                    None => here,
-                                },
-                                None => here,
+        for (elem, slots) in &sweep {
+            let frame = &frames[*elem];
+            targets.clear();
+            for slot in slots {
+                wants.clear();
+                for &i in slot {
+                    let here = prev[i];
+                    let w = match anchor_of[i] {
+                        Some(SweepAnchor::Fixed(x)) => x,
+                        // A frozen peer will not come to meet us, so
+                        // go all the way; otherwise both ends aim at
+                        // the midpoint — chasing the partner's last
+                        // position just swaps them.
+                        Some(SweepAnchor::Peer(p)) => {
+                            if frozen[p] {
+                                prev[p]
+                            } else {
+                                0.5 * (here + prev[p])
                             }
-                        })
-                        .collect();
-                    median(&wants)
-                })
-                .collect();
+                        }
+                        None => here,
+                    };
+                    wants.push(w);
+                }
+                targets.push(median_sorted(&mut wants));
+            }
             let (lo, hi) = face_align_band(frame, slots.len(), &targets, pitch);
-            let placed = project_ordered(&targets, pitch, lo, hi);
+            let placed = project_ordered_into(&mut proj, &targets, pitch, lo, hi);
             for (slot, x) in slots.iter().zip(placed) {
-                for end in slot {
-                    at.insert((end.edge_id.clone(), end.is_source), x);
+                for &i in slot {
+                    at[i] = *x;
                 }
             }
         }
         let moved = at
             .iter()
-            .map(|(k, x)| (x - prev[k]).abs())
+            .zip(&prev)
+            .map(|(x, p)| (x - p).abs())
             .fold(0.0f64, f64::max);
         if moved < PORT_ALIGN_EPS {
             break;
@@ -292,9 +349,7 @@ fn align_ns_ports(
 
     for (&(elem, side), slots) in &faces {
         for end in slots.iter().flatten() {
-            let Some(&x) = at.get(&(end.edge_id.clone(), end.is_source)) else {
-                continue;
-            };
+            let x = at[idx_of(end)];
             let along = local_on_side(&frames[elem], side, x);
             let Some(ep) = ports.get_mut(&end.edge_id) else {
                 continue;
@@ -469,29 +524,70 @@ fn face_align_band(frame: &Rect, n_slots: usize, targets: &[f64], pitch: f64) ->
 /// cannot both reach their partner, least squares splits the difference and
 /// leaves *both* edges with a sub-pixel jog, which still costs two bends each.
 /// The median hands one of them exact alignment.
-fn project_ordered(targets: &[f64], pitch: f64, lo: f64, hi: f64) -> Vec<f64> {
+///
+/// Reusable PAVA scratch for [`project_ordered_into`].
+struct ProjScratch {
+    flat: Vec<f64>,
+    starts: Vec<usize>,
+    mbuf: Vec<f64>,
+    out: Vec<f64>,
+}
+
+impl ProjScratch {
+    fn with_slot_capacity(n: usize) -> Self {
+        Self {
+            flat: Vec::with_capacity(n),
+            starts: Vec::with_capacity(n),
+            mbuf: Vec::with_capacity(n),
+            out: Vec::with_capacity(n),
+        }
+    }
+}
+
+/// Same projection as the legacy `project_ordered`, writing into reusable
+/// scratch (the Jacobi sweep calls it once per face per round). PAVA runs
+/// over `u_i = t_i − i·pitch` with flat storage: block k is
+/// `flat[starts[k]..starts[k+1]]` — a merge pops one start index, so the
+/// pooled value sequence (and therefore every median) is identical to the
+/// nested-Vec version.
+fn project_ordered_into<'a>(
+    s: &'a mut ProjScratch,
+    targets: &[f64],
+    pitch: f64,
+    lo: f64,
+    hi: f64,
+) -> &'a [f64] {
     let n = targets.len();
+    let ProjScratch {
+        flat,
+        starts,
+        mbuf,
+        out,
+    } = s;
+    out.clear();
     if n == 0 {
-        return Vec::new();
+        return out;
     }
     if (n as f64 - 1.0) * pitch > hi - lo {
         // No room for the pitch: fall back to the canonical even slots.
-        return (0..n)
-            .map(|i| lo + (i as f64 + 1.0) / (n as f64 + 1.0) * (hi - lo))
-            .collect();
+        out.extend((0..n).map(|i| lo + (i as f64 + 1.0) / (n as f64 + 1.0) * (hi - lo)));
+        return out;
     }
 
-    let mut blocks: Vec<Vec<f64>> = Vec::with_capacity(n);
+    flat.clear();
+    starts.clear();
     for (i, &t) in targets.iter().enumerate() {
-        blocks.push(vec![t.clamp(lo, hi) - i as f64 * pitch]);
-        while blocks.len() >= 2 {
-            let last = median(&blocks[blocks.len() - 1]);
-            let prev = median(&blocks[blocks.len() - 2]);
+        flat.push(t.clamp(lo, hi) - i as f64 * pitch);
+        starts.push(flat.len() - 1);
+        while starts.len() >= 2 {
+            let s1 = starts[starts.len() - 1];
+            let s0 = starts[starts.len() - 2];
+            let last = median_into(mbuf, &flat[s1..]);
+            let prev = median_into(mbuf, &flat[s0..s1]);
             if prev <= last {
                 break;
             }
-            let merged = blocks.pop().unwrap();
-            blocks.last_mut().unwrap().extend(merged);
+            starts.pop();
         }
     }
 
@@ -503,20 +599,41 @@ fn project_ordered(targets: &[f64], pitch: f64, lo: f64, hi: f64) -> Vec<f64> {
     // shift correcting the left block's `lo` violation drags right-hand
     // blocks that were already in-band out through `hi` — the corner-slam
     // escape seen on `demo.flat-realtime-recommendation` recall→item_db.
-    let mut out: Vec<f64> = Vec::with_capacity(n);
     let mut prev_u = f64::NEG_INFINITY;
-    for block in &blocks {
-        let s = out.len();
-        let e = s + block.len() - 1;
-        let lo_u = lo - s as f64 * pitch;
-        let hi_u = hi - e as f64 * pitch;
-        let v = median(block).max(lo_u.max(prev_u)).min(hi_u);
+    for (bi, &sb) in starts.iter().enumerate() {
+        let e = if bi + 1 < starts.len() {
+            starts[bi + 1]
+        } else {
+            flat.len()
+        };
+        let k = e - sb;
+        let si = out.len();
+        let ei = si + k - 1;
+        let lo_u = lo - si as f64 * pitch;
+        let hi_u = hi - ei as f64 * pitch;
+        let v = median_into(mbuf, &flat[sb..e])
+            .max(lo_u.max(prev_u))
+            .min(hi_u);
         prev_u = v;
-        for _ in 0..block.len() {
+        for _ in 0..k {
             out.push(v + out.len() as f64 * pitch);
         }
     }
     out
+}
+
+/// Lower median of `values` into scratch `buf` (no allocation).
+fn median_into(buf: &mut Vec<f64>, values: &[f64]) -> f64 {
+    buf.clear();
+    buf.extend_from_slice(values);
+    buf.sort_by(f64::total_cmp);
+    buf[(buf.len() - 1) / 2]
+}
+
+/// In-place lower median of a scratch buffer the caller discards afterwards.
+fn median_sorted(values: &mut [f64]) -> f64 {
+    values.sort_by(f64::total_cmp);
+    values[(values.len() - 1) / 2]
 }
 
 /// Lower median — deterministic, and it lands on an actual target.

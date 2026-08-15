@@ -12,7 +12,9 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 
 use super::graph::{ChannelGraph, Occupancy, Via};
-use super::substrate::{BlueprintIndex, GateId, GroupId, Substrate, TrackId, TrackOrient};
+use super::substrate::{
+    BlueprintIndex, GateId, GroupId, GroupScope, Substrate, Track, TrackId, TrackOrient,
+};
 use plotgram_algo::orientation::Side;
 
 /// How Ink enters/leaves the first/last corridor (P5-3). Channel search
@@ -288,21 +290,11 @@ impl ScopeMask {
 /// Metric may place the two Mains on opposite sides of the frame, and Ink
 /// expands a Cross as an infinite-width horizontal. Top/bottom seams
 /// (`k=r0` / `k=r1+1`) stay legal because derive does not cut them.
-pub fn cross_covers_foreign_group(
-    substrate: &Substrate,
-    track: TrackId,
-    allowed: &ScopeMask,
-) -> bool {
-    let Some(t) = substrate.track(track) else {
-        return false;
-    };
+pub(crate) fn cross_covers_foreign_in(t: &Track, foreign: &[&GroupScope]) -> bool {
     if t.orient != TrackOrient::Cross {
         return false;
     }
-    for g in substrate.groups() {
-        if allowed.allows(Some(g.id)) {
-            continue;
-        }
+    for g in foreign {
         let (r0, r1) = g.ranks;
         if !(r0 < t.line && t.line <= r1) {
             continue;
@@ -320,21 +312,28 @@ pub fn cross_covers_foreign_group(
     false
 }
 
+/// Groups the mask does not allow, in substrate (BTreeMap) order.
+pub(crate) fn foreign_groups<'a>(
+    substrate: &'a Substrate,
+    allowed: &ScopeMask,
+) -> Vec<&'a GroupScope> {
+    substrate
+        .groups()
+        .filter(|g| !allowed.allows(Some(g.id)))
+        .collect()
+}
+
 /// True when a Main at `og` sits on the opposite side of a foreign group
 /// from `endpoint_order` on a rank that group occupies. Landing there
 /// makes Ink's first/last horizontal punch through the sibling frame;
 /// the around-path must stay on this side and cross at `k=r0` / `k=r1+1`.
-pub fn main_straddles_foreign_group(
-    substrate: &Substrate,
-    allowed: &ScopeMask,
+pub(crate) fn main_straddles_in(
+    foreign: &[&GroupScope],
     endpoint_order: usize,
     endpoint_rank: usize,
     og: usize,
 ) -> bool {
-    for g in substrate.groups() {
-        if allowed.allows(Some(g.id)) {
-            continue;
-        }
+    for g in foreign {
         let (r0, r1) = g.ranks;
         if endpoint_rank < r0 || endpoint_rank > r1 {
             continue;
@@ -350,30 +349,6 @@ pub fn main_straddles_foreign_group(
         }
     }
     false
-}
-
-/// Cross→Main (or reverse) whose order span jumps a foreign group: Ink
-/// draws one horizontal at the Cross Y through the sibling frame.
-fn hop_straddles_foreign_group(
-    substrate: &Substrate,
-    allowed: &ScopeMask,
-    from: TrackId,
-    to: TrackId,
-) -> bool {
-    let Some(a) = substrate.track(from) else {
-        return false;
-    };
-    let Some(b) = substrate.track(to) else {
-        return false;
-    };
-    let (cross, main_og) = match (a.orient, b.orient) {
-        (TrackOrient::Cross, TrackOrient::Main) => (a, b.line),
-        (TrackOrient::Main, TrackOrient::Cross) => (b, a.line),
-        _ => return false,
-    };
-    let mid = (cross.ext.0 / 2 + cross.ext.1 / 2) / 2;
-    let rank = cross.line.saturating_sub(1);
-    main_straddles_foreign_group(substrate, allowed, mid, rank, main_og)
 }
 
 /// Endpoint-induced corridor band for span affinity (D1.3.1).
@@ -596,11 +571,11 @@ pub fn main_chain_dist(order_gap: usize, chain_order: Option<usize>) -> u32 {
     }
 }
 
-fn track_span_affinity(substrate: &Substrate, track: TrackId, hints: &RouteHints) -> u32 {
+fn track_span_affinity(t: Option<&Track>, hints: &RouteHints) -> u32 {
     let Some(span) = hints.span else {
         return 0;
     };
-    let Some(t) = substrate.track(track) else {
+    let Some(t) = t else {
         return 0;
     };
     match t.orient {
@@ -786,6 +761,138 @@ fn route_edge_coupled_main(
     best.unwrap_or_else(RouteOutcome::infeasible)
 }
 
+/// Per-call dense/memoized view of the search inputs that are immutable
+/// within one `route_edge` call (substrate, mask, occupancy, hints). Pure
+/// cache of the free-function queries — identical results, fewer map walks.
+struct SearchEnv<'a> {
+    substrate: &'a Substrate,
+    /// Dense track table by `TrackId.0` (None = id hole).
+    tracks: Vec<Option<&'a Track>>,
+    /// Groups the mask does not allow, in substrate (BTreeMap) order.
+    foreign: Vec<&'a GroupScope>,
+    /// Memoized `cross_covers_foreign_group` per track id.
+    cross_foreign: Vec<Option<bool>>,
+    /// Memoized `soft_penalties` per track id.
+    soft: Vec<Option<f64>>,
+    /// Memoized `inner_main_saturated` (constant within a call).
+    inner_saturated: Option<bool>,
+    /// Memoized `main_line_demand` per order-gap line.
+    main_demand: Vec<Option<u32>>,
+}
+
+impl<'a> SearchEnv<'a> {
+    fn new(substrate: &'a Substrate, allowed: &ScopeMask) -> Self {
+        let n = substrate
+            .tracks()
+            .map(|t| t.id.0 as usize + 1)
+            .max()
+            .unwrap_or(0);
+        let mut tracks: Vec<Option<&'a Track>> = vec![None; n];
+        for t in substrate.tracks() {
+            tracks[t.id.0 as usize] = Some(t);
+        }
+        Self {
+            substrate,
+            tracks,
+            foreign: foreign_groups(substrate, allowed),
+            cross_foreign: vec![None; n],
+            soft: vec![None; n],
+            inner_saturated: None,
+            main_demand: Vec::new(),
+        }
+    }
+
+    /// Dense track lookup (the borrow is tied to the substrate, not `self`).
+    fn track(&self, id: TrackId) -> Option<&'a Track> {
+        self.tracks.get(id.0 as usize).copied().flatten()
+    }
+
+    fn cross_covers_foreign(&mut self, track: TrackId) -> bool {
+        let i = track.0 as usize;
+        if let Some(Some(v)) = self.cross_foreign.get(i) {
+            return *v;
+        }
+        let v = match self.track(track) {
+            None => false,
+            Some(t) => cross_covers_foreign_in(t, &self.foreign),
+        };
+        self.cross_foreign[i] = Some(v);
+        v
+    }
+
+    /// Cross→Main (or reverse) whose order span jumps a foreign group: Ink
+    /// draws one horizontal at the Cross Y through the sibling frame.
+    fn hop_straddles(&self, from: TrackId, to: TrackId) -> bool {
+        let (a, b) = (self.track(from), self.track(to));
+        let (Some(a), Some(b)) = (a, b) else {
+            return false;
+        };
+        let (cross, main_og) = match (a.orient, b.orient) {
+            (TrackOrient::Cross, TrackOrient::Main) => (a, b.line),
+            (TrackOrient::Main, TrackOrient::Cross) => (b, a.line),
+            _ => return false,
+        };
+        let mid = (cross.ext.0 / 2 + cross.ext.1 / 2) / 2;
+        let rank = cross.line.saturating_sub(1);
+        main_straddles_in(&self.foreign, mid, rank, main_og)
+    }
+
+    fn span_affinity(&self, track: TrackId, hints: &RouteHints) -> u32 {
+        track_span_affinity(self.track(track), hints)
+    }
+
+    fn soft_penalty(&mut self, track: TrackId, hints: &RouteHints, occupancy: &Occupancy) -> f64 {
+        let i = track.0 as usize;
+        if let Some(Some(v)) = self.soft.get(i) {
+            return *v;
+        }
+        let t = self.track(track);
+        let v = soft_penalties_core(t, hints, || {
+            let span = hints.span.expect("core checks span before inner_sat");
+            self.inner_saturated(hints, occupancy, span)
+        });
+        self.soft[i] = Some(v);
+        v
+    }
+
+    fn inner_saturated(
+        &mut self,
+        hints: &RouteHints,
+        occupancy: &Occupancy,
+        span: SpanAffinity,
+    ) -> bool {
+        if let Some(v) = self.inner_saturated {
+            return v;
+        }
+        let order_lo = span.src_order.min(span.tgt_order);
+        let order_hi = span.src_order.max(span.tgt_order);
+        let mut saturated = true;
+        for og in order_lo..=order_hi.saturating_add(1) {
+            if og == 0 || og == hints.order_count {
+                continue;
+            }
+            if self.main_demand_at(og, occupancy) < INNER_SATURATION_DEMAND {
+                saturated = false;
+                break;
+            }
+        }
+        self.inner_saturated = Some(saturated);
+        saturated
+    }
+
+    fn main_demand_at(&mut self, og: usize, occupancy: &Occupancy) -> u32 {
+        if let Some(Some(v)) = self.main_demand.get(og) {
+            return *v;
+        }
+        let v = main_line_demand(self.substrate, occupancy, og);
+        if og >= self.main_demand.len() {
+            self.main_demand.resize(og + 1, None);
+        }
+        self.main_demand[og] = Some(v);
+        v
+    }
+}
+
 fn route_edge_ungated(
     graph: &ChannelGraph<'_>,
     starts: &[EndCandidate],
@@ -796,6 +903,7 @@ fn route_edge_ungated(
     hints: RouteHints,
 ) -> RouteOutcome {
     let substrate = graph.substrate();
+    let mut env = SearchEnv::new(substrate, allowed);
     // Per-track best goal candidate (deterministic pick on duplicates).
     let mut goal_map: BTreeMap<TrackId, EndCandidate> = BTreeMap::new();
     for &g in goals {
@@ -822,23 +930,21 @@ fn route_edge_ungated(
     };
 
     let mut open = BinaryHeap::new();
-    // best: track → (cost, parent track, via used to enter, start candidate idx)
-    let mut best: BTreeMap<TrackId, (LexCost, Option<TrackId>, Option<Via>, usize)> =
-        BTreeMap::new();
+    // best: dense by TrackId.0 → (cost, parent track, via used to enter,
+    // start candidate idx). Track ids come from the same substrate.
+    let mut best: Vec<Option<BestEntry>> = vec![None; env.tracks.len()];
 
     for (si, sc) in starts.iter().enumerate() {
-        let Some(start_t) = substrate.track(sc.track) else {
+        let Some(start_t) = env.track(sc.track) else {
             continue;
         };
-        if !allowed.allows(start_t.scope)
-            || cross_covers_foreign_group(substrate, sc.track, allowed)
-        {
+        if !allowed.allows(start_t.scope) || env.cross_covers_foreign(sc.track) {
             continue;
         }
         let mut start_cost = LexCost {
             bends: sc.extra_bends,
             length: start_t.span_weight + sc.extra_len,
-            span_affinity: track_span_affinity(substrate, sc.track, &hints),
+            span_affinity: env.span_affinity(sc.track, &hints),
             congestion: if congestion_bias {
                 occupancy.lane_demand(sc.track) as f64
             } else {
@@ -847,14 +953,14 @@ fn route_edge_ungated(
             crossings: occupancy.crossing_count(sc.track, start_t.ext),
             ..LexCost::default()
         };
-        start_cost.congestion += soft_penalties(substrate, sc.track, &hints, occupancy);
+        start_cost.congestion += env.soft_penalty(sc.track, &hints, occupancy);
         start_cost.recompute(&hints.weights);
-        let replace = match best.get(&sc.track) {
+        let replace = match best_at(&best, sc.track) {
             None => true,
-            Some((bc, _, _, _)) => start_cost < *bc,
+            Some((bc, _, _, _)) => start_cost < bc,
         };
         if replace {
-            best.insert(sc.track, (start_cost, None, None, si));
+            best[sc.track.0 as usize] = Some((start_cost, None, None, si));
             open.push(State {
                 cost: start_cost,
                 track: sc.track,
@@ -871,12 +977,12 @@ fn route_edge_ungated(
                     continue;
                 }
             }
-            let Some(to_t) = substrate.track(gt) else {
+            let Some(to_t) = env.track(gt) else {
                 continue;
             };
             if !allowed.allows(to_t.scope)
-                || cross_covers_foreign_group(substrate, gt, allowed)
-                || hop_straddles_foreign_group(substrate, allowed, sc.track, gt)
+                || env.cross_covers_foreign(gt)
+                || env.hop_straddles(sc.track, gt)
             {
                 continue;
             }
@@ -887,21 +993,21 @@ fn route_edge_ungated(
             direct.length += to_t.span_weight;
             direct.span_affinity = direct
                 .span_affinity
-                .saturating_add(track_span_affinity(substrate, gt, &hints));
+                .saturating_add(env.span_affinity(gt, &hints));
             direct.crossings = direct
                 .crossings
                 .saturating_add(occupancy.crossing_count(gt, to_t.ext));
             if congestion_bias {
                 direct.congestion += occupancy.lane_demand(gt) as f64;
             }
-            direct.congestion += soft_penalties(substrate, gt, &hints, occupancy);
+            direct.congestion += env.soft_penalty(gt, &hints, occupancy);
             direct.recompute(&hints.weights);
-            let replace = match best.get(&gt) {
+            let replace = match best_at(&best, gt) {
                 None => true,
-                Some((bc, _, _, _)) => direct < *bc,
+                Some((bc, _, _, _)) => direct < bc,
             };
             if replace {
-                best.insert(gt, (direct, Some(sc.track), Some(via), si));
+                best[gt.0 as usize] = Some((direct, Some(sc.track), Some(via), si));
                 open.push(State {
                     cost: direct,
                     track: gt,
@@ -909,34 +1015,30 @@ fn route_edge_ungated(
             }
         }
     }
-    if best.is_empty() {
+    if best.iter().all(|e| e.is_none()) {
         return RouteOutcome::infeasible();
     }
-
-    let finish_goal = |track: TrackId, mut cost: LexCost, goal: &EndCandidate| -> LexCost {
-        cost.bends += goal.extra_bends;
-        cost.length += goal.extra_len;
-        if hints.min_last_span > 0.0
-            && substrate
-                .track(track)
-                .is_some_and(|t| t.span_weight + 1e-9 < hints.min_last_span)
-        {
-            cost.congestion += 1e6;
-        }
-        cost.recompute(&hints.weights);
-        cost
-    };
 
     let mut best_goal: Option<(LexCost, TrackId)> = None;
 
     while let Some(State { cost, track }) = open.pop() {
-        if let Some((bc, _, _, _)) = best.get(&track) {
-            if cost > *bc {
+        if let Some((bc, _, _, _)) = best_at(&best, track) {
+            if cost > bc {
                 continue;
             }
         }
-        if let Some(gc) = goal_map.get(&track) {
-            let mut total = finish_goal(track, cost, gc);
+        if let Some(gc) = goal_map.get(&track).copied() {
+            let mut total = cost;
+            total.bends += gc.extra_bends;
+            total.length += gc.extra_len;
+            if hints.min_last_span > 0.0
+                && env
+                    .track(track)
+                    .is_some_and(|t| t.span_weight + 1e-9 < hints.min_last_span)
+            {
+                total.congestion += 1e6;
+            }
+            total.recompute(&hints.weights);
             // Spike-fold discount (pair-level): when both ends escape via the
             // *same* gap line onto the *same* corridor through the minimal
             // Main→Cross→Main chain, Ink's out-and-back rail excursion sits on
@@ -945,26 +1047,26 @@ fn route_edge_ungated(
             // shape). The fold erases the 2 transit bends plus one rail-touch
             // bend per end; price the pair accordingly. Rim AtPortNormal
             // pairings never fold and keep their full price.
-            if let Some(si) = best.get(&track).map(|e| e.3) {
+            if let Some((_, _, _, si)) = best_at(&best, track) {
                 if let (EscapeEnd::ViaGap(sl), EscapeEnd::ViaGap(gl)) =
                     (starts[si].escape, gc.escape)
                 {
-                    let same_corridor = substrate
+                    let same_corridor = env
                         .track(starts[si].track)
-                        .zip(substrate.track(gc.track))
+                        .zip(env.track(gc.track))
                         .is_some_and(|(s, g)| s.orient == g.orient && s.line == g.line);
                     // Minimal chain: reach the start entry within 2 hops.
                     let mut hops = 0usize;
                     let mut cur = track;
                     let mut minimal = false;
                     loop {
-                        match best.get(&cur) {
+                        match best_at(&best, cur) {
                             Some((_, None, _, _)) => {
                                 minimal = true;
                                 break;
                             }
                             Some((_, Some(p), _, _)) if hops < 2 => {
-                                cur = *p;
+                                cur = p;
                                 hops += 1;
                             }
                             _ => break,
@@ -993,26 +1095,26 @@ fn route_edge_ungated(
                 break;
             }
         }
-        let from_orient = match substrate.track(track) {
+        let from_orient = match env.track(track) {
             Some(t) => t.orient,
             None => continue,
         };
         // Still on a start seed (no parent). Do not gate on `cost.bends == 0`:
         // ViaGap seeds already carry escape bends, but the first corridor
         // leave must still honor `min_first_span`.
-        let leaving_start = best.get(&track).is_some_and(|e| e.1.is_none());
+        let leaving_start = best_at(&best, track).is_some_and(|e| e.1.is_none());
         for tr in graph.neighbors(track) {
             if let Via::Gate(g) = tr.via {
                 if !occupancy.gate_open(substrate, g) {
                     continue;
                 }
             }
-            let Some(to_t) = substrate.track(tr.to) else {
+            let Some(to_t) = env.track(tr.to) else {
                 continue;
             };
             if !allowed.allows(to_t.scope)
-                || cross_covers_foreign_group(substrate, tr.to, allowed)
-                || hop_straddles_foreign_group(substrate, allowed, track, tr.to)
+                || env.cross_covers_foreign(tr.to)
+                || env.hop_straddles(track, tr.to)
             {
                 continue;
             }
@@ -1022,7 +1124,7 @@ fn route_edge_ungated(
                     next.bends += 1;
                     if leaving_start
                         && hints.min_first_span > 0.0
-                        && substrate
+                        && env
                             .track(track)
                             .is_some_and(|t| t.span_weight + 1e-9 < hints.min_first_span)
                     {
@@ -1037,22 +1139,22 @@ fn route_edge_ungated(
             next.length += to_t.span_weight;
             next.span_affinity = next
                 .span_affinity
-                .saturating_add(track_span_affinity(substrate, tr.to, &hints));
+                .saturating_add(env.span_affinity(tr.to, &hints));
             next.crossings = next
                 .crossings
                 .saturating_add(occupancy.crossing_count(tr.to, to_t.ext));
             if congestion_bias {
                 next.congestion += occupancy.lane_demand(tr.to) as f64;
             }
-            next.congestion += soft_penalties(substrate, tr.to, &hints, occupancy);
+            next.congestion += env.soft_penalty(tr.to, &hints, occupancy);
             next.recompute(&hints.weights);
-            let replace = match best.get(&tr.to) {
+            let replace = match best_at(&best, tr.to) {
                 None => true,
-                Some((bc, _, _, _)) => next < *bc,
+                Some((bc, _, _, _)) => next < bc,
             };
             if replace {
-                let start_idx = best.get(&track).map(|e| e.3).unwrap_or(0);
-                best.insert(tr.to, (next, Some(track), Some(tr.via), start_idx));
+                let start_idx = best_at(&best, track).map(|e| e.3).unwrap_or(0);
+                best[tr.to.0 as usize] = Some((next, Some(track), Some(tr.via), start_idx));
                 open.push(State {
                     cost: next,
                     track: tr.to,
@@ -1065,7 +1167,7 @@ fn route_edge_ungated(
         return RouteOutcome::infeasible();
     };
     let (tracks, gates) = reconstruct(&best, goal_track);
-    let start_idx = best.get(&tracks[0]).map(|e| e.3).unwrap_or(0);
+    let start_idx = best_at(&best, tracks[0]).map(|e| e.3).unwrap_or(0);
     let path = ChannelPath {
         tracks,
         gates,
@@ -1101,13 +1203,26 @@ fn soft_penalties(
     hints: &RouteHints,
     occupancy: &Occupancy,
 ) -> f64 {
+    soft_penalties_core(substrate.track(track), hints, || {
+        let span = hints.span.expect("core checks span before inner_sat");
+        inner_main_saturated(substrate, occupancy, span, hints.order_count)
+    })
+}
+
+/// [`soft_penalties`] core with a lazily-evaluated saturation probe (the
+/// search env memoizes the probe; it is constant within one call).
+fn soft_penalties_core(
+    t: Option<&Track>,
+    hints: &RouteHints,
+    inner_sat: impl FnOnce() -> bool,
+) -> f64 {
     if !hints.outer_main_as_overflow {
         return 0.0;
     }
     let Some(span) = hints.span else {
         return 0.0;
     };
-    let Some(t) = substrate.track(track) else {
+    let Some(t) = t else {
         return 0.0;
     };
     if t.orient != TrackOrient::Main {
@@ -1117,7 +1232,7 @@ fn soft_penalties(
     if !outer {
         return 0.0;
     }
-    if inner_main_saturated(substrate, occupancy, span, hints.order_count) {
+    if inner_sat() {
         0.0
     } else if span.src_order == span.tgt_order {
         SAME_ORDER_OUTER_OVERFLOW_PENALTY
@@ -1126,23 +1241,28 @@ fn soft_penalties(
     }
 }
 
-fn reconstruct(
-    best: &BTreeMap<TrackId, (LexCost, Option<TrackId>, Option<Via>, usize)>,
-    goal: TrackId,
-) -> (Vec<TrackId>, Vec<GateId>) {
+fn reconstruct(best: &[Option<BestEntry>], goal: TrackId) -> (Vec<TrackId>, Vec<GateId>) {
     let mut cur = goal;
     let mut rev_tracks = vec![cur];
     let mut rev_gates = Vec::new();
-    while let Some((_, Some(parent), via, _)) = best.get(&cur) {
+    while let Some((_, Some(parent), via, _)) = best_at(best, cur) {
         if let Some(Via::Gate(g)) = via {
-            rev_gates.push(*g);
+            rev_gates.push(g);
         }
-        cur = *parent;
+        cur = parent;
         rev_tracks.push(cur);
     }
     rev_tracks.reverse();
     rev_gates.reverse();
     (rev_tracks, rev_gates)
+}
+
+/// Best-table entry: `(cost, parent track, via used to enter, start cand idx)`.
+type BestEntry = (LexCost, Option<TrackId>, Option<Via>, usize);
+
+#[inline]
+fn best_at(best: &[Option<BestEntry>], track: TrackId) -> Option<BestEntry> {
+    best.get(track.0 as usize).copied().flatten()
 }
 
 #[cfg(test)]
