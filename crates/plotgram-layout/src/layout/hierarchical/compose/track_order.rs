@@ -875,10 +875,7 @@ mod tests {
                 EdgePorts {
                     source: ResolvedPort {
                         side: AlgoSide::South,
-                        along: AlongSpec::Ordered {
-                            order: 0,
-                            count: 1,
-                        },
+                        along: AlongSpec::Ordered { order: 0, count: 1 },
                     },
                     target: ResolvedPort {
                         side: AlgoSide::North,

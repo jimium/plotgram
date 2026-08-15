@@ -336,7 +336,11 @@ fn is_acyclic(num_nodes: usize, edges: &[(usize, usize)], reversed: &BTreeSet<us
         if u == v {
             continue;
         }
-        let (s, t) = if reversed.contains(&i) { (v, u) } else { (u, v) };
+        let (s, t) = if reversed.contains(&i) {
+            (v, u)
+        } else {
+            (u, v)
+        };
         adj[s].push(t);
         indeg[t] += 1;
     }
