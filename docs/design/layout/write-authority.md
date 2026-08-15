@@ -109,4 +109,5 @@ producer 局部聚合（可 sum/count）
 | [`routing/orthogonal/architecture`](../routing/orthogonal/architecture.md) | 独立 EdgeRouter：只写 path；L2–L4；可夹具开发 |
 | [`hierarchical/from-yfiles-reference`](hierarchical/notes/from-yfiles-reference.md) | 参考文库对 Hier 的启发纪要 |
 | [`hierarchical/notes/anti-patterns.md`](hierarchical/notes/anti-patterns.md) | Hier 已否决路线 |
+| [`hierarchical/notes/incomplete-policy.md`](hierarchical/notes/incomplete-policy.md) | 剩余折数 / 交叉：先问已有写者的政策，再问要不要新写者 |
 | [`archive/atlas/`](../../archive/atlas/README.md) | 历史总纲与债单（只读） |

@@ -52,4 +52,4 @@ FAS(+环 reroot) → rank / properify / order（含 chain-block sift）
 1. 单写者；Ink 零新决策；反向只走 DemandBoard。  
 2. 多期待拉扯 → 改 `J` / 权重，不加第三趟特判。  
 3. 禁止图种分支；参数能 bind 就必须被消费。  
-4. 已否决的试法见 [anti-patterns](notes/anti-patterns.md)，不要重开。
+4. 已否决的试法见 [anti-patterns](notes/anti-patterns.md)，不要重开。大件齐了还差折 / 交叉，先读 [incomplete-policy](notes/incomplete-policy.md)，不要第一刀去拧更大的写者。

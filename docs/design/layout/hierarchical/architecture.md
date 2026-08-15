@@ -609,6 +609,7 @@ v1 Atlas 只作反例与形状启发（[anti-patterns](notes/anti-patterns.md)�
 | [scope.md](scope.md) | 能力 / 非目标 / 典型域 |
 | [phases/](phases/README.md) | 相级契约；不得改变本文写权 |
 | [notes/anti-patterns.md](notes/anti-patterns.md) | 已否决路线 |
+| [notes/incomplete-policy.md](notes/incomplete-policy.md) | 剩余折数 / 交叉：政策缺口，不是新写者 |
 | [from-yfiles-reference.md](notes/from-yfiles-reference.md) | 阅读启发纪要 |
 | [write-authority.md](../write-authority.md) | 全布局尺子 |
 | `docs/reference/yfiles/*` | 算法证据 |

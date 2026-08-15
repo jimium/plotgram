@@ -135,7 +135,7 @@ Port → VerticalToTrack → HorizontalOnTrack(corridor, track_index) → Vertic
    - **Main**：rank 占用半开区间 `[min_rank, max_rank+1)`（同层带堆叠回边平行分道；仅端点相接的层带可共 lane）。
    D1.0 实现：先用 base `layer_gap` 跑一轮次轴得像素帧，再在该帧上着色；随后 Demand 撑开层缝并重算主轴（cross 不变）。不得在 Ink 改 `track_index`。
 3. 冲突图：span 重叠 ⇒ 不得同 lane；lane 数 ≥ clique（可用 first-fit 得到）。
-4. **外内嵌套**（对齐 yFiles）：Cross 按**走廊（line）粒度**做 outer-first first-fit——组切把一条 Cross line 切成多条 scope track，着色按 line 聚合，同一边在同一 line 上所有 track 拿同一 lane index（跨 gate 连续）。着色顺序键为 **几何 span 宽度降序主键**（最长跨拿最外 lane），`hub`（多源分区 R§2.12）/ 声明 nest `nest = min(Ordered.order, count-1-order)` / `order` 均降为 tiebreak（宽度相等时保留多源分区语义）。hub 降为次键的理由：声明槽位只覆盖扇出边，无声明的边退化 `(0,0,0)` 混堆；宽度才是每条边真实的几何嵌套位置。**禁止**仅按左端点贪心复用（会把右内外轨反转，见 `smoke.fan-out-four`）。
+4. **外内嵌套**（对齐 yFiles）：Cross 按**走廊（line）粒度**做 outer-first first-fit——组切把一条 Cross line 切成多条 scope track，着色按 line 聚合，同一边在同一 line 上所有 track 拿同一 lane index（跨 gate 连续）。着色顺序键为 **几何 span 宽度降序主键**（最长跨拿最外 lane），`hub`（多源分区 R§2.12）/ 声明 nest `nest = min(Ordered.order, count-1-order)` / `order` 均降为 tiebreak（宽度相等时保留多源分区语义）。**同目标、同向汇合**的 bundle 在该宽度序的槽位里按着陆槽极端位置对换（最远出口走最浅轨），不改其它边的宽度主键。hub 降为次键的理由：声明槽位只覆盖扇出边，无声明的边退化 `(0,0,0)` 混堆；宽度才是每条边真实的几何嵌套位置。**禁止**仅按左端点贪心复用（会把右内外轨反转，见 `smoke.fan-out-four`）。汇合交叉不要第一刀去改 Channel 搜索，见 [incomplete-policy](../notes/incomplete-policy.md)。
 5. 硬端口序成环 → `Infeasible`；本阶段无软偏好环、无 rip-up。
 6. `BusPrefix` 成员共享 `track_index`，不参与分轨着色。
 

@@ -84,9 +84,11 @@ Compose Ordered（相对序）
 
 同一 `Ordered` 槽上的多个端共用一个 port point（`auto_edge_grouping` 的总线），必须整体移动。投影按槽做，槽内取成员目标的中位数。
 
-### 7.2 只动已经共享的脸
+### 7.2 单槽也进扫，带有界
 
-**单槽脸不动**。那一个端口的列就是节点自己的列，属 cross 轴写者；为省一折把它滑到框角，换来的是箭头扎在盒子角上（`smoke.fan-out-four` 上可复现）。只有已经被多个槽瓜分的脸——槽位本就是任意的——才归 PortLane 重排。
+单槽脸也进对齐扫（yFiles `PortAlignmentIds`：孤端口在框内滑向伙伴列）。`n=1` 时内分带塌成中心，只按 `min(宽/4, pitch/2)` 向近目标打开——有界漂移，不是拽到圆角。
+
+无界滑口仍否决（箭头扎框角，`smoke.fan-out-four`）。伙伴列落在这个窗口之外的 Δx，才是节点列 / `node_gap` 的债，归 cross 轴。误把「砸角」写成「单槽列根本不归 PortLane」的经过见 [incomplete-policy](../notes/incomplete-policy.md)。
 
 ### 7.3 目标与投影
 
@@ -109,4 +111,4 @@ Compose Ordered（相对序）
 - `auto_edge_grouping` 总线仍共享一个 port point；
 - `smoke.fan-out-four` 的嵌套横杠不塌。
 
-**仍未闭合**：两端都是单槽脸、中心差十几像素的短边（`mech` 里 e3 / e9 一类）。脸上没有可动的自由度，只能靠节点列——而那要求层不被压在 `node_gap` 下限上。归 cross 轴，见 [coordinate-and-demand §8.1](coordinate-and-demand.md)。
+**仍未闭合**：伙伴列落在有界窗口之外的短边（层常被 `node_gap` 压死，节点挪不动）。那一截 Δx 归 cross 轴，见 [coordinate-and-demand §8.1](coordinate-and-demand.md)。窗口内的近共线两折是 PortLane 的 along，不要再推给 `J`。

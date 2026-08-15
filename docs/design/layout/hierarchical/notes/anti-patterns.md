@@ -50,7 +50,7 @@ v1 源码仍在 `crates/v1/plotgram-core/src/layout/atlas/`（只读）。可借
 | order 给 reverse dummy 加远真实端 bary 偏置 | 量纲错（跨层 order 下标）；crossings 升 | 链块级 sift；不要单元素偏置 |
 | Compose 槽序用远真实端 `layer_order` | 跨层不可比；e29 倒在 n11 最左，P4 把廊锚错槽，e6×e29 交叉 | 邻层邻接元（含 dummy）；dummy 与叶左右反了是 P3 的事 |
 | 内分带外扩到脸上重叠的对端 | 共享脸扇贴圆角 | 内分带 `[1/(2n), 1−1/(2n)]`；追逐不超过 `min(半 inset, 半 port_pitch)` |
-| 单槽脸滑端口省折 | 箭头扎在盒子角上 | 单槽列 = 节点列，属 cross 轴 |
+| 单槽脸**无界**滑口省折 | 箭头扎在盒子角上（`fan-out-four`） | 有界漂移仍归 PortLane（n=1 带塌成中心，只开 `min(宽/4, pitch/2)`）；窗口外的 Δx 才是 cross 轴。勿把砸角写成「单槽不动」——见 [incomplete-policy](incomplete-policy.md) |
 | `forward_gutter_side` 掩盖错列 | e18 走到与 yFiles 相反的一侧 | 改 P4 列，不在下游加第三趟侧别 |
 
 声明表熔断的判断句（写权 §2.2）：修法若是「再加一个谓词 / continue」，先问 `J` 缺哪一项。
@@ -77,4 +77,5 @@ v1 源码仍在 `crates/v1/plotgram-core/src/layout/atlas/`（只读）。可借
 
 - **扇出下的短链贴父槽**（n13 相对 n11 仍偏左；n19 已离开 n18，剩余是贴 n0/n1 脊约 30px）：P3 廊已在短链右侧。再对调父脸槽序、再让带 dummy 的扇入汇点 `center_h`、再在单 dummy 链上拉扇入端跟廊、再恢复最短跨主臂身份、再把 dummy–real 分离改成 `edge_gap`，会打 D3 / 上游轴继承 / 把 n19 粘回去。廊墙是层内序，不是分离常数。下一刀是 P3 链块 / 源 hub 写列。
 - **dense 层整层 `node_gap` 取等**：投影在吃 slack。不要加宽 dummy，先查下降步。
+- **大件齐了还差十几折 / 一对交叉**：先读 [incomplete-policy](incomplete-policy.md)（PortLane / TrackOrder 政策是否写窄），不要第一刀去拧 `J` / Channel / Ink。
 - **穿组构造清零、label/loop reserve**：见 [roadmap](../roadmap.md)，不是再开一张 claimed 表。

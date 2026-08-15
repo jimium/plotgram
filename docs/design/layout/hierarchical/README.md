@@ -58,6 +58,7 @@ Sugiyama 骨架 + 三相写权（组合 → 度量 → Ink）。
 | **[expectations.md](expectations.md)** | **视觉期待**：用户看见什么 × 写者 × 冲突裁定 |
 | **[roadmap.md](roadmap.md)** | 现在能做什么 + 下一步缺口 |
 | [notes/anti-patterns.md](notes/anti-patterns.md) | 已否决路线 |
+| [notes/incomplete-policy.md](notes/incomplete-policy.md) | 大件齐了还差折 / 交叉时先读 |
 | [debug-profile.md](debug-profile.md) | Hier 的 DebugTrace **扩展剖面**（rank/dummy/…） |
 | [../debug-inspector.md](../debug-inspector.md) | **跨核**调试检视器信封 + UI 壳 |
 | [phases/](phases/README.md) | 各相契约 |
