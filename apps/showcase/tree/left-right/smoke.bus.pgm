@@ -1,0 +1,16 @@
+// 总线 placer：左右槽 + 末子朝下
+diagram {
+    title: "总线",
+    layout: tree { placer: bus }
+
+    node root "Root"
+    node a "A"
+    node b "B"
+    node c "C"
+    node d "D"
+
+    root -> a
+    root -> b
+    root -> c
+    root -> d
+}

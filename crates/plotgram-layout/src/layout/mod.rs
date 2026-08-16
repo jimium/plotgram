@@ -12,4 +12,4 @@ pub use hierarchical::{
     HierarchicalPreset, LayoutDebugTrace, Orientation, RoutingStyle,
 };
 pub use sequence::{SequenceLayout, SequenceParams, SequencePreset};
-pub use tree::{TreeLayout, TreeParams, TreePreset};
+pub use tree::{PlacerId, TreeLayout, TreeParams, TreePreset};

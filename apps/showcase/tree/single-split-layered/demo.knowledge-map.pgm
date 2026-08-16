@@ -1,0 +1,43 @@
+// AI/ML 知识树：mindmap 默认 single-split-layered
+diagram {
+    profile: mindmap,
+    title: "AI/ML 知识图谱"
+
+    node ai "人工智能"
+
+    node ml "机器学习"
+    node supervised "监督学习"
+    node unsupervised "无监督学习"
+    node reinforcement "强化学习"
+
+    node dl "深度学习"
+    node cnn "CNN"
+    node rnn "RNN"
+    node transformer "Transformer"
+    node llm "大语言模型"
+    node pretrain "预训练"
+    node finetune "微调"
+    node rag "RAG"
+    node agent "Agent"
+
+    node infra "基础设施"
+    node gpu "GPU 集群"
+    node vector_db "向量数据库"
+
+    ai -> ml
+    ml -> supervised
+    ml -> unsupervised
+    ml -> reinforcement
+    ai -> dl
+    dl -> cnn
+    dl -> rnn
+    dl -> transformer
+    transformer -> llm
+    llm -> pretrain
+    llm -> finetune
+    llm -> rag
+    llm -> agent
+    ai -> infra
+    infra -> gpu
+    infra -> vector_db
+}

@@ -96,6 +96,17 @@
 | **参考** | 15 §3 六步流水线 |
 | **模块** | [`src/path_ortho.rs`](src/path_ortho.rs) |
 
+### P3-2 · `buchheim` — 线性时间树放置（Buchheim–Jünger–Leipert）
+
+| | |
+|--|--|
+| **为何重要** | TreeLayout `single-layer` / `level-aligned` 的 x 写者；RT 五条美学 |
+| **独立性** | 孩子数组 + 节点宽 + sibling gap → 中心 x；不看 Graph / DSL |
+| **稳定 API 直觉** | `place(&BuchheimTree) -> Result<Vec<f64>, BuchheimError>` |
+| **验收** | 表驱动：单点 / 等宽二叉 / 不等宽 / 三叉 / 镜像 / 同构子树同形；双跑一致 |
+| **参考** | [`05-树与径向布局`](../../docs/reference/yfiles/05-树与径向布局.md) §1.3 |
+| **模块** | [`src/buchheim.rs`](src/buchheim.rs) |
+
 ### P3-1 · `linear_arrange` — 一维排列（MinLA + pin）
 
 | | |
@@ -106,7 +117,6 @@
 | **验收** | 表驱动：identity / greedy 拉近 / pin 不被 swap / 冲突 Infeasible；同输入双跑一致 |
 | **参考** | [`19-序列图与一维排列`](../../docs/reference/yfiles/19-序列图与一维排列.md) L2/L3 |
 | **模块** | [`src/linear_arrange.rs`](src/linear_arrange.rs) |
-
 
 ---
 
@@ -180,6 +190,7 @@ Week 焦点
 | `interval_color` | Channel 出拓扑后的 track 真源 |
 | `path_ortho` | Ink 只展开：规范化 + 降半径，不发明端口 |
 | `linear_arrange` | Sequence 生命线次轴：greedy/local；pin/before 硬约束 |
+| `buchheim` | Tree `single-layer` / `level-aligned` 的中心 x |
 
 更多叙事见 [`docs/design/layout/hierarchical/from-yfiles-reference.md`](../../docs/design/layout/hierarchical/from-yfiles-reference.md)。
 

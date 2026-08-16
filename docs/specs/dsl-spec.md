@@ -1036,7 +1036,7 @@ db -> api {
 | architecture | hierarchical | **None**（布局内建正交） | 禁止 |
 | state | hierarchical（默认）；环形作者写 `layout: circular` | **None**（依布局内建） | 可允许 |
 | sequence | sequence | **None**（布局自带边几何） | 禁止 |
-| mindmap | tree | **None**（依布局） | 禁止 |
+| mindmap | tree（默认 `placer: single-split-layered`，填空不覆盖） | **None**（依布局） | 禁止 |
 | er | circular 等 | **None**（依布局） | 禁止 |
 
 上表「自环」列仅当 diagram **显式**写了对应 `profile:` 时生效；未写 `profile` 时自环一律禁止（§4.2）。
@@ -1353,7 +1353,10 @@ node legacy { label: "ERP", shape: rounded_rect, variant: muted, icon: external 
 | `style.*` | 见 §14.9 | `active` | DSL 作者 | `apply_inline_node_styles` |
 | `lifeline_pin` | number（槽位 `0`…）或 atom `left` / `right` | `active` | DSL 作者 | Sequence Compose 生命线序；优化不得覆盖 |
 | `lifeline_before` | atom（另一参与者 id） | `active` | DSL 作者 | Sequence Compose：该生命线必须在指定 id 左侧 |
+| `subtree_placer` | atom（tree placer id，见 [tree/architecture §6.2](../design/layout/tree/architecture.md)） | `active` | DSL 作者 | Tree Compose：覆盖该局部根的 placer |
 | `circle` | atom（circular 分区 id，`[a-z][a-z0-9_]*`） | `active` | DSL 作者 | Circular Compose：同一 atom = 同一分区；未标节点回退 `bcc-compact`。**不要**写节点键 `partition:`（§10 保留字，图级 PartitionGrid） |
+| `assistant` | bool | `active` | DSL 作者 | Tree `assistant` / `compact`：该子走左右总线 |
+| `split_side` | atom：`primary` / `secondary`（别名 `left` / `right`） | `active` | DSL 作者 | Tree `single-split-*`：切开侧 |
 | `meta.*` | 任意 | — | DSL 作者 | 无（约定如此） |
 
 **已废弃**：`kind`；声明后缀 `: shape`；把位置 string 当作规范标签写法（仍允许为糖，见 §5.5）。

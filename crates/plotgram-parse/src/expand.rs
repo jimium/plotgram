@@ -56,9 +56,27 @@ impl DiagramMeta {
             None => (AlgorithmRef::new("hierarchical"), None),
         };
 
-        let layout = self.layout.clone().unwrap_or(default_layout);
+        let layout = match &self.layout {
+            Some(author) => fill_layout_options(author, &default_layout),
+            None => default_layout,
+        };
         let edge_routing = self.edge_routing.clone().or(default_routing);
         (layout, edge_routing, profile)
+    }
+}
+
+/// Default options fill empty keys only; author-written keys win.
+fn fill_layout_options(author: &AlgorithmRef, default: &AlgorithmRef) -> AlgorithmRef {
+    if author.name != default.name {
+        return author.clone();
+    }
+    let mut options = default.options.clone();
+    for (k, v) in &author.options {
+        options.insert(k.clone(), v.clone());
+    }
+    AlgorithmRef {
+        name: author.name.clone(),
+        options,
     }
 }
 
@@ -376,13 +394,15 @@ fn expand_archetypes_in_nodes(nodes: &mut [Node]) {
         // Fill variant (attrs)
         if !node.attrs.contains_key("variant") {
             if let Some(var) = def.variant {
-                node.attrs.insert("variant".to_string(), AttrValue::Atom(var.to_string()));
+                node.attrs
+                    .insert("variant".to_string(), AttrValue::Atom(var.to_string()));
             }
         }
         // Fill icon (attrs); explicit `icon: none` counts as "already set"
         if !node.attrs.contains_key("icon") {
             if let Some(icon) = def.icon {
-                node.attrs.insert("icon".to_string(), AttrValue::Atom(icon.to_string()));
+                node.attrs
+                    .insert("icon".to_string(), AttrValue::Atom(icon.to_string()));
             }
         }
     }
@@ -405,11 +425,13 @@ mod tests {
 
     #[test]
     fn group_frame_edge_expanded() {
-        let graph = parse_and_expand(r#"diagram {
+        let graph = parse_and_expand(
+            r#"diagram {
             group fe { node web {} }
             group be { node api {} }
             @fe -> @be { from_side: east, to_side: west }
-        }"#);
+        }"#,
+        );
 
         // Should have 1 edge at top level
         assert_eq!(graph.edges.len(), 1);
@@ -427,25 +449,33 @@ mod tests {
 
     #[test]
     fn anchor_reuse_same_group_side() {
-        let graph = parse_and_expand(r#"diagram {
+        let graph = parse_and_expand(
+            r#"diagram {
             group fe { node web {} }
             group be { node api {} node db {} }
             @fe -> @be { from_side: east, to_side: west }
             web -> @be { to_side: west }
-        }"#);
+        }"#,
+        );
 
         // Both edges targeting @be with to_side: west should share the same anchor
         let be = graph.groups.iter().find(|g| g.id == "be").unwrap();
         let anchor_count = be.nodes.iter().filter(|n| n.is_group_anchor()).count();
-        assert_eq!(anchor_count, 1, "anchors with same (group, side, slot) should be reused");
+        assert_eq!(
+            anchor_count, 1,
+            "anchors with same (group, side, slot) should be reused"
+        );
     }
 
     #[test]
     fn missing_side_error() {
-        let ast = parse_file(r#"diagram {
+        let ast = parse_file(
+            r#"diagram {
             group fe { node web {} }
             @fe -> web { to_side: north }
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
         let lowered = lower(&ast).unwrap();
         let mut graph = lowered.graph;
         let err = expand_group_frame_sugar(&mut graph, &lowered.pending_group_edges).unwrap_err();
@@ -454,11 +484,13 @@ mod tests {
 
     #[test]
     fn mixed_endpoint_node_and_group() {
-        let graph = parse_and_expand(r#"diagram {
+        let graph = parse_and_expand(
+            r#"diagram {
             group be { node api {} }
             node user {}
             user -> @be { to_side: north }
-        }"#);
+        }"#,
+        );
 
         assert_eq!(graph.edges.len(), 1);
         let edge = &graph.edges[0];
@@ -475,10 +507,13 @@ mod tests {
 
     #[test]
     fn validate_group_anchors_rejects_outside_host() {
-        let ast = parse_file(r#"diagram {
+        let ast = parse_file(
+            r#"diagram {
             group g { node x {} }
             node a { role: group_anchor, host_group: g, side: north }
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
         let lowered = lower(&ast).unwrap();
         let mut graph = lowered.graph;
         expand_group_frame_sugar(&mut graph, &lowered.pending_group_edges).unwrap();
@@ -518,6 +553,36 @@ mod tests {
         assert_eq!(profile, Some(DiagramType::Sequence));
     }
 
+    #[test]
+    fn resolve_algorithms_mindmap_fills_placer() {
+        let meta = DiagramMeta {
+            profile: Some(DiagramType::Mindmap),
+            ..Default::default()
+        };
+        let (layout, _, _) = meta.resolve_algorithms();
+        assert_eq!(layout.name, "tree");
+        assert_eq!(
+            layout.options.get("placer").and_then(|v| v.as_str()),
+            Some("single-split-layered")
+        );
+    }
+
+    #[test]
+    fn resolve_algorithms_mindmap_does_not_override_author_placer() {
+        let mut options = AttrMap::new();
+        options.insert("placer".into(), AttrValue::Atom("single-layer".into()));
+        let meta = DiagramMeta {
+            profile: Some(DiagramType::Mindmap),
+            layout: Some(AlgorithmRef::with_options("tree", options)),
+            ..Default::default()
+        };
+        let (layout, _, _) = meta.resolve_algorithms();
+        assert_eq!(
+            layout.options.get("placer").and_then(|v| v.as_str()),
+            Some("single-layer")
+        );
+    }
+
     // ── archetype expansion ──────────────────────────────────────────────
 
     fn parse_lift_and_archetype(source: &str) -> Graph {
@@ -532,12 +597,14 @@ mod tests {
 
     #[test]
     fn archetype_fills_shape_variant_icon() {
-        let graph = parse_lift_and_archetype(
-            r#"diagram { node db { label: "DB", archetype: database } }"#,
-        );
+        let graph =
+            parse_lift_and_archetype(r#"diagram { node db { label: "DB", archetype: database } }"#);
         let n = &graph.nodes[0];
         assert_eq!(n.shape, Some(plotgram_model::NodeShape::Cylinder));
-        assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("info"));
+        assert_eq!(
+            n.attrs.get("variant").and_then(|v| v.as_str()),
+            Some("info")
+        );
         // database has icon: None → no icon filled
         assert!(!n.attrs.contains_key("icon"));
     }
@@ -549,8 +616,14 @@ mod tests {
         );
         let n = &graph.nodes[0];
         assert_eq!(n.shape, Some(plotgram_model::NodeShape::RoundedRect));
-        assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("default"));
-        assert_eq!(n.attrs.get("icon").and_then(|v| v.as_str()), Some("service"));
+        assert_eq!(
+            n.attrs.get("variant").and_then(|v| v.as_str()),
+            Some("default")
+        );
+        assert_eq!(
+            n.attrs.get("icon").and_then(|v| v.as_str()),
+            Some("service")
+        );
     }
 
     #[test]
@@ -562,7 +635,10 @@ mod tests {
         // Explicit shape wins over archetype default
         assert_eq!(n.shape, Some(plotgram_model::NodeShape::RoundedRect));
         // variant still filled (not explicitly set)
-        assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("info"));
+        assert_eq!(
+            n.attrs.get("variant").and_then(|v| v.as_str()),
+            Some("info")
+        );
     }
 
     #[test]
@@ -571,14 +647,16 @@ mod tests {
             r#"diagram { node db { archetype: database, variant: primary } }"#,
         );
         let n = &graph.nodes[0];
-        assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("primary"));
+        assert_eq!(
+            n.attrs.get("variant").and_then(|v| v.as_str()),
+            Some("primary")
+        );
     }
 
     #[test]
     fn archetype_does_not_override_explicit_icon_none() {
-        let graph = parse_lift_and_archetype(
-            r#"diagram { node svc { archetype: service, icon: none } }"#,
-        );
+        let graph =
+            parse_lift_and_archetype(r#"diagram { node svc { archetype: service, icon: none } }"#);
         let n = &graph.nodes[0];
         // `icon: none` counts as "already set" — archetype must not overwrite
         assert_eq!(n.attrs.get("icon").and_then(|v| v.as_str()), Some("none"));
@@ -586,9 +664,7 @@ mod tests {
 
     #[test]
     fn archetype_unknown_name_no_error() {
-        let graph = parse_lift_and_archetype(
-            r#"diagram { node x { archetype: nonexistent } }"#,
-        );
+        let graph = parse_lift_and_archetype(r#"diagram { node x { archetype: nonexistent } }"#);
         let n = &graph.nodes[0];
         // No expansion, no error
         assert!(n.shape.is_none());
@@ -597,11 +673,13 @@ mod tests {
 
     #[test]
     fn archetype_in_group_nodes() {
-        let graph = parse_lift_and_archetype(r#"diagram {
+        let graph = parse_lift_and_archetype(
+            r#"diagram {
             group g {
                 node db { archetype: cache }
             }
-        }"#);
+        }"#,
+        );
         let n = &graph.groups[0].nodes[0];
         assert_eq!(n.shape, Some(plotgram_model::NodeShape::Cylinder));
         assert_eq!(n.attrs.get("icon").and_then(|v| v.as_str()), Some("cache"));
@@ -610,11 +688,13 @@ mod tests {
     #[test]
     fn archetype_skips_group_anchor() {
         // Anchors have no archetype attr normally, but ensure they're skipped
-        let graph = parse_lift_and_archetype(r#"diagram {
+        let graph = parse_lift_and_archetype(
+            r#"diagram {
             group fe { node web {} }
             node user {}
             user -> @fe { to_side: north }
-        }"#);
+        }"#,
+        );
         let fe = &graph.groups[0];
         let anchor = fe.nodes.iter().find(|n| n.is_group_anchor()).unwrap();
         assert!(anchor.shape.is_none());

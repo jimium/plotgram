@@ -1,23 +1,42 @@
-//! Tree layout skeleton: spanning forest + layered centered placer.
+//! Tree layout: spanning forest + ISubtreePlacer dispatch.
 //!
-//! Not Reingold–Tilford / Buchheim (those land with a real subtree placer).
-//! Core runs in canonical top-to-bottom space; orientation is a Stage wrap
-//! via [`plotgram_algo::orientation`]. Independent EdgeRouter is allowed.
+//! M1: Buchheim `single-layer`. M2: split / bus. M3: `double-layer` /
+//! `dendrogram` / `root_alignment` / `orthogonal-at-root`. M4: `assistant` /
+//! `compact` / `aspect-ratio`. M5: `radial` / `balloon`. DemandBoard raises
+//! `layer_gap` for `min_first_segment` and tree-edge labels before placers.
+//! Independent EdgeRouter is allowed (`DeferToRouter` leaves path empty).
 
 mod compose;
+mod demand;
 mod ink;
 mod metric;
 mod params;
 mod plan;
+mod verify;
 
-pub use params::{Orientation, TreeParams, TreePreset, TreeRoutingStyle};
+pub use params::{
+    Orientation, PlacerId, RootAlignment, SplitPolicy, TreeParams, TreePreset, TreeRoutingStyle,
+};
 
 use plotgram_algo::orientation as algo_orient;
-use plotgram_engine_api::{LayoutAlgorithm, LayoutError, LayoutInput, LayoutOutput, LayoutWarning};
+use plotgram_engine_api::{
+    EdgeGeometryMode, LayoutAlgorithm, LayoutError, LayoutInput, LayoutOutput, LayoutWarning,
+};
 use plotgram_model::diagnostics::LayoutDiagnostics;
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::port::{AlongSpec, PortRef, Side};
 use plotgram_model::result::{EdgePath, EdgePlacement, NodePlacement};
+
+pub(crate) fn tree_err(msg: impl Into<String>) -> LayoutError {
+    let m = msg.into();
+    if m.contains("invariant:") {
+        LayoutError::invariant(m)
+    } else if let Some(rest) = m.split_once("unsupported:") {
+        LayoutError::unsupported(rest.1.trim().to_string())
+    } else {
+        LayoutError::invalid_input(m)
+    }
+}
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TreeLayout;
@@ -49,20 +68,7 @@ fn compute(input: LayoutInput<'_>) -> Result<LayoutOutput, LayoutError> {
     };
 
     let plan = compose::compose(input.graph, params)?;
-    for id in &plan.nodes {
-        let is_root = plan.roots.iter().any(|r| r == id);
-        if is_root {
-            if plan.parent.contains_key(id) {
-                return Err(LayoutError::message(format!(
-                    "tree: invariant: root `{id}` has a parent"
-                )));
-            }
-        } else if !plan.parent.contains_key(id) {
-            return Err(LayoutError::message(format!(
-                "tree: invariant: non-root `{id}` has no parent"
-            )));
-        }
-    }
+    verify::verify_plan(&plan)?;
     if !plan.extra_edge_ids.is_empty() {
         diagnostics.warnings.push(LayoutWarning {
             message: format!(
@@ -71,13 +77,14 @@ fn compute(input: LayoutInput<'_>) -> Result<LayoutOutput, LayoutError> {
             ),
         });
     }
-    let canonical_frames = metric::assign(&plan, params, input.node_sizes)?;
-    let canonical_edges = ink::expand(
-        input.graph,
-        &plan,
-        &canonical_frames,
-        params,
-        input.edge_geometry,
+    let demand = demand::publish_floors(input.graph, &plan, params, input.node_sizes);
+    let metric = metric::assign(&plan, params, input.node_sizes, &demand)?;
+    verify::verify_metric(&plan, &metric, &demand)?;
+    let canonical_edges = ink::expand(input.graph, &plan, &metric, input.edge_geometry);
+    verify::verify_ink(
+        &canonical_edges,
+        &metric,
+        input.edge_geometry == EdgeGeometryMode::DeferToRouter,
     )?;
 
     let orientation = to_algo_orientation(params.orientation);
@@ -85,7 +92,7 @@ fn compute(input: LayoutInput<'_>) -> Result<LayoutOutput, LayoutError> {
         .nodes
         .iter()
         .filter_map(|id| {
-            let frame = canonical_frames.get(id)?;
+            let frame = metric.frames.get(id)?;
             Some(NodePlacement {
                 id: id.clone(),
                 frame: canonical_rect_to_physical(orientation, *frame),

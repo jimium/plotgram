@@ -1,0 +1,31 @@
+// 组织架构：助理走 left-right 总线，其余仍分层居中
+diagram {
+    title: "组织架构（助理）",
+    layout: tree {
+        placer: assistant,
+        orientation: top-to-bottom
+    }
+
+    node ceo "CEO"
+    node ea "行政助理" { assistant: true }
+    node cofs "幕僚长" { assistant: true }
+
+    node cto "CTO"
+    node cfo "CFO"
+    node coo "COO"
+
+    node platform "平台工程"
+    node ml "机器学习"
+    node finance "财务"
+    node ops "运营"
+
+    ceo -> ea
+    ceo -> cofs
+    ceo -> cto
+    ceo -> cfo
+    ceo -> coo
+    cto -> platform
+    cto -> ml
+    cfo -> finance
+    coo -> ops
+}

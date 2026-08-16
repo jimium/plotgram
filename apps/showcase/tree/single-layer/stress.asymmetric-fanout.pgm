@@ -1,0 +1,47 @@
+// 不对称扇出 + 一条深链：盯重叠与确定性（M0 美观可妥协）
+diagram {
+    title: "不对称扇出",
+    layout: tree { placer: layered }
+
+    node root "根"
+
+    node chain "深链"
+    node c1 "C1"
+    node c2 "C2"
+    node c3 "C3"
+    node c4 "C4"
+
+    node wide "宽扇出"
+    node w1 "W1"
+    node w2 "W2"
+    node w3 "W3"
+    node w4 "W4"
+    node w5 "W5"
+    node w6 "W6"
+
+    node mid "中等"
+    node m1 "M1"
+    node m1a "M1a"
+    node m1b "M1b"
+    node m2 "M2"
+
+    root -> chain
+    chain -> c1
+    c1 -> c2
+    c2 -> c3
+    c3 -> c4
+
+    root -> wide
+    wide -> w1
+    wide -> w2
+    wide -> w3
+    wide -> w4
+    wide -> w5
+    wide -> w6
+
+    root -> mid
+    mid -> m1
+    m1 -> m1a
+    m1 -> m1b
+    mid -> m2
+}

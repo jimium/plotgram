@@ -1,0 +1,29 @@
+// 宽扇出：按目标长宽比切行/列，根钉在左上角
+diagram {
+    title: "长宽比扇出",
+    layout: tree {
+        placer: aspect-ratio,
+        preferred_aspect_ratio: 1,
+        orientation: top-to-bottom
+    }
+
+    node mgr "经理"
+
+    node a "A"
+    node b "B"
+    node c "C"
+    node d "D"
+    node e "E"
+    node f "F"
+    node g "G"
+    node h "H"
+
+    mgr -> a
+    mgr -> b
+    mgr -> c
+    mgr -> d
+    mgr -> e
+    mgr -> f
+    mgr -> g
+    mgr -> h
+}

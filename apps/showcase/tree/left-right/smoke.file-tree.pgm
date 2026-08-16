@@ -1,0 +1,18 @@
+// 文件树：竖直总线（left-right），不是导图默认
+diagram {
+    title: "源码树",
+    layout: tree { placer: left-right }
+
+    node repo "repo"
+    node src "src"
+    node lib "lib.rs"
+    node tree "tree/"
+    node tests "tests"
+    node readme "README.md"
+
+    repo -> src
+    repo -> tests
+    repo -> readme
+    src -> lib
+    src -> tree
+}

@@ -37,8 +37,8 @@ hierarchical/flat/smoke.decision-loop.pgm
 └ layout ─┘ └facet┘ └role┘ └──── slug ────┘
 
 hierarchical/group-weak/product.cloud-native.pgm
-tree/plain/smoke.basic.pgm          # 将来；tree 自定 facet
-sequence/smoke.ping-pong.pgm     # 现行；无 facet
+tree/single-layer/smoke.root-branches.pgm   # 现行；facet = placer 族
+sequence/smoke.ping-pong.pgm                # 现行；无 facet
 ```
 
 - `layout` = 路径第一段  
@@ -59,12 +59,34 @@ manifest 写入 `layout` / `facet`（可 null）/ `role`；SVG 镜像源路径�
 | `group` | 有 group（含用 group 表达分区的旧「泳道」样例） | Weak 子集；StrongMacro 未实现 |
 | `partition` | 真 PartitionGrid（`partition { }` + `cell_col`/`cell_row`） | **空目录占位**；等 parse + 引擎 M5 |
 
-### 其它内核（毕业时再定，示例）
+### tree（facet = placer 族）
+
+对齐 yFiles：组织图 / mindmap / dendrogram 是同一 `layout: tree` 换 SubtreePlacer，**禁止**再建 `mindmap/` 图种目录。细则见 [`tree/README.md`](tree/README.md)。
+
+| facet | 含义 | 状态 |
+|-------|------|------|
+| `single-layer` | 默认 `SingleLayerSubtreePlacer`（子水平排、父居中） | **M1 Buchheim** |
+| `single-split-layered` | `SingleSplit` + 两侧 `LevelAligned` 对向旋转；**mindmap 主路径** | **M2** |
+| `left-right` | `LeftRight` / `Bus`：竖直总线 | **M2**；文件树 / 多直属 |
+| `double-layer` | 子分两行交错 + 水平总线 | **M3** |
+| `dendrogram` | 叶底对齐 | **M3** |
+| `assistant` | 标记子走左右总线，其余在下 | **M4** |
+| `compact` | 有界策略搜索，接近目标长宽比 | **M4** |
+| `aspect-ratio` | 按目标宽高比切行/列，根在左上角 | **M4** |
+| `radial` | `placer: radial`：同深度同心圆 | **M5** |
+| `balloon` | `placer: balloon`：子树圆盘绕父 | **M5** |
+| `mixed` | 节点级 `subtree_placer`（默认分层 + 局部总线） | 收口 |
+
+### sequence
+
+| 内核 | facet | 说明 |
+|------|-------|------|
+| sequence | （无；文件直接落在 `sequence/`） | M4 生命线 + 消息 + 组合片段框 |
+
+### 其它内核（毕业时再定）
 
 | 内核 | 建议 facet | 说明 |
 |------|------------|------|
-| tree | `plain` / `compound` | 通常无 PartitionGrid |
-| sequence | （无；文件直接落在 `sequence/`） | M4 生命线 + 消息 + 组合片段框 |
 | circular | `cycle` / `bcc` / `custom` | 单环 vs BCC vs 作者 `circle:`；**M3** |
 
 ---
@@ -78,8 +100,9 @@ showcase/
 │   ├── group/                # 有 group
 │   ├── partition/            # PartitionGrid 占位（可空）
 │   └── README.md             # hier facet 说明（可选短注）
-├── tree/                     # 将来
-├── sequence/                 # 现行；无 facet（M1 生命线 + 消息）
+├── tree/                     # 现行种子；facet = placer 族
+│   └── single-layer/         # 默认 SingleLayer；M1 起对齐 RT 美学
+├── sequence/                 # 现行；无 facet（M4 生命线 + 消息 + 片段）
 ├── circular/                 # M3：cycle/ 单环 + bcc/ 多环 + custom/ 作者分区
 │   ├── cycle/
 │   ├── bcc/
@@ -177,3 +200,5 @@ diagram {
 | 跨部门泳道 | `hierarchical/group-strong-macro/product.swimlane-order-process.pgm` | group-strong-macro |
 | yFiles 管道压测 | `hierarchical/flat/stress.layout-stress-yfiles-pipeline.pgm` | flat |
 | D2 对照 | `hierarchical/group-weak/product.d2-cell-tower-network.pgm` | group-weak |
+| 树冒烟三分支 | `tree/single-layer/smoke.root-branches.pgm` | single-layer |
+| 组织架构 | `tree/single-layer/product.org-chart.pgm` | single-layer |

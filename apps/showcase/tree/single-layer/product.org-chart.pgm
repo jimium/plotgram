@@ -1,0 +1,38 @@
+// 组织架构：yFiles TreeLayout 默认 SingleLayer 的典型域
+diagram {
+    title: "组织架构",
+    layout: tree {
+        placer: layered,
+        orientation: top-to-bottom
+    }
+
+    node ceo "CEO"
+
+    node cto "CTO"
+    node cfo "CFO"
+    node coo "COO"
+
+    node platform "平台工程"
+    node ml "机器学习"
+    node finance "财务"
+    node ops "运营"
+    node support "客户支持"
+
+    node gateway "网关"
+    node data "数据平台"
+    node recs "推荐"
+    node nlp "NLP"
+
+    ceo -> cto
+    ceo -> cfo
+    ceo -> coo
+    cto -> platform
+    cto -> ml
+    cfo -> finance
+    coo -> ops
+    coo -> support
+    platform -> gateway
+    platform -> data
+    ml -> recs
+    ml -> nlp
+}

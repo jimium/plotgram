@@ -1,0 +1,33 @@
+// 分类树：同深度同心圆（Eades radial）
+diagram {
+    title: "生物分类",
+    layout: tree {
+        placer: radial,
+        orientation: top-to-bottom
+    }
+
+    node life "生命"
+
+    node prokaryote "原核生物"
+    node eukaryote "真核生物"
+
+    node bacteria "细菌"
+    node archaea "古菌"
+
+    node plant "植物"
+    node animal "动物"
+
+    node angiosperm "被子植物"
+    node vertebrate "脊椎动物"
+    node arthropod "节肢动物"
+
+    life -> prokaryote
+    life -> eukaryote
+    prokaryote -> bacteria
+    prokaryote -> archaea
+    eukaryote -> plant
+    eukaryote -> animal
+    plant -> angiosperm
+    animal -> vertebrate
+    animal -> arthropod
+}

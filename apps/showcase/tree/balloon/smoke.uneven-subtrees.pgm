@@ -1,0 +1,25 @@
+// 不对称子树：大盘占更大圆心角（balloon）
+diagram {
+    title: "不对称泡泡",
+    layout: tree {
+        placer: balloon,
+        orientation: top-to-bottom
+    }
+
+    node root "根"
+
+    node a "A"
+    node a1 "A1"
+    node a2 "A2"
+    node a3 "A3"
+
+    node b "B"
+    node b1 "B1"
+
+    root -> a
+    a -> a1
+    a -> a2
+    a -> a3
+    root -> b
+    b -> b1
+}

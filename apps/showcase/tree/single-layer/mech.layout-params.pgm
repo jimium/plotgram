@@ -1,0 +1,23 @@
+// 机制探针：M0 已消费的 tree 参数（未知 placer 勿放本文件）
+diagram {
+    title: "tree params",
+    layout: tree {
+        placer: layered,
+        orientation: top-to-bottom,
+        preset: spacious,
+        routing_style: orthogonal,
+        node_gap: 32,
+        layer_gap: 48
+    }
+
+    node root "根"
+    node a "A"
+    node b "B"
+    node a1 "A1"
+    node a2 "A2"
+
+    root -> a
+    root -> b
+    a -> a1
+    a -> a2
+}

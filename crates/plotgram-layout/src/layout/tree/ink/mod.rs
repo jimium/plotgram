@@ -1,45 +1,41 @@
-//! Ink: expand tree / extra edges. Orthogonal 3-segment or straight.
+//! Ink: expand TreeRoute skeletons. Zero new decisions.
 
-use std::collections::{BTreeMap, BTreeSet};
-
-use plotgram_engine_api::{EdgeGeometryMode, LayoutError};
-use plotgram_model::geometry::{Point, Rect};
+use plotgram_engine_api::EdgeGeometryMode;
+use plotgram_model::geometry::Point;
 use plotgram_model::graph::Graph;
 use plotgram_model::port::{AlongSpec, PortRef, Side};
 use plotgram_model::result::{EdgePath, EdgePlacement};
 
-use super::params::{TreeParams, TreeRoutingStyle};
+use super::metric::TreeMetric;
 use super::plan::TreePlan;
 
 pub fn expand(
     graph: &Graph,
-    plan: &TreePlan,
-    frames: &BTreeMap<String, Rect>,
-    params: &TreeParams,
+    _plan: &TreePlan,
+    metric: &TreeMetric,
     mode: EdgeGeometryMode,
-) -> Result<Vec<EdgePlacement>, LayoutError> {
-    let tree_set: BTreeSet<&str> = plan.tree_edge_ids.iter().map(|s| s.as_str()).collect();
+) -> Vec<EdgePlacement> {
     let mut out = Vec::new();
     for edge in graph.edges_in_declaration_order() {
-        let Some(src) = frames.get(&edge.source) else {
+        let Some(src) = metric.frames.get(&edge.source) else {
             continue;
         };
-        let Some(tgt) = frames.get(&edge.target) else {
+        let Some(tgt) = metric.frames.get(&edge.target) else {
             continue;
         };
-        let from_port = PortRef {
-            side: Side::South,
-            along: AlongSpec::Ordered { order: 0, count: 1 },
-        };
-        let to_port = PortRef {
-            side: Side::North,
-            along: AlongSpec::Ordered { order: 0, count: 1 },
-        };
-        let path = if mode == EdgeGeometryMode::DeferToRouter {
-            EdgePath::polyline(Vec::new())
-        } else if tree_set.contains(edge.id.as_str())
-            && matches!(params.routing_style, TreeRoutingStyle::Orthogonal)
-        {
+        let (path, from_port, to_port) = if let Some(route) = metric.routes.get(&edge.id) {
+            let from = side_of(route.start(), src.center());
+            let to = side_of(route.end(), tgt.center());
+            let path = if mode == EdgeGeometryMode::DeferToRouter {
+                EdgePath::polyline(Vec::new())
+            } else {
+                EdgePath::polyline(route.points())
+            };
+            (path, Some(port(from)), Some(port(to)))
+        } else if mode == EdgeGeometryMode::DeferToRouter {
+            (EdgePath::polyline(Vec::new()), None, None)
+        } else {
+            // Extra (non-tree) edges have no TreeRoute; straight between frames.
             let a = Point {
                 x: src.center().x,
                 y: src.bottom(),
@@ -48,33 +44,43 @@ pub fn expand(
                 x: tgt.center().x,
                 y: tgt.y,
             };
-            let mid_y = (a.y + b.y) / 2.0;
-            EdgePath::polyline(vec![
-                a,
-                Point { x: a.x, y: mid_y },
-                Point { x: b.x, y: mid_y },
-                b,
-            ])
-        } else {
-            EdgePath::polyline(vec![
-                Point {
-                    x: src.center().x,
-                    y: src.bottom(),
-                },
-                Point {
-                    x: tgt.center().x,
-                    y: tgt.y,
-                },
-            ])
+            (
+                EdgePath::polyline(vec![a, b]),
+                Some(port(Side::South)),
+                Some(port(Side::North)),
+            )
         };
         out.push(EdgePlacement {
             id: edge.id.clone(),
             source: edge.source.clone(),
             target: edge.target.clone(),
             path,
-            from_port: Some(from_port),
-            to_port: Some(to_port),
+            from_port,
+            to_port,
         });
     }
-    Ok(out)
+    out
+}
+
+fn port(side: Side) -> PortRef {
+    PortRef {
+        side,
+        along: AlongSpec::Ordered { order: 0, count: 1 },
+    }
+}
+
+fn side_of(p: Point, center: Point) -> Side {
+    let dx = p.x - center.x;
+    let dy = p.y - center.y;
+    if dx.abs() >= dy.abs() {
+        if dx >= 0.0 {
+            Side::East
+        } else {
+            Side::West
+        }
+    } else if dy >= 0.0 {
+        Side::South
+    } else {
+        Side::North
+    }
 }

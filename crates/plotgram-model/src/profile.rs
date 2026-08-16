@@ -7,6 +7,7 @@
 //! A future engine algorithm registry may override names/options; it still must not take
 //! [`DiagramType`] (profile id) as an input.
 
+use crate::attr::{AttrMap, AttrValue};
 use crate::contract::AlgorithmRef;
 
 /// Closed set of DSL `profile:` atoms (dsl-spec §1.2).
@@ -106,12 +107,19 @@ impl Profile {
                 // Sequence `A -> A` is a SelfCall message, not a generic loop.
                 allow_self_loop: true,
             },
-            DiagramType::Mindmap => Self {
-                diagram_type: dt,
-                default_layout: AlgorithmRef::new("tree"),
-                default_edge_routing: None,
-                allow_self_loop: false,
-            },
+            DiagramType::Mindmap => {
+                let mut options = AttrMap::new();
+                options.insert(
+                    "placer".into(),
+                    AttrValue::Atom("single-split-layered".into()),
+                );
+                Self {
+                    diagram_type: dt,
+                    default_layout: AlgorithmRef::with_options("tree", options),
+                    default_edge_routing: None,
+                    allow_self_loop: false,
+                }
+            }
             DiagramType::Er => Self {
                 diagram_type: dt,
                 default_layout: AlgorithmRef::new("circular"),

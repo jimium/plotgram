@@ -15,6 +15,7 @@
 #![forbid(unsafe_code)]
 
 pub mod bcc;
+pub mod buchheim;
 pub mod crossing;
 pub mod fas;
 pub mod fiedler;

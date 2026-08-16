@@ -31,7 +31,7 @@
 | 内核 | 注册名（目标） | 一句话 | 文档 | 代码（重建） |
 |------|----------------|--------|------|----------------|
 | Hierarchical | `hierarchical` | 有向分层；主核 | [hierarchical/](hierarchical/) | `plotgram-layout` → `layout/hierarchical` |
-| Tree | `tree` | 树形递归放置 | [tree/](tree/) | `plotgram-layout` → `layout/tree`（骨架：层式居中放置器） |
+| Tree | `tree` | 树形递归放置（SubtreePlacer） | [tree/](tree/) · [架构](tree/architecture.md) | `plotgram-layout` → `layout/tree`（M1–M5 + DemandBoard） |
 | Sequence | `sequence` | 参与者轴 + 消息时间序；Builtin 边 | [sequence/](sequence/) · [架构](sequence/architecture.md) | `plotgram-layout` → `layout/sequence`（M4） |
 | Circular | `circular` | 圆环 / BCC 多环 | [circular/](circular/) · [架构](circular/architecture.md) · [后置](circular/deferred.md) | **M3** 节点 `circle` 自定义分区 |
 
@@ -52,7 +52,8 @@
 
 ```text
 flowchart / architecture / state(分层)  → hierarchical（不同 profile）
-mindmap                                 → tree
+mindmap                                 → tree（默认 placer 目标：single-split-layered）
+组织树 / 目录树                         → tree（默认 placer：single-layer）
 sequence                                → sequence
 state(环形)                             → circular
 ```
@@ -66,5 +67,6 @@ state(环形)                             → circular
 1. 先读 [写权纪律](write-authority.md)。
 2. 做 Hier：本目录 [hierarchical/](hierarchical/) → **架构** [architecture](hierarchical/architecture.md) → [相级契约](hierarchical/phases/README.md) → [anti-patterns](hierarchical/notes/anti-patterns.md) → 启发纪要 [from-yfiles-reference](hierarchical/nodes/from-yfiles-reference.md) → reference [01](../../reference/yfiles/01-sugiyama分层布局.md) / [13](../../reference/yfiles/13-实现路线图与选型.md)。
 3. 做独立正交路由： [routing/](../routing/) → [orthogonal/](../routing/orthogonal/) → [architecture](../routing/orthogonal/architecture.md) → reference [03](../../reference/yfiles/03-正交边路由.md)。可手写 `RouteScene` 夹具，不经布局核。
-4. 做 Circular：本目录 [circular/](circular/) → **架构** [architecture](circular/architecture.md) → [分区/圈序](circular/phases/partition-and-order.md) · [骨架/Ink](circular/phases/backbone-and-ink.md) → [vs-reference](circular/vs-reference.md) → [后置](circular/deferred.md) → reference [05 §4](../../reference/yfiles/05-树与径向布局.md) / [14](../../reference/yfiles/14-图论与优化工具箱.md)。径向树仍是 Tree placer，不是第二注册名。
-5. 回溯 Atlas 决策动机时再翻 `docs/archive/atlas/`（21 立场 → 22 总纲）。
+4. 做 Tree：本目录 [tree/](tree/) → **架构** [architecture](tree/architecture.md) → [placer 契约](tree/phases/subtree-placer.md) → [vs-reference](tree/vs-reference.md) → reference [05](../../reference/yfiles/05-树与径向布局.md)。组织图与 mindmap 都是 `layout: tree` 换 placer，不是两个核。
+5. 做 Circular：本目录 [circular/](circular/) → **架构** [architecture](circular/architecture.md) → [分区/圈序](circular/phases/partition-and-order.md) · [骨架/Ink](circular/phases/backbone-and-ink.md) → [vs-reference](circular/vs-reference.md) → reference [05 §4](../../reference/yfiles/05-树与径向布局.md) / [14](../../reference/yfiles/14-图论与优化工具箱.md)。径向树仍是 Tree placer，不是第二注册名。
+6. 回溯 Atlas 决策动机时再翻 `docs/archive/atlas/`（21 立场 → 22 总纲）。

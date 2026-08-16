@@ -1,0 +1,18 @@
+// 机制探针：root_alignment leading（父钉在最左子）
+diagram {
+    title: "root alignment leading",
+    layout: tree {
+        placer: layered,
+        root_alignment: leading,
+        orientation: top-to-bottom
+    }
+
+    node root "根"
+    node a "A"
+    node b "B"
+    node c "C"
+
+    root -> a
+    root -> b
+    root -> c
+}

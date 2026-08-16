@@ -167,7 +167,7 @@ mod tests {
     use super::*;
     use plotgram_model::attr::{AttrMap, AttrValue};
     use plotgram_model::contract::AlgorithmRef;
-    use plotgram_model::geometry::{Point, Size};
+    use plotgram_model::geometry::{Point, Rect, Size};
     use plotgram_model::graph::{Arrow, Edge, Graph, Node, NodeRole};
     use plotgram_model::result::Decoration;
     use plotgram_model::sizes::NodeSizes;
@@ -224,6 +224,16 @@ mod tests {
             s.insert(*id, Size::new(60.0, 30.0));
         }
         s
+    }
+
+    fn tree_options(pairs: &[(&str, AttrValue)]) -> AlgorithmRef {
+        AlgorithmRef::with_options(
+            "tree",
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect(),
+        )
     }
 
     fn seq_options(pairs: &[(&str, AttrValue)]) -> AlgorithmRef {
@@ -863,8 +873,633 @@ mod tests {
         let frame = |id: &str| result.nodes.iter().find(|n| n.id == id).unwrap().frame;
         assert!(frame("root").bottom() <= frame("l").y + 1e-6);
         assert!(frame("l").x < frame("r").x);
+        let mid = (frame("l").center().x + frame("r").center().x) / 2.0;
+        assert!(
+            (frame("root").center().x - mid).abs() < 1e-6,
+            "parent should be centered over children, root={} mid={}",
+            frame("root").center().x,
+            mid
+        );
         assert_eq!(result.edges.len(), 2);
         assert!(result.edges[0].path.polyline_points().unwrap().len() >= 2);
+    }
+
+    #[test]
+    fn tree_split_layered_opens_left_and_right() {
+        let graph = Graph {
+            nodes: vec![node("root"), node("l"), node("r")],
+            edges: vec![edge("e0", "root", "l"), edge("e1", "root", "r")],
+            groups: vec![],
+            partition: None,
+        };
+        let mut options = AttrMap::new();
+        options.insert(
+            "placer".into(),
+            AttrValue::Atom("single-split-layered".into()),
+        );
+        let result = run(&LayoutContract {
+            layout: AlgorithmRef::with_options("tree", options),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["root", "l", "r"]),
+        })
+        .unwrap();
+        let frame = |id: &str| result.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        assert!(
+            frame("l").right() <= frame("root").x + 1e-6,
+            "primary child should sit to the left, l={:?} root={:?}",
+            frame("l"),
+            frame("root")
+        );
+        assert!(
+            frame("r").x + 1e-6 >= frame("root").right(),
+            "secondary child should sit to the right, r={:?} root={:?}",
+            frame("r"),
+            frame("root")
+        );
+    }
+
+    #[test]
+    fn tree_named_unimplemented_placer_is_unsupported() {
+        let cases = ["single-split", "multi-layer", "fixed"];
+        for name in cases {
+            let graph = Graph {
+                nodes: vec![node("root"), node("a")],
+                edges: vec![edge("e0", "root", "a")],
+                groups: vec![],
+                partition: None,
+            };
+            let err = run(&LayoutContract {
+                layout: tree_options(&[("placer", AttrValue::Atom(name.into()))]),
+                edge_routing: None,
+                graph,
+                node_sizes: sizes(&["root", "a"]),
+            })
+            .unwrap_err();
+            assert!(
+                matches!(err, LayoutError::Unsupported { .. }),
+                "placer `{name}` must be Unsupported, got {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn tree_dendrogram_aligns_leaf_bottoms() {
+        let graph = Graph {
+            nodes: vec![node("root"), node("a"), node("b"), node("c")],
+            edges: vec![
+                edge("e0", "root", "a"),
+                edge("e1", "root", "b"),
+                edge("e2", "b", "c"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let result = run(&LayoutContract {
+            layout: tree_options(&[("placer", AttrValue::Atom("dendrogram".into()))]),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["root", "a", "b", "c"]),
+        })
+        .unwrap();
+        let frame = |id: &str| result.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        assert!(
+            (frame("a").bottom() - frame("c").bottom()).abs() < 1e-6,
+            "leaves should share a baseline, a={} c={}",
+            frame("a").bottom(),
+            frame("c").bottom()
+        );
+        assert!(frame("b").bottom() <= frame("c").y + 1e-6);
+        assert!(frame("root").bottom() <= frame("b").y + 1e-6);
+    }
+
+    #[test]
+    fn tree_double_layer_is_narrower_than_single_layer() {
+        let ids = ["root", "a", "b", "c", "d", "e", "f"];
+        let graph = Graph {
+            nodes: ids.iter().copied().map(node).collect(),
+            edges: vec![
+                edge("e0", "root", "a"),
+                edge("e1", "root", "b"),
+                edge("e2", "root", "c"),
+                edge("e3", "root", "d"),
+                edge("e4", "root", "e"),
+                edge("e5", "root", "f"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let span = |placer: &str| {
+            let result = run(&LayoutContract {
+                layout: tree_options(&[("placer", AttrValue::Atom(placer.into()))]),
+                edge_routing: None,
+                graph: graph.clone(),
+                node_sizes: sizes(&ids),
+            })
+            .unwrap();
+            let min_x = result
+                .nodes
+                .iter()
+                .map(|n| n.frame.x)
+                .fold(f64::INFINITY, f64::min);
+            let max_r = result
+                .nodes
+                .iter()
+                .map(|n| n.frame.right())
+                .fold(f64::NEG_INFINITY, f64::max);
+            max_r - min_x
+        };
+        let single = span("single-layer");
+        let double = span("double-layer");
+        assert!(
+            double + 1.0 < single,
+            "double-layer should be narrower, single={single} double={double}"
+        );
+    }
+
+    #[test]
+    fn tree_root_alignment_leading_pins_parent_to_left_child() {
+        let graph = Graph {
+            nodes: vec![node("root"), node("l"), node("m"), node("r")],
+            edges: vec![
+                edge("e0", "root", "l"),
+                edge("e1", "root", "m"),
+                edge("e2", "root", "r"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let result = run(&LayoutContract {
+            layout: tree_options(&[("root_alignment", AttrValue::Atom("leading".into()))]),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["root", "l", "m", "r"]),
+        })
+        .unwrap();
+        let frame = |id: &str| result.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        assert!(
+            (frame("root").x - frame("l").x).abs() < 1e-6,
+            "leading parent.x should match leftmost child, root={} l={}",
+            frame("root").x,
+            frame("l").x
+        );
+        let mid = (frame("l").center().x + frame("r").center().x) / 2.0;
+        assert!(
+            (frame("root").center().x - mid).abs() > 1.0,
+            "leading must not keep the Buchheim center"
+        );
+    }
+
+    #[test]
+    fn tree_orthogonal_at_root_drops_vertically_first() {
+        let graph = Graph {
+            nodes: vec![node("root"), node("l"), node("r")],
+            edges: vec![edge("e0", "root", "l"), edge("e1", "root", "r")],
+            groups: vec![],
+            partition: None,
+        };
+        let result = run(&LayoutContract {
+            layout: tree_options(&[(
+                "routing_style",
+                AttrValue::Atom("orthogonal-at-root".into()),
+            )]),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["root", "l", "r"]),
+        })
+        .unwrap();
+        for e in &result.edges {
+            let pts = e.path.polyline_points().unwrap();
+            assert!(
+                pts.len() >= 3,
+                "orthogonal-at-root should bend, got {pts:?}"
+            );
+            assert!(
+                (pts[0].x - pts[1].x).abs() < 1e-6,
+                "first segment should be vertical, got {pts:?}"
+            );
+            assert!(
+                pts[1].y > pts[0].y + 1e-6,
+                "first segment should drop from the parent, got {pts:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn tree_assistant_sits_beside_bus_regulars_below() {
+        let graph = Graph {
+            nodes: vec![
+                node("root"),
+                node_attr("asst", "assistant", AttrValue::Bool(true)),
+                node("a"),
+                node("b"),
+            ],
+            edges: vec![
+                edge("e0", "root", "asst"),
+                edge("e1", "root", "a"),
+                edge("e2", "root", "b"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let result = run(&LayoutContract {
+            layout: tree_options(&[("placer", AttrValue::Atom("assistant".into()))]),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["root", "asst", "a", "b"]),
+        })
+        .unwrap();
+        let frame = |id: &str| result.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        assert!(
+            frame("asst").right() <= frame("root").center().x + 1e-6,
+            "first assistant should sit on the left bus, asst={:?} root={:?}",
+            frame("asst"),
+            frame("root")
+        );
+        assert!(
+            frame("a").y + 1e-6 >= frame("asst").bottom(),
+            "regular children should sit below assistants, a={:?} asst={:?}",
+            frame("a"),
+            frame("asst")
+        );
+        assert!(frame("a").x < frame("b").x);
+        let mid = (frame("a").center().x + frame("b").center().x) / 2.0;
+        assert!(
+            (frame("root").center().x - mid).abs() < 1.0,
+            "regulars should be centered under the parent"
+        );
+    }
+
+    #[test]
+    fn tree_assistant_without_flags_behaves_like_single_layer() {
+        let graph = Graph {
+            nodes: vec![node("root"), node("l"), node("r")],
+            edges: vec![edge("e0", "root", "l"), edge("e1", "root", "r")],
+            groups: vec![],
+            partition: None,
+        };
+        let result = run(&LayoutContract {
+            layout: tree_options(&[("placer", AttrValue::Atom("assistant".into()))]),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["root", "l", "r"]),
+        })
+        .unwrap();
+        let frame = |id: &str| result.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        let mid = (frame("l").center().x + frame("r").center().x) / 2.0;
+        assert!(
+            (frame("root").center().x - mid).abs() < 1e-6,
+            "barren assistant should stamp to single-layer"
+        );
+    }
+
+    #[test]
+    fn tree_compact_area_beats_single_layer_fanout() {
+        let ids = ["root", "a", "b", "c", "d", "e", "f"];
+        let graph = Graph {
+            nodes: ids.iter().copied().map(node).collect(),
+            edges: vec![
+                edge("e0", "root", "a"),
+                edge("e1", "root", "b"),
+                edge("e2", "root", "c"),
+                edge("e3", "root", "d"),
+                edge("e4", "root", "e"),
+                edge("e5", "root", "f"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let area = |placer: &str| {
+            let result = run(&LayoutContract {
+                layout: tree_options(&[("placer", AttrValue::Atom(placer.into()))]),
+                edge_routing: None,
+                graph: graph.clone(),
+                node_sizes: sizes(&ids),
+            })
+            .unwrap();
+            let min_x = result
+                .nodes
+                .iter()
+                .map(|n| n.frame.x)
+                .fold(f64::INFINITY, f64::min);
+            let min_y = result
+                .nodes
+                .iter()
+                .map(|n| n.frame.y)
+                .fold(f64::INFINITY, f64::min);
+            let max_r = result
+                .nodes
+                .iter()
+                .map(|n| n.frame.right())
+                .fold(f64::NEG_INFINITY, f64::max);
+            let max_b = result
+                .nodes
+                .iter()
+                .map(|n| n.frame.bottom())
+                .fold(f64::NEG_INFINITY, f64::max);
+            (max_r - min_x) * (max_b - min_y)
+        };
+        let single = area("single-layer");
+        let compact = area("compact");
+        assert!(
+            compact + 1.0 < single,
+            "compact should reduce area, single={single} compact={compact}"
+        );
+    }
+
+    #[test]
+    fn tree_aspect_ratio_pins_parent_to_corner_and_tracks_ratio() {
+        let ids = ["root", "a", "b", "c", "d", "e", "f"];
+        let graph = Graph {
+            nodes: ids.iter().copied().map(node).collect(),
+            edges: vec![
+                edge("e0", "root", "a"),
+                edge("e1", "root", "b"),
+                edge("e2", "root", "c"),
+                edge("e3", "root", "d"),
+                edge("e4", "root", "e"),
+                edge("e5", "root", "f"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let layout = |ratio: f64| {
+            run(&LayoutContract {
+                layout: tree_options(&[
+                    ("placer", AttrValue::Atom("aspect-ratio".into())),
+                    ("preferred_aspect_ratio", AttrValue::Num(ratio)),
+                ]),
+                edge_routing: None,
+                graph: graph.clone(),
+                node_sizes: sizes(&ids),
+            })
+            .unwrap()
+        };
+        let wide = layout(2.0);
+        let tall = layout(0.5);
+        let frame =
+            |res: &LayoutResult, id: &str| res.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        let min_child_x = ["a", "b", "c", "d", "e", "f"]
+            .iter()
+            .map(|id| frame(&wide, id).x)
+            .fold(f64::INFINITY, f64::min);
+        assert!(
+            (frame(&wide, "root").x - min_child_x).abs() < 1e-6,
+            "aspect-ratio root stays in the top-left corner"
+        );
+        let mid = (frame(&wide, "a").center().x + frame(&wide, "f").center().x) / 2.0;
+        assert!(
+            (frame(&wide, "root").center().x - mid).abs() > 1.0,
+            "corner placement must not center the parent"
+        );
+        let span = |res: &LayoutResult| {
+            let min_x = res
+                .nodes
+                .iter()
+                .map(|n| n.frame.x)
+                .fold(f64::INFINITY, f64::min);
+            let min_y = res
+                .nodes
+                .iter()
+                .map(|n| n.frame.y)
+                .fold(f64::INFINITY, f64::min);
+            let max_r = res
+                .nodes
+                .iter()
+                .map(|n| n.frame.right())
+                .fold(f64::NEG_INFINITY, f64::max);
+            let max_b = res
+                .nodes
+                .iter()
+                .map(|n| n.frame.bottom())
+                .fold(f64::NEG_INFINITY, f64::max);
+            (max_r - min_x, max_b - min_y)
+        };
+        let (ww, wh) = span(&wide);
+        let (tw, th) = span(&tall);
+        assert!(
+            ww / wh > tw / th + 0.1,
+            "ratio 2 should be wider than ratio 0.5, wide={ww}x{wh} tall={tw}x{th}"
+        );
+    }
+
+    fn center_dist(a: &Rect, b: &Rect) -> f64 {
+        let ca = a.center();
+        let cb = b.center();
+        ((ca.x - cb.x).powi(2) + (ca.y - cb.y).powi(2)).sqrt()
+    }
+
+    #[test]
+    fn tree_radial_same_depth_shares_radius() {
+        let graph = Graph {
+            nodes: vec![node("root"), node("a"), node("a1"), node("b"), node("b1")],
+            edges: vec![
+                edge("e0", "root", "a"),
+                edge("e1", "a", "a1"),
+                edge("e2", "root", "b"),
+                edge("e3", "b", "b1"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let result = run(&LayoutContract {
+            layout: tree_options(&[("placer", AttrValue::Atom("radial".into()))]),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["root", "a", "a1", "b", "b1"]),
+        })
+        .unwrap();
+        let frame = |id: &str| result.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        let d_a = center_dist(&frame("root"), &frame("a"));
+        let d_b = center_dist(&frame("root"), &frame("b"));
+        let d_a1 = center_dist(&frame("root"), &frame("a1"));
+        let d_b1 = center_dist(&frame("root"), &frame("b1"));
+        assert!(
+            (d_a - d_b).abs() < 1e-6,
+            "same-depth children should share a radius, a={d_a} b={d_b}"
+        );
+        assert!(
+            (d_a1 - d_b1).abs() < 1e-6,
+            "same-depth grandchildren should share a radius, a1={d_a1} b1={d_b1}"
+        );
+        assert!(
+            d_a1 > d_a + 1.0,
+            "grandchild should sit on a farther ring, a={d_a} a1={d_a1}"
+        );
+    }
+
+    #[test]
+    fn tree_balloon_packs_children_around_parent() {
+        let graph = Graph {
+            nodes: vec![
+                node("root"),
+                node("a"),
+                node("a1"),
+                node("a2"),
+                node("a3"),
+                node("b"),
+                node("b1"),
+            ],
+            edges: vec![
+                edge("e0", "root", "a"),
+                edge("e1", "a", "a1"),
+                edge("e2", "a", "a2"),
+                edge("e3", "a", "a3"),
+                edge("e4", "root", "b"),
+                edge("e5", "b", "b1"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let balloon = run(&LayoutContract {
+            layout: tree_options(&[("placer", AttrValue::Atom("balloon".into()))]),
+            edge_routing: None,
+            graph: graph.clone(),
+            node_sizes: sizes(&["root", "a", "a1", "a2", "a3", "b", "b1"]),
+        })
+        .unwrap();
+        let radial = run(&LayoutContract {
+            layout: tree_options(&[("placer", AttrValue::Atom("radial".into()))]),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["root", "a", "a1", "a2", "a3", "b", "b1"]),
+        })
+        .unwrap();
+        let frame =
+            |res: &LayoutResult, id: &str| res.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        let ba = frame(&balloon, "a");
+        let d_a1 = center_dist(&ba, &frame(&balloon, "a1"));
+        let d_a2 = center_dist(&ba, &frame(&balloon, "a2"));
+        let d_a3 = center_dist(&ba, &frame(&balloon, "a3"));
+        assert!(
+            (d_a1 - d_a2).abs() < 1e-6 && (d_a1 - d_a3).abs() < 1e-6,
+            "balloon children should share a ring around their parent, {d_a1} {d_a2} {d_a3}"
+        );
+        assert!(
+            (center_dist(&frame(&balloon, "root"), &ba)
+                - center_dist(&frame(&balloon, "root"), &frame(&balloon, "b")))
+            .abs()
+                < 1e-6,
+            "balloon siblings of the root sit on one ring"
+        );
+        let br = frame(&balloon, "root");
+        let balloon_from_root = [
+            center_dist(&br, &frame(&balloon, "a1")),
+            center_dist(&br, &frame(&balloon, "a2")),
+            center_dist(&br, &frame(&balloon, "a3")),
+        ];
+        let balloon_spread = balloon_from_root.iter().copied().fold(0.0, f64::max)
+            - balloon_from_root
+                .iter()
+                .copied()
+                .fold(f64::INFINITY, f64::min);
+        assert!(
+            balloon_spread > 1.0,
+            "balloon grandchildren orbit their parent, not the global root, spread={balloon_spread}"
+        );
+        let rr = frame(&radial, "root");
+        let radial_from_root = [
+            center_dist(&rr, &frame(&radial, "a1")),
+            center_dist(&rr, &frame(&radial, "a2")),
+            center_dist(&rr, &frame(&radial, "a3")),
+            center_dist(&rr, &frame(&radial, "b1")),
+        ];
+        let radial_spread = radial_from_root.iter().copied().fold(0.0, f64::max)
+            - radial_from_root
+                .iter()
+                .copied()
+                .fold(f64::INFINITY, f64::min);
+        assert!(
+            radial_spread < 1e-6,
+            "radial same-depth nodes stay concentric, spread={radial_spread}"
+        );
+    }
+
+    #[test]
+    fn tree_mixed_subtree_placer_uses_left_right_locally() {
+        let graph = Graph {
+            nodes: vec![
+                node("root"),
+                node_attr("a", "subtree_placer", AttrValue::Atom("left-right".into())),
+                node("a1"),
+                node("a2"),
+                node("a3"),
+                node("b"),
+                node("b1"),
+                node("b2"),
+                node("b3"),
+            ],
+            edges: vec![
+                edge("e0", "root", "a"),
+                edge("e1", "a", "a1"),
+                edge("e2", "a", "a2"),
+                edge("e3", "a", "a3"),
+                edge("e4", "root", "b"),
+                edge("e5", "b", "b1"),
+                edge("e6", "b", "b2"),
+                edge("e7", "b", "b3"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let result = run(&LayoutContract {
+            layout: tree_options(&[("placer", AttrValue::Atom("single-layer".into()))]),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["root", "a", "a1", "a2", "a3", "b", "b1", "b2", "b3"]),
+        })
+        .unwrap();
+        let frame = |id: &str| result.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        assert!(
+            frame("a1").right() <= frame("a").center().x + 1e-6,
+            "left-right first child sits left of the bus, a1={:?} a={:?}",
+            frame("a1"),
+            frame("a")
+        );
+        assert!(
+            frame("a2").x + 1e-6 >= frame("a").center().x,
+            "left-right second child sits right of the bus, a2={:?} a={:?}",
+            frame("a2"),
+            frame("a")
+        );
+        assert!(
+            frame("a3").y + 1e-6 >= frame("a1").bottom(),
+            "left-right stacks extra left-slot children, a3={:?} a1={:?}",
+            frame("a3"),
+            frame("a1")
+        );
+        assert!(
+            (frame("b1").y - frame("b2").y).abs() < 1e-6
+                && (frame("b1").y - frame("b3").y).abs() < 1e-6,
+            "default single-layer keeps siblings on one row"
+        );
+        assert!(frame("b1").x < frame("b2").x && frame("b2").x < frame("b3").x);
+    }
+
+    #[test]
+    fn tree_demand_raises_layer_gap_for_min_first_segment() {
+        let graph = Graph {
+            nodes: vec![node("root"), node("a")],
+            edges: vec![edge("e0", "root", "a")],
+            groups: vec![],
+            partition: None,
+        };
+        let result = run(&LayoutContract {
+            layout: tree_options(&[
+                ("layer_gap", AttrValue::Num(20.0)),
+                ("min_first_segment", AttrValue::Num(80.0)),
+            ]),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["root", "a"]),
+        })
+        .unwrap();
+        let frame = |id: &str| result.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        let gap = frame("a").y - frame("root").bottom();
+        assert!(
+            gap + 1e-6 >= 80.0,
+            "DemandBoard should raise layer_gap to min_first_segment, gap={gap}"
+        );
     }
 
     #[test]

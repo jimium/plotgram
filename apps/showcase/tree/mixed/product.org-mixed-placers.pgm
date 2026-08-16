@@ -1,0 +1,31 @@
+// 同一棵树节点级换 placer：默认分层，运营走竖直总线
+diagram {
+    title: "组织架构（混放置器）",
+    layout: tree {
+        placer: single-layer,
+        orientation: top-to-bottom
+    }
+
+    node ceo "CEO"
+    node cto "CTO"
+    node cfo "CFO"
+    node ops "运营" { subtree_placer: left-right }
+
+    node platform "平台工程"
+    node ml "机器学习"
+    node finance "财务"
+
+    node night "夜班"
+    node day "白班"
+    node weekend "周末"
+
+    ceo -> cto
+    ceo -> cfo
+    ceo -> ops
+    cto -> platform
+    cto -> ml
+    cfo -> finance
+    ops -> night
+    ops -> day
+    ops -> weekend
+}

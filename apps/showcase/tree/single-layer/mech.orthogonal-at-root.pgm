@@ -1,0 +1,18 @@
+// 机制探针：首段垂直离开父，再连向子
+diagram {
+    title: "orthogonal at root",
+    layout: tree {
+        placer: layered,
+        routing_style: orthogonal-at-root,
+        orientation: top-to-bottom
+    }
+
+    node root "根"
+    node a "A"
+    node b "B"
+    node c "C"
+
+    root -> a
+    root -> b
+    root -> c
+}

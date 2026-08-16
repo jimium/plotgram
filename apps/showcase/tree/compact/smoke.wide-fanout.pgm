@@ -1,0 +1,29 @@
+// 宽扇出：compact 在预定义策略里搜，接近正方形
+diagram {
+    title: "紧凑扇出",
+    layout: tree {
+        placer: compact,
+        preferred_aspect_ratio: 1,
+        orientation: top-to-bottom
+    }
+
+    node mgr "经理"
+
+    node a "A"
+    node b "B"
+    node c "C"
+    node d "D"
+    node e "E"
+    node f "F"
+    node g "G"
+    node h "H"
+
+    mgr -> a
+    mgr -> b
+    mgr -> c
+    mgr -> d
+    mgr -> e
+    mgr -> f
+    mgr -> g
+    mgr -> h
+}

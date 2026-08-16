@@ -1,0 +1,28 @@
+// 宽扇出：双行交错比 single-layer 更窄
+diagram {
+    title: "双层扇出",
+    layout: tree {
+        placer: double-layer,
+        orientation: top-to-bottom
+    }
+
+    node mgr "经理"
+
+    node a "A"
+    node b "B"
+    node c "C"
+    node d "D"
+    node e "E"
+    node f "F"
+    node g "G"
+    node h "H"
+
+    mgr -> a
+    mgr -> b
+    mgr -> c
+    mgr -> d
+    mgr -> e
+    mgr -> f
+    mgr -> g
+    mgr -> h
+}

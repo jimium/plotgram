@@ -1,0 +1,29 @@
+// 技术栈：profile mindmap 填空默认 single-split-layered（根左右开）
+diagram {
+    profile: mindmap,
+    title: "技术栈选型"
+
+    node stack "全栈技术"
+
+    node frontend "前端"
+    node react "React"
+    node wasm "WASM"
+
+    node backend "后端"
+    node rust "Rust"
+    node postgres "PostgreSQL"
+
+    node devops "运维"
+    node docker "Docker"
+    node k8s "Kubernetes"
+
+    stack -> frontend
+    frontend -> react
+    frontend -> wasm
+    stack -> backend
+    backend -> rust
+    backend -> postgres
+    stack -> devops
+    devops -> docker
+    devops -> k8s
+}
