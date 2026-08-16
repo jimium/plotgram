@@ -10,7 +10,9 @@ use plotgram_content::measure::estimate_text_width;
 use plotgram_content::RunStyle;
 
 fn main() {
-    let path = std::env::args().nth(1).expect("usage: dump_estimates <cases.json>");
+    let path = std::env::args()
+        .nth(1)
+        .expect("usage: dump_estimates <cases.json>");
     let raw = std::fs::read_to_string(&path).expect("read cases file");
     let cases: Vec<serde_json::Value> = serde_json::from_str(&raw).expect("cases: JSON array");
 

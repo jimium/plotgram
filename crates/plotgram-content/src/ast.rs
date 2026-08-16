@@ -50,6 +50,9 @@ pub enum RunStyle {
 
 impl Run {
     pub fn new(text: impl Into<String>, style: RunStyle) -> Self {
-        Self { text: text.into(), style }
+        Self {
+            text: text.into(),
+            style,
+        }
     }
 }

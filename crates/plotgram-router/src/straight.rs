@@ -132,7 +132,11 @@ mod tests {
         for (name, sc, from, to) in cases {
             let p = StraightEdgeRouter.route(&sc).unwrap();
             assert_eq!(p.len(), 1, "{name}");
-            assert_eq!(p[0].path.polyline_points().unwrap(), &vec![from, to][..], "{name}");
+            assert_eq!(
+                p[0].path.polyline_points().unwrap(),
+                &vec![from, to][..],
+                "{name}"
+            );
             assert_eq!(p[0].source, "a");
             assert_eq!(p[0].target, "b");
             assert_eq!(p[0].from_port.unwrap().side, Side::East);
@@ -203,7 +207,10 @@ mod tests {
             params: OrthogonalRouteParams::default(),
         };
         let p = StraightEdgeRouter.route(&sc).unwrap();
-        assert_eq!(p.iter().map(|e| e.id.as_str()).collect::<Vec<_>>(), ["e0", "e1"]);
+        assert_eq!(
+            p.iter().map(|e| e.id.as_str()).collect::<Vec<_>>(),
+            ["e0", "e1"]
+        );
         assert_eq!(p[0].path.polyline_points().unwrap()[0].y, 30.0);
         assert_eq!(p[1].path.polyline_points().unwrap()[0].y, 10.0);
     }

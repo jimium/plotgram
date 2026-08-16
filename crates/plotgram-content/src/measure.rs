@@ -187,7 +187,9 @@ fn em_factor(class: CharClass, style: RunStyle) -> f64 {
 /// Estimated advance width of `text` at `font_size`. Public for the
 /// estimates-dump tooling (`examples/dump_estimates.rs`).
 pub fn estimate_text_width(text: &str, style: RunStyle, font_size: f64) -> f64 {
-    text.chars().map(|c| em_factor(char_class(c), style) * font_size).sum()
+    text.chars()
+        .map(|c| em_factor(char_class(c), style) * font_size)
+        .sum()
 }
 
 // ── measure ────────────────────────────────────────────────────────────────
@@ -202,7 +204,9 @@ pub fn measure(doc: &ContentDoc, p: &MeasureParams) -> ContentLayout {
     // Budgets derived once here: the list continuation indent is a decision
     // of the measuring phase, not of any downstream consumer.
     let para_budget = p.max_width.unwrap_or(f64::INFINITY);
-    let list_budget = p.max_width.map_or(f64::INFINITY, |w| (w - p.list_indent).max(p.font_size));
+    let list_budget = p
+        .max_width
+        .map_or(f64::INFINITY, |w| (w - p.list_indent).max(p.font_size));
     let mut lines: Vec<LineBox> = Vec::new();
     let mut rules: Vec<f64> = Vec::new();
     let mut y = 0.0;
@@ -215,7 +219,17 @@ pub fn measure(doc: &ContentDoc, p: &MeasureParams) -> ContentLayout {
         match block {
             Block::Paragraph { lines: para } => {
                 for line in para {
-                    push_wrapped(line, 0.0, para_budget, None, p, line_h, &mut y, &mut width, &mut lines);
+                    push_wrapped(
+                        line,
+                        0.0,
+                        para_budget,
+                        None,
+                        p,
+                        line_h,
+                        &mut y,
+                        &mut width,
+                        &mut lines,
+                    );
                 }
             }
             Block::List { ordered, items } => {
@@ -254,7 +268,11 @@ pub fn measure(doc: &ContentDoc, p: &MeasureParams) -> ContentLayout {
             let cutoff = lines.last().map_or(0.0, |lb| lb.top + lb.height);
             rules.retain(|&r| r < cutoff);
             y = cutoff;
-            add_ellipsis(lines.last_mut().expect("keep >= 1"), para_budget, p.font_size);
+            add_ellipsis(
+                lines.last_mut().expect("keep >= 1"),
+                para_budget,
+                p.font_size,
+            );
             width = lines.iter().fold(0.0, |acc, lb| acc.max(line_width(lb)));
         }
     }
@@ -333,7 +351,9 @@ const ELLIPSIS: char = '…';
 /// Pop the last glyph of the line (shrinking / removing its run). Returns
 /// false when the line has no runs left.
 fn pop_last_char(lb: &mut LineBox, font_size: f64) -> bool {
-    let Some(last) = lb.runs.last_mut() else { return false };
+    let Some(last) = lb.runs.last_mut() else {
+        return false;
+    };
     match last.text.pop() {
         Some(c) => {
             last.width -= em_factor(char_class(c), last.style) * font_size;
@@ -355,7 +375,12 @@ fn pop_last_char(lb: &mut LineBox, font_size: f64) -> bool {
 /// matches the `…` calibration class.
 fn add_ellipsis(lb: &mut LineBox, budget: f64, font_size: f64) {
     let ell_w = em_factor(char_class(ELLIPSIS), RunStyle::Plain) * font_size;
-    let glyphs = |lb: &LineBox| lb.runs.iter().map(|r| r.text.chars().count()).sum::<usize>();
+    let glyphs = |lb: &LineBox| {
+        lb.runs
+            .iter()
+            .map(|r| r.text.chars().count())
+            .sum::<usize>()
+    };
     let trailing_space = |lb: &LineBox| lb.runs.last().is_some_and(|r| r.text.ends_with(' '));
     while trailing_space(lb) {
         pop_last_char(lb, font_size);
@@ -373,10 +398,20 @@ fn add_ellipsis(lb: &mut LineBox, budget: f64, font_size: f64) {
         }
         Some(last) => {
             let x = last.x + last.width;
-            lb.runs.push(RunBox { x, width: ell_w, text: ELLIPSIS.to_string(), style: RunStyle::Plain });
+            lb.runs.push(RunBox {
+                x,
+                width: ell_w,
+                text: ELLIPSIS.to_string(),
+                style: RunStyle::Plain,
+            });
         }
         None => {
-            lb.runs.push(RunBox { x: 0.0, width: ell_w, text: ELLIPSIS.to_string(), style: RunStyle::Plain });
+            lb.runs.push(RunBox {
+                x: 0.0,
+                width: ell_w,
+                text: ELLIPSIS.to_string(),
+                style: RunStyle::Plain,
+            });
         }
     }
 }
@@ -406,7 +441,24 @@ struct Atom {
 /// Kinsoku: CJK closing punctuation must not start a line — glue it to the
 /// previous atom so it wraps together with the preceding glyph.
 fn glues_to_prev(c: char) -> bool {
-    matches!(c, '，' | '。' | '、' | '：' | '；' | '！' | '？' | '）' | '】' | '」' | '』' | '〉' | '》' | '…' | '’' | '”')
+    matches!(
+        c,
+        '，' | '。'
+            | '、'
+            | '：'
+            | '；'
+            | '！'
+            | '？'
+            | '）'
+            | '】'
+            | '」'
+            | '』'
+            | '〉'
+            | '》'
+            | '…'
+            | '’'
+            | '”'
+    )
 }
 
 /// Kinsoku: CJK opening punctuation must not end a line — glue the next
@@ -429,9 +481,8 @@ fn atomize(line: &Line, font_size: f64) -> VecDeque<Atom> {
             let joined = match atoms.back_mut() {
                 Some(last) if last.style == run.style && kind != AtomKind::Space => {
                     let same_word = last.kind == kind && kind != AtomKind::Wide;
-                    let closing = kind == AtomKind::Wide
-                        && glues_to_prev(c)
-                        && last.kind != AtomKind::Space;
+                    let closing =
+                        kind == AtomKind::Wide && glues_to_prev(c) && last.kind != AtomKind::Space;
                     let after_opening = last.text.chars().next_back().is_some_and(glues_to_next);
                     if same_word || closing || after_opening {
                         last.text.push(c);
@@ -447,9 +498,7 @@ fn atomize(line: &Line, font_size: f64) -> VecDeque<Atom> {
                     }
                 }
                 Some(last)
-                    if last.style == run.style
-                        && last.kind == kind
-                        && kind == AtomKind::Space =>
+                    if last.style == run.style && last.kind == kind && kind == AtomKind::Space =>
                 {
                     last.text.push(c);
                     last.width += w;
@@ -458,7 +507,12 @@ fn atomize(line: &Line, font_size: f64) -> VecDeque<Atom> {
                 _ => false,
             };
             if !joined {
-                atoms.push_back(Atom { text: c.to_string(), width: w, style: run.style, kind });
+                atoms.push_back(Atom {
+                    text: c.to_string(),
+                    width: w,
+                    style: run.style,
+                    kind,
+                });
             }
         }
     }
@@ -529,8 +583,18 @@ fn split_atom(atom: Atom, budget: f64, font_size: f64) -> (Atom, Option<Atom>) {
     let head_w = estimate_text_width(&head, atom.style, font_size);
     let tail_w = estimate_text_width(&tail, atom.style, font_size);
     (
-        Atom { text: head, width: head_w, style: atom.style, kind: atom.kind },
-        Some(Atom { text: tail, width: tail_w, style: atom.style, kind: atom.kind }),
+        Atom {
+            text: head,
+            width: head_w,
+            style: atom.style,
+            kind: atom.kind,
+        },
+        Some(Atom {
+            text: tail,
+            width: tail_w,
+            style: atom.style,
+            kind: atom.kind,
+        }),
     )
 }
 
@@ -545,11 +609,21 @@ fn assemble(row: &[Atom], x0: f64, top: f64, line_h: f64, font_size: f64) -> Lin
                 last.text.push_str(&atom.text);
                 last.width += atom.width;
             }
-            _ => runs.push(RunBox { x, width: atom.width, text: atom.text.clone(), style: atom.style }),
+            _ => runs.push(RunBox {
+                x,
+                width: atom.width,
+                text: atom.text.clone(),
+                style: atom.style,
+            }),
         }
         x += atom.width;
     }
-    LineBox { top, height: line_h, baseline: top + font_size * ASCENT, runs }
+    LineBox {
+        top,
+        height: line_h,
+        baseline: top + font_size * ASCENT,
+        runs,
+    }
 }
 
 // ── tests ──────────────────────────────────────────────────────────────────
@@ -617,14 +691,30 @@ mod tests {
         let eps = 1e-6;
         // (name, text, max_width)
         let cases: &[(&str, &str, f64)] = &[
-            ("cjk_breaks_anywhere", "订单服务处理下单主链路校验库存", 100.0),
+            (
+                "cjk_breaks_anywhere",
+                "订单服务处理下单主链路校验库存",
+                100.0,
+            ),
             ("latin_words_move_whole", "check inventory levels now", 90.0),
-            ("long_token_hard_split", "supercalifragilisticexpialidocious", 60.0),
+            (
+                "long_token_hard_split",
+                "supercalifragilisticexpialidocious",
+                60.0,
+            ),
             ("mixed_cjk_latin", "HTTP 504 网关超时后重试三次", 110.0),
-            ("styled_runs_survive", "**重试策略**指数退避加 `jitter` 随机扰动", 120.0),
+            (
+                "styled_runs_survive",
+                "**重试策略**指数退避加 `jitter` 随机扰动",
+                120.0,
+            ),
             // Greedy per-char breaking would start line 2 with "，".
             ("kinsoku_no_leading_punct", "一二三四五六七，八九十", 100.0),
-            ("list_continuation_indent", "- 校验库存并落库并发消息去重处理", 120.0),
+            (
+                "list_continuation_indent",
+                "- 校验库存并落库并发消息去重处理",
+                120.0,
+            ),
         ];
         for &(name, text, max_width) in cases {
             let mut p = params(14.0);
@@ -632,7 +722,11 @@ mod tests {
             let cl = measure(&parse(text), &p);
 
             // Wrapping actually happened and every visual line fits the budget.
-            assert!(cl.lines.len() >= 2, "{name}: expected wrapping, got {} lines", cl.lines.len());
+            assert!(
+                cl.lines.len() >= 2,
+                "{name}: expected wrapping, got {} lines",
+                cl.lines.len()
+            );
             for (i, lb) in cl.lines.iter().enumerate() {
                 assert!(
                     line_width(lb) <= max_width + eps,
@@ -643,11 +737,21 @@ mod tests {
                 // Kinsoku: closing punctuation never starts a visual line,
                 // opening punctuation never ends one.
                 let first = lb.runs.first().and_then(|r| r.text.chars().next()).unwrap();
-                let last = lb.runs.last().and_then(|r| r.text.chars().next_back()).unwrap();
-                assert!(!glues_to_prev(first), "{name}: line {i} starts with {first:?}");
+                let last = lb
+                    .runs
+                    .last()
+                    .and_then(|r| r.text.chars().next_back())
+                    .unwrap();
+                assert!(
+                    !glues_to_prev(first),
+                    "{name}: line {i} starts with {first:?}"
+                );
                 assert!(!glues_to_next(last), "{name}: line {i} ends with {last:?}");
             }
-            assert!(cl.width <= max_width + eps, "{name}: total width exceeds max_width");
+            assert!(
+                cl.width <= max_width + eps,
+                "{name}: total width exceeds max_width"
+            );
 
             // No ink lost or reordered vs the unwrapped measurement.
             let unwrapped = measure(&parse(text), &params(14.0));
@@ -676,8 +780,14 @@ mod tests {
         assert_eq!(cl.lines[0].runs[0].x, 0.0);
         assert_eq!(cl.lines[0].runs[1].x, 18.0);
         for (i, lb) in cl.lines.iter().enumerate().skip(1) {
-            assert_eq!(lb.runs[0].x, 18.0, "continuation line {i} must keep list indent");
-            assert_ne!(lb.runs[0].text, "•", "continuation line {i} must not repeat marker");
+            assert_eq!(
+                lb.runs[0].x, 18.0,
+                "continuation line {i} must keep list indent"
+            );
+            assert_ne!(
+                lb.runs[0].text, "•",
+                "continuation line {i} must not repeat marker"
+            );
         }
 
         // max_width = None keeps each logical line on one visual line.
@@ -692,11 +802,19 @@ mod tests {
         // resizes anything (width/height/run widths identical to Left).
         let text = "**发布确认**\n等待人工审批中处理";
         let base = measure(&parse(text), &params(14.0));
-        for (align, f) in [(Align::Left, 0.0), (Align::Center, 0.5), (Align::Right, 1.0)] {
+        for (align, f) in [
+            (Align::Left, 0.0),
+            (Align::Center, 0.5),
+            (Align::Right, 1.0),
+        ] {
             let mut p = params(14.0);
             p.align = align;
             let cl = measure(&parse(text), &p);
-            assert_eq!((cl.width, cl.height), (base.width, base.height), "{align:?}: box resized");
+            assert_eq!(
+                (cl.width, cl.height),
+                (base.width, base.height),
+                "{align:?}: box resized"
+            );
             for (la, lb) in cl.lines.iter().zip(&base.lines) {
                 let dx = (cl.width - line_width(lb)) * f;
                 for (ra, rb) in la.runs.iter().zip(&lb.runs) {
@@ -715,16 +833,26 @@ mod tests {
 
         // Truncation: keep max_lines, last line ends with … and re-fits the
         // budget, height stops at the cut, rules above the cut survive.
-        let long = "**支付回调**\n---\n收到网关回调后先验签再幂等落库失败进入重试队列并告警通知值班";
+        let long =
+            "**支付回调**\n---\n收到网关回调后先验签再幂等落库失败进入重试队列并告警通知值班";
         let mut p = params(14.0);
         p.max_width = Some(160.0);
         p.max_lines = Some(3);
         let cl = measure(&parse(long), &p);
         assert_eq!(cl.lines.len(), 3);
         let last = cl.lines.last().unwrap();
-        assert!(last.runs.last().unwrap().text.ends_with('…'), "missing ellipsis");
-        assert!(line_width(last) <= 160.0 + 1e-6, "ellipsis line overflows budget");
-        assert!((cl.height - (last.top + last.height)).abs() < eps, "height beyond the cut");
+        assert!(
+            last.runs.last().unwrap().text.ends_with('…'),
+            "missing ellipsis"
+        );
+        assert!(
+            line_width(last) <= 160.0 + 1e-6,
+            "ellipsis line overflows budget"
+        );
+        assert!(
+            (cl.height - (last.top + last.height)).abs() < eps,
+            "height beyond the cut"
+        );
         assert_eq!(cl.rules.len(), 1, "rule above the cut must survive");
         assert_eq!(cl, measure(&parse(long), &p), "truncate: nondeterministic");
 
@@ -732,6 +860,14 @@ mod tests {
         p.max_lines = Some(50);
         let full = measure(&parse(long), &p);
         assert!(full.lines.len() > 3);
-        assert!(!full.lines.last().unwrap().runs.last().unwrap().text.ends_with('…'));
+        assert!(!full
+            .lines
+            .last()
+            .unwrap()
+            .runs
+            .last()
+            .unwrap()
+            .text
+            .ends_with('…'));
     }
 }

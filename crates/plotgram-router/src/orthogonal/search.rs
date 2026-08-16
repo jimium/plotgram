@@ -300,7 +300,17 @@ mod tests {
     ) -> SearchOutcome {
         let (nx, ny) = grid.dims();
         let mut state = SearchState::new(nx * ny * 4);
-        astar(grid, start, start_dir, goal, approach_dir, bend_penalty, step_cost, budget, &mut state)
+        astar(
+            grid,
+            start,
+            start_dir,
+            goal,
+            approach_dir,
+            bend_penalty,
+            step_cost,
+            budget,
+            &mut state,
+        )
     }
 
     #[test]

@@ -50,7 +50,9 @@ fn load_fixtures() -> Vec<SceneFixture> {
 // ─── SVG rendering ──────────────────────────────────────────
 
 const PAD: f64 = 30.0;
-const COLORS: &[&str] = &["#2563eb", "#dc2626", "#16a34a", "#9333ea", "#ea580c", "#0891b2"];
+const COLORS: &[&str] = &[
+    "#2563eb", "#dc2626", "#16a34a", "#9333ea", "#ea580c", "#0891b2",
+];
 
 fn expand_bbox(bbox: &mut (f64, f64, f64, f64), r: Rect) {
     bbox.0 = bbox.0.min(r.x);

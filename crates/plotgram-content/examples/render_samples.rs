@@ -20,7 +20,13 @@ struct Sample {
 }
 
 const fn sample(name: &'static str, text: &'static str) -> Sample {
-    Sample { name, text, max_width: None, align: Align::Left, max_lines: None }
+    Sample {
+        name,
+        text,
+        max_width: None,
+        align: Align::Left,
+        max_lines: None,
+    }
 }
 
 const SAMPLES: &[Sample] = &[
@@ -96,9 +102,9 @@ fn main() {
     };
     let paint = ContentPaint {
         text_fill: "#1f2430".into(),
-        strong_fill: None,                     // strong 继承正文色，只加粗
-        emph_fill: Some("#4c6ef5".into()),     // emph 斜体 + 蓝
-        code_fill: Some("#7c3aed".into()),     // code 等宽 + 紫
+        strong_fill: None,                      // strong 继承正文色，只加粗
+        emph_fill: Some("#4c6ef5".into()),      // emph 斜体 + 蓝
+        code_fill: Some("#7c3aed".into()),      // code 等宽 + 紫
         code_chip_fill: Some("#f3effe".into()), // code 底色 chip（落在既有 run 盒上）
         rule_stroke: "#c3c9d4".into(),
         mono_family: "Menlo".into(),
@@ -157,7 +163,13 @@ fn main() {
             serde_json::to_string_pretty(&meta).expect("serialize meta"),
         )
         .expect("write meta json");
-        println!("{name}: {:.1} x {:.1} ({} lines, {} rules)", layout.width, layout.height, layout.lines.len(), layout.rules.len());
+        println!(
+            "{name}: {:.1} x {:.1} ({} lines, {} rules)",
+            layout.width,
+            layout.height,
+            layout.lines.len(),
+            layout.rules.len()
+        );
     }
     println!("wrote {} samples to {}", SAMPLES.len(), out_dir.display());
 }

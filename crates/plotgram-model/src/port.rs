@@ -17,7 +17,9 @@ use crate::attr::AttrMap;
 use crate::geometry::Point;
 
 /// Which side of a node's frame an edge anchors to (closed four-way set).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Side {
     North,
@@ -104,9 +106,15 @@ impl PortConstraint {
 #[derive(Debug, Clone, PartialEq)]
 pub enum PortConstraintError {
     /// Side atom outside the closed set, or non-atom value.
-    InvalidSide { side_key: &'static str, value: String },
+    InvalidSide {
+        side_key: &'static str,
+        value: String,
+    },
     /// Slot/order is not a non-negative integer (anchor `slot` only).
-    InvalidSlot { slot_key: &'static str, value: String },
+    InvalidSlot {
+        slot_key: &'static str,
+        value: String,
+    },
     /// `slot` without `side` on a group anchor.
     SlotWithoutSide { slot_key: &'static str },
     /// Removed edge port key still present (`from_slot`, `from_ratio`, …).
@@ -133,10 +141,7 @@ impl fmt::Display for PortConstraintError {
                 write!(f, "`undirected` expects a boolean, got {value}")
             }
             Self::InvalidWeight { value } => {
-                write!(
-                    f,
-                    "`weight` expects a positive finite number, got {value}"
-                )
+                write!(f, "`weight` expects a positive finite number, got {value}")
             }
             Self::CriticalWeightConflict => {
                 write!(
@@ -153,13 +158,19 @@ impl fmt::Display for PortConstraintError {
                 )
             }
             Self::InvalidSide { side_key, value } => {
-                write!(f, "`{side_key}`: `{value}` is not one of north/south/east/west")
+                write!(
+                    f,
+                    "`{side_key}`: `{value}` is not one of north/south/east/west"
+                )
             }
             Self::InvalidSlot { slot_key, value } => {
                 write!(f, "`{slot_key}`: `{value}` is not a non-negative integer")
             }
             Self::SlotWithoutSide { slot_key } => {
-                write!(f, "`{slot_key}` requires `side` on a group_anchor (dsl-spec §5.7)")
+                write!(
+                    f,
+                    "`{slot_key}` requires `side` on a group_anchor (dsl-spec §5.7)"
+                )
             }
             Self::UnsupportedEdgePortKey { key } => {
                 write!(
@@ -271,7 +282,10 @@ mod tests {
     use crate::attr::AttrValue;
 
     fn attrs(pairs: &[(&str, AttrValue)]) -> AttrMap {
-        pairs.iter().map(|(k, v)| ((*k).to_string(), v.clone())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), v.clone()))
+            .collect()
     }
 
     #[test]
@@ -331,9 +345,7 @@ mod tests {
         let a = attrs(&[("slot", AttrValue::Num(0.0))]);
         assert_eq!(
             anchor_port_constraint(&a),
-            Err(PortConstraintError::SlotWithoutSide {
-                slot_key: "slot"
-            })
+            Err(PortConstraintError::SlotWithoutSide { slot_key: "slot" })
         );
     }
 }

@@ -64,7 +64,11 @@ pub fn verify_edge(scene: &RouteScene, edge_id: &str, path: &[Point]) -> EdgeVer
     checks.push(check_orthogonal(path));
 
     if let Some(pair) = scene.terminals.get(edge_id) {
-        checks.push(check_endpoint_attach(path, &pair.source.point, &pair.target.point));
+        checks.push(check_endpoint_attach(
+            path,
+            &pair.source.point,
+            &pair.target.point,
+        ));
         checks.push(check_obstacle_clearance(scene, edge_id, path));
         checks.push(check_group_clearance(scene, edge_id, path));
     }
@@ -97,10 +101,7 @@ pub fn verify_all(scene: &RouteScene, placements: &[EdgePlacement]) -> VerifyRep
             checks: vec![CheckOutcome {
                 name: "edge_set_conservation",
                 pass: false,
-                detail: format!(
-                    "expected {:?}, got {:?}",
-                    scene.edge_order, placement_ids
-                ),
+                detail: format!("expected {:?}, got {:?}", scene.edge_order, placement_ids),
             }],
             pass: false,
         });
@@ -122,9 +123,9 @@ pub fn verify_determinism(scene: &RouteScene, router: &dyn EdgeRouter) -> bool {
             if a.len() != b.len() {
                 return false;
             }
-            a.iter().zip(b.iter()).all(|(ea, eb)| {
-                ea.id == eb.id && ea.path == eb.path
-            })
+            a.iter()
+                .zip(b.iter())
+                .all(|(ea, eb)| ea.id == eb.id && ea.path == eb.path)
         }
         (Err(_), Err(_)) => true, // Both fail consistently.
         _ => false,
@@ -154,10 +155,7 @@ fn check_orthogonal(path: &[Point]) -> CheckOutcome {
             return CheckOutcome {
                 name: "orthogonal",
                 pass: false,
-                detail: format!(
-                    "segment {} ({:?} → {:?}) is diagonal",
-                    i, w[0], w[1]
-                ),
+                detail: format!("segment {} ({:?} → {:?}) is diagonal", i, w[0], w[1]),
             };
         }
     }

@@ -133,10 +133,7 @@ impl fmt::Display for PartitionError {
                 )
             }
             Self::UnknownColumn { node_id, column } => {
-                write!(
-                    f,
-                    "node `{node_id}`: unknown partition column `{column}`"
-                )
+                write!(f, "node `{node_id}`: unknown partition column `{column}`")
             }
             Self::UnknownRow { node_id, row } => {
                 write!(f, "node `{node_id}`: unknown partition row `{row}`")
@@ -200,9 +197,7 @@ fn validate_grid_axes(grid: &PartitionGrid) -> Result<(), PartitionError> {
     let mut seen = BTreeSet::new();
     for id in grid.axis_ids() {
         if !seen.insert(id.to_string()) {
-            return Err(PartitionError::DuplicateAxisId {
-                id: id.to_string(),
-            });
+            return Err(PartitionError::DuplicateAxisId { id: id.to_string() });
         }
     }
     Ok(())
@@ -216,9 +211,7 @@ fn validate_axis_id_space(graph: &Graph, grid: &PartitionGrid) -> Result<(), Par
     collect_group_ids(graph, &mut occupied);
     for id in grid.axis_ids() {
         if occupied.contains(id) {
-            return Err(PartitionError::AxisIdConflict {
-                id: id.to_string(),
-            });
+            return Err(PartitionError::AxisIdConflict { id: id.to_string() });
         }
     }
     Ok(())

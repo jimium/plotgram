@@ -103,11 +103,13 @@ fn invalid_side_value() {
 
 #[test]
 fn group_frame_missing_from_side() {
-    let e = expect_err(r#"diagram {
+    let e = expect_err(
+        r#"diagram {
         group g { node x {} }
         node a {}
         @g -> a { to_side: north }
-    }"#);
+    }"#,
+    );
     assert!(
         matches!(&e, ParseError::Semantic(msg) if msg.contains("from_side")),
         "got: {e:?}"
@@ -116,11 +118,13 @@ fn group_frame_missing_from_side() {
 
 #[test]
 fn group_frame_missing_to_side() {
-    let e = expect_err(r#"diagram {
+    let e = expect_err(
+        r#"diagram {
         group g { node x {} }
         node a {}
         a -> @g { from_side: south }
-    }"#);
+    }"#,
+    );
     assert!(
         matches!(&e, ParseError::Semantic(msg) if msg.contains("to_side")),
         "got: {e:?}"
@@ -129,11 +133,13 @@ fn group_frame_missing_to_side() {
 
 #[test]
 fn group_frame_both_group_missing_side() {
-    let e = expect_err(r#"diagram {
+    let e = expect_err(
+        r#"diagram {
         group g1 { node x {} }
         group g2 { node y {} }
         @g1 -> @g2 { from_side: east }
-    }"#);
+    }"#,
+    );
     // g2 endpoint missing to_side
     assert!(
         matches!(&e, ParseError::Semantic(msg) if msg.contains("to_side")),
@@ -189,7 +195,8 @@ fn duplicate_attr_in_node_block() {
 
 #[test]
 fn duplicate_attr_in_edge_block() {
-    let e = expect_err("diagram { node a {} node b {} a -> b { from_side: north, from_side: south } }");
+    let e =
+        expect_err("diagram { node a {} node b {} a -> b { from_side: north, from_side: south } }");
     assert!(matches!(e, ParseError::DuplicateAttr { .. }), "got: {e:?}");
 }
 
@@ -218,7 +225,9 @@ fn entity_with_host_group_rejected() {
 
 #[test]
 fn group_anchor_missing_side() {
-    let e = expect_err("diagram { group g { node x {} } node a { role: group_anchor, host_group: g } }");
+    let e = expect_err(
+        "diagram { group g { node x {} } node a { role: group_anchor, host_group: g } }",
+    );
     assert!(
         matches!(&e, ParseError::NodeStructural(_) | ParseError::Semantic(_)),
         "got: {e:?}"
@@ -244,13 +253,15 @@ fn only_comments() {
 #[test]
 fn group_edge_referencing_external_node() {
     // Edge inside group references a top-level node → error
-    let e = expect_err(r#"diagram {
+    let e = expect_err(
+        r#"diagram {
         node external {}
         group g {
             node x {}
             x -> external
         }
-    }"#);
+    }"#,
+    );
     assert!(
         matches!(&e, ParseError::Semantic(msg) if msg.contains("external")),
         "got: {e:?}"
@@ -259,13 +270,15 @@ fn group_edge_referencing_external_node() {
 
 #[test]
 fn group_edge_referencing_other_group_node() {
-    let e = expect_err(r#"diagram {
+    let e = expect_err(
+        r#"diagram {
         group g1 { node a {} }
         group g2 {
             node b {}
             b -> a
         }
-    }"#);
+    }"#,
+    );
     assert!(
         matches!(&e, ParseError::Semantic(msg) if msg.contains("a")),
         "got: {e:?}"
@@ -275,13 +288,15 @@ fn group_edge_referencing_other_group_node() {
 #[test]
 fn group_edge_to_nested_child_ok() {
     // Edge in parent group referencing node in child group → OK (descendant)
-    let out = parse(r#"diagram {
+    let out = parse(
+        r#"diagram {
         group outer {
             group inner { node x {} }
             node y {}
             y -> x
         }
-    }"#);
+    }"#,
+    );
     assert!(out.is_ok(), "should accept edge to descendant node");
 }
 
@@ -289,7 +304,14 @@ fn group_edge_to_nested_child_ok() {
 
 #[test]
 fn reserved_word_as_node_id() {
-    let cases = &["flowchart", "sequence", "architecture", "state", "er", "mindmap"];
+    let cases = &[
+        "flowchart",
+        "sequence",
+        "architecture",
+        "state",
+        "er",
+        "mindmap",
+    ];
     for word in cases {
         let src = format!("diagram {{ node {word} {{}} }}");
         let e = expect_err(&src);
@@ -348,11 +370,13 @@ fn keyword_as_id_rejected() {
 
 #[test]
 fn bare_group_id_as_edge_source() {
-    let e = expect_err(r#"diagram {
+    let e = expect_err(
+        r#"diagram {
         group g { node x {} }
         node a {}
         g -> a
-    }"#);
+    }"#,
+    );
     assert!(
         matches!(&e, ParseError::Semantic(msg) if msg.contains("group id") && msg.contains("@")),
         "got: {e:?}"
@@ -361,11 +385,13 @@ fn bare_group_id_as_edge_source() {
 
 #[test]
 fn bare_group_id_as_edge_target() {
-    let e = expect_err(r#"diagram {
+    let e = expect_err(
+        r#"diagram {
         group g { node x {} }
         node a {}
         a -> g
-    }"#);
+    }"#,
+    );
     assert!(
         matches!(&e, ParseError::Semantic(msg) if msg.contains("group id") && msg.contains("@")),
         "got: {e:?}"
@@ -376,14 +402,19 @@ fn bare_group_id_as_edge_target() {
 
 #[test]
 fn group_layout_with_options_parses() {
-    let out = parse(r#"diagram {
+    let out = parse(
+        r#"diagram {
         group g {
             layout: hierarchical { direction: left-to-right }
             node a {} node b {}
             a -> b
         }
-    }"#);
-    assert!(out.is_ok(), "group layout with options should parse: {out:?}");
+    }"#,
+    );
+    assert!(
+        out.is_ok(),
+        "group layout with options should parse: {out:?}"
+    );
 }
 
 // ─── P3a: Lexical constraints (§2.1–2.3) ────────────────────────────────────
@@ -463,9 +494,8 @@ fn node_bare_archetype_atom_rejected() {
 
 #[test]
 fn group_anchor_unknown_host_group() {
-    let e = expect_err(
-        "diagram { node a { role: group_anchor, host_group: missing, side: north } }",
-    );
+    let e =
+        expect_err("diagram { node a { role: group_anchor, host_group: missing, side: north } }");
     assert!(
         matches!(&e, ParseError::Semantic(msg) if msg.contains("missing")),
         "got: {e:?}"
@@ -474,10 +504,12 @@ fn group_anchor_unknown_host_group() {
 
 #[test]
 fn group_anchor_not_in_host_group() {
-    let e = expect_err(r#"diagram {
+    let e = expect_err(
+        r#"diagram {
         group g { node x {} }
         node a { role: group_anchor, host_group: g, side: north }
-    }"#);
+    }"#,
+    );
     assert!(
         matches!(&e, ParseError::Semantic(msg) if msg.contains("direct member")),
         "got: {e:?}"
@@ -500,7 +532,10 @@ fn comma_separated_attrs_in_block() {
     let out = parse(r#"diagram { node a { label: "X", variant: primary } }"#).unwrap();
     let n = &out.graph.nodes[0];
     assert_eq!(n.label.as_deref(), Some("X"));
-    assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("primary"));
+    assert_eq!(
+        n.attrs.get("variant").and_then(|v| v.as_str()),
+        Some("primary")
+    );
 }
 
 // ─── P3h: atom dot rules (§2.2) ─────────────────────────────────────────────

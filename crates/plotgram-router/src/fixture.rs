@@ -72,9 +72,7 @@ impl std::fmt::Display for Requires {
 }
 
 /// Expected routing outcome for a fixture (group-crossing.md §5.3).
-#[derive(
-    Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RouteExpect {
     /// Route succeeds and passes verify.

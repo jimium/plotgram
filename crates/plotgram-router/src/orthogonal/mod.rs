@@ -11,16 +11,15 @@
 //! with no collision-free path (or one exceeding the node budget) is a hard
 //! error — never a degenerate obstacle-crossing elbow.
 
-pub(crate) mod ovg;
 mod nudge;
+pub(crate) mod ovg;
 mod search;
 mod track;
 
 use std::collections::BTreeMap;
 
 use plotgram_engine_api::{
-    BoundaryCrossing, EdgeRouter, LayoutError, OrthogonalRouteParams, RouteScene,
-    TerminalPair,
+    BoundaryCrossing, EdgeRouter, LayoutError, OrthogonalRouteParams, RouteScene, TerminalPair,
 };
 use plotgram_model::geometry::Point;
 use plotgram_model::port::PortRef;
@@ -141,7 +140,17 @@ fn route_edges(
                 "router: edge `{edge_id}` in edge_order but missing from terminals"
             ))
         })?;
-        match route_edge(scene, grid, obs_index, obs_id_map, edge_id, pair, round1, budget, &mut search_state) {
+        match route_edge(
+            scene,
+            grid,
+            obs_index,
+            obs_id_map,
+            edge_id,
+            pair,
+            round1,
+            budget,
+            &mut search_state,
+        ) {
             Ok(p) => out.push(p),
             Err(e) => match fallback {
                 Some(prev) => {
@@ -171,8 +180,14 @@ fn route_edge(
     let params = &scene.params;
 
     // Pre-extract exempt obstacle indices (avoids BTreeMap lookup per step).
-    let exempt_i = obs_id_map.get(pair.source.node_id.as_str()).copied().unwrap_or(usize::MAX);
-    let exempt_j = obs_id_map.get(pair.target.node_id.as_str()).copied().unwrap_or(usize::MAX);
+    let exempt_i = obs_id_map
+        .get(pair.source.node_id.as_str())
+        .copied()
+        .unwrap_or(usize::MAX);
+    let exempt_j = obs_id_map
+        .get(pair.target.node_id.as_str())
+        .copied()
+        .unwrap_or(usize::MAX);
 
     // Pre-extract group crossings for this edge (avoids BTreeMap lookup per step).
     let crossings: &[BoundaryCrossing] = scene
@@ -189,12 +204,7 @@ fn route_edge(
             return true;
         }
         if has_groups {
-            ovg::group_blocks_segment(
-                a, b,
-                &scene.group_boundaries,
-                crossings,
-                params.spacing,
-            )
+            ovg::group_blocks_segment(a, b, &scene.group_boundaries, crossings, params.spacing)
         } else {
             false
         }
@@ -330,7 +340,11 @@ impl Round1Segments {
             edge_idx.insert(p.id.clone(), i);
             for w in p.path.polyline_points().unwrap().windows(2) {
                 let (a, b) = (w[0], w[1]);
-                let seg = IndexedSeg { edge_idx: i, c: a, d: b };
+                let seg = IndexedSeg {
+                    edge_idx: i,
+                    c: a,
+                    d: b,
+                };
                 if (a.y - b.y).abs() < EPS {
                     // Horizontal: key by y.
                     h_lines.entry(a.y.to_bits()).or_default().push(seg);
@@ -340,7 +354,11 @@ impl Round1Segments {
                 }
             }
         }
-        Self { edge_idx, h_lines, v_lines }
+        Self {
+            edge_idx,
+            h_lines,
+            v_lines,
+        }
     }
 
     /// Total overlap of segment `a→b` with round-1 segments of *other* edges
@@ -679,7 +697,10 @@ mod tests {
         assert_eq!(a.len(), b.len());
         for (pa, pb) in a.iter().zip(b.iter()) {
             assert_eq!(pa.id, pb.id);
-            assert_eq!(pa.path.polyline_points().unwrap(), pb.path.polyline_points().unwrap());
+            assert_eq!(
+                pa.path.polyline_points().unwrap(),
+                pb.path.polyline_points().unwrap()
+            );
         }
     }
 
@@ -704,7 +725,8 @@ mod tests {
         let sc = shared_corridor();
         let p = OrthogonalEdgeRouter.route(&sc).unwrap();
         assert_ne!(
-            p[0].path.polyline_points().unwrap(), p[1].path.polyline_points().unwrap(),
+            p[0].path.polyline_points().unwrap(),
+            p[1].path.polyline_points().unwrap(),
             "tracks must separate a shared corridor"
         );
         let report = verify_all(&sc, &p);
@@ -734,7 +756,10 @@ mod tests {
         sc.params.route_rounds = 2;
         sc.params.shared_penalty = 60.0;
         let p = OrthogonalEdgeRouter.route(&sc).unwrap();
-        assert_ne!(p[0].path.polyline_points().unwrap(), p[1].path.polyline_points().unwrap());
+        assert_ne!(
+            p[0].path.polyline_points().unwrap(),
+            p[1].path.polyline_points().unwrap()
+        );
         let report = verify_all(&sc, &p);
         assert!(report.all_pass, "failures: {:?}", report.failures());
     }

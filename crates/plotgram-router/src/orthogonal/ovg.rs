@@ -263,13 +263,7 @@ impl ObstacleIndex {
     ///
     /// `exempt_indices` are obstacle indices to skip (own-node exemption).
     #[inline]
-    pub fn segment_blocked(
-        &self,
-        a: Point,
-        b: Point,
-        exempt_i: usize,
-        exempt_j: usize,
-    ) -> bool {
+    pub fn segment_blocked(&self, a: Point, b: Point, exempt_i: usize, exempt_j: usize) -> bool {
         // Segment bounding box.
         let sx0 = a.x.min(b.x);
         let sx1 = a.x.max(b.x);
@@ -391,10 +385,7 @@ pub(crate) fn group_blocks_segment(
 }
 
 fn point_in_rect(p: Point, r: Rect) -> bool {
-    p.x >= r.x - EPS
-        && p.x <= r.right() + EPS
-        && p.y >= r.y - EPS
-        && p.y <= r.bottom() + EPS
+    p.x >= r.x - EPS && p.x <= r.right() + EPS && p.y >= r.y - EPS && p.y <= r.bottom() + EPS
 }
 
 /// Collect every gate rect from the scene (stable edge_order then crossing order).

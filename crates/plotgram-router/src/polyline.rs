@@ -508,7 +508,10 @@ mod tests {
         assert_eq!(a.len(), b.len());
         for (pa, pb) in a.iter().zip(b.iter()) {
             assert_eq!(pa.id, pb.id);
-            assert_eq!(pa.path.polyline_points().unwrap(), pb.path.polyline_points().unwrap());
+            assert_eq!(
+                pa.path.polyline_points().unwrap(),
+                pb.path.polyline_points().unwrap()
+            );
         }
     }
 }

@@ -23,8 +23,7 @@ fn main() -> ExitCode {
                 if out.warnings.is_empty() {
                     println!("OK   {path}");
                 } else {
-                    let msgs: Vec<&str> =
-                        out.warnings.iter().map(|w| w.message.as_str()).collect();
+                    let msgs: Vec<&str> = out.warnings.iter().map(|w| w.message.as_str()).collect();
                     println!("WARN {path}: {}", msgs.join("; "));
                 }
             }

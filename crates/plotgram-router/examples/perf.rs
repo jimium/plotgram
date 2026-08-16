@@ -345,19 +345,37 @@ fn main() {
         println!("┌─────────────────────────────────────────────────┐");
         println!("│  plotgram-router performance benchmark          │");
         println!("├─────────────────────────────────────────────────┤");
-        println!("│  nodes:        {:>8}                       │", gs.node_count);
-        println!("│  edges:        {:>8}                       │", gs.edge_count);
-        println!("│  routed:       {:>8}                       │", route_ok.map(|n| n.to_string()).unwrap_or("ERR".into()));
+        println!(
+            "│  nodes:        {:>8}                       │",
+            gs.node_count
+        );
+        println!(
+            "│  edges:        {:>8}                       │",
+            gs.edge_count
+        );
+        println!(
+            "│  routed:       {:>8}                       │",
+            route_ok.map(|n| n.to_string()).unwrap_or("ERR".into())
+        );
         println!("│  clearance:    {:>8}                       │", clearance);
         println!("├─────────────────────────────────────────────────┤");
         println!("│  min:          {:>8.2} ms                    │", min_ms);
-        println!("│  median:       {:>8.2} ms                    │", median_ms);
+        println!(
+            "│  median:       {:>8.2} ms                    │",
+            median_ms
+        );
         println!("│  mean:         {:>8.2} ms                    │", mean_ms);
         println!("│  max:          {:>8.2} ms                    │", max_ms);
-        println!("│  per-edge:     {:>8.1} µs                    │", per_edge_us);
+        println!(
+            "│  per-edge:     {:>8.1} µs                    │",
+            per_edge_us
+        );
         println!("└─────────────────────────────────────────────────┘");
         println!();
-        println!("  warmup={} iters={} rounds={}", cfg.warmup, cfg.iters, cfg.rounds);
+        println!(
+            "  warmup={} iters={} rounds={}",
+            cfg.warmup, cfg.iters, cfg.rounds
+        );
     }
 
     // Exit code: fail if routing errored.

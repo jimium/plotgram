@@ -18,7 +18,10 @@ pub fn parse(input: &str) -> ContentDoc {
 /// trailing blank lines. Leading indentation is kept for classification.
 fn normalize(input: &str) -> Vec<String> {
     let unified = input.replace("\r\n", "\n").replace('\r', "\n");
-    let mut lines: Vec<String> = unified.split('\n').map(|l| l.trim_end().to_string()).collect();
+    let mut lines: Vec<String> = unified
+        .split('\n')
+        .map(|l| l.trim_end().to_string())
+        .collect();
     while lines.first().is_some_and(|l| l.is_empty()) {
         lines.remove(0);
     }
@@ -80,12 +83,13 @@ fn aggregate(lines: &[RawLine]) -> ContentDoc {
     let mut blocks = Vec::new();
     let mut pending = Pending::None;
 
-    let flush = |pending: &mut Pending, blocks: &mut Vec<Block>| {
-        match std::mem::replace(pending, Pending::None) {
-            Pending::None => {}
-            Pending::Paragraph(lines) => blocks.push(Block::Paragraph { lines }),
-            Pending::List { ordered, items } => blocks.push(Block::List { ordered, items }),
-        }
+    let flush = |pending: &mut Pending, blocks: &mut Vec<Block>| match std::mem::replace(
+        pending,
+        Pending::None,
+    ) {
+        Pending::None => {}
+        Pending::Paragraph(lines) => blocks.push(Block::Paragraph { lines }),
+        Pending::List { ordered, items } => blocks.push(Block::List { ordered, items }),
     };
 
     for raw in lines {
@@ -106,23 +110,41 @@ fn aggregate(lines: &[RawLine]) -> ContentDoc {
                 }
             }
             RawLine::Bullet(content) => {
-                let item = ListItem { number: None, line: parse_inline(content) };
+                let item = ListItem {
+                    number: None,
+                    line: parse_inline(content),
+                };
                 match &mut pending {
                     // Same-kind items extend the current list; a kind switch starts a new one.
-                    Pending::List { ordered: false, items } => items.push(item),
+                    Pending::List {
+                        ordered: false,
+                        items,
+                    } => items.push(item),
                     _ => {
                         flush(&mut pending, &mut blocks);
-                        pending = Pending::List { ordered: false, items: vec![item] };
+                        pending = Pending::List {
+                            ordered: false,
+                            items: vec![item],
+                        };
                     }
                 }
             }
             RawLine::Ordered(n, content) => {
-                let item = ListItem { number: Some(*n), line: parse_inline(content) };
+                let item = ListItem {
+                    number: Some(*n),
+                    line: parse_inline(content),
+                };
                 match &mut pending {
-                    Pending::List { ordered: true, items } => items.push(item),
+                    Pending::List {
+                        ordered: true,
+                        items,
+                    } => items.push(item),
                     _ => {
                         flush(&mut pending, &mut blocks);
-                        pending = Pending::List { ordered: true, items: vec![item] };
+                        pending = Pending::List {
+                            ordered: true,
+                            items: vec![item],
+                        };
                     }
                 }
             }
@@ -179,7 +201,11 @@ fn parse_inline(text: &str) -> Line {
                     && !content.ends_with(char::is_whitespace);
                 if valid {
                     flush_plain(&mut plain, &mut runs);
-                    let style = if strong { RunStyle::Strong } else { RunStyle::Emph };
+                    let style = if strong {
+                        RunStyle::Strong
+                    } else {
+                        RunStyle::Emph
+                    };
                     runs.push(Run::new(content, style));
                     i = next;
                     continue;
@@ -196,7 +222,9 @@ fn parse_inline(text: &str) -> Line {
         i += 1;
     }
     flush_plain(&mut plain, &mut runs);
-    Line { runs: merge_adjacent(runs) }
+    Line {
+        runs: merge_adjacent(runs),
+    }
 }
 
 /// Scan for the closing `*` / `**`. Content is plain text: escapes apply,
@@ -246,7 +274,9 @@ mod tests {
     use RunStyle::*;
 
     fn line(runs: Vec<(&str, RunStyle)>) -> Line {
-        Line { runs: runs.into_iter().map(|(t, s)| Run::new(t, s)).collect() }
+        Line {
+            runs: runs.into_iter().map(|(t, s)| Run::new(t, s)).collect(),
+        }
     }
     fn para(lines: Vec<Line>) -> Block {
         Block::Paragraph { lines }

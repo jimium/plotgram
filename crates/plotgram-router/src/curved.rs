@@ -7,9 +7,7 @@
 //!
 //! Honesty (R5): group scenes are rejected in this MVP.
 
-use plotgram_engine_api::{
-    EdgeRouter, LayoutError, Obstacle, RouteScene, TerminalPair,
-};
+use plotgram_engine_api::{EdgeRouter, LayoutError, Obstacle, RouteScene, TerminalPair};
 use plotgram_model::geometry::Point;
 use plotgram_model::port::{PortRef, Side};
 use plotgram_model::result::{EdgePath, EdgePlacement};
@@ -156,8 +154,14 @@ fn path_clear(scene: &RouteScene, pair: &TerminalPair, points: &[Point]) -> bool
     let exempt_src = pair.source.node_id.as_str();
     let exempt_tgt = pair.target.node_id.as_str();
     for w in points.windows(2) {
-        if segment_hits_obstacles(w[0], w[1], &scene.obstacles, spacing, exempt_src, exempt_tgt)
-        {
+        if segment_hits_obstacles(
+            w[0],
+            w[1],
+            &scene.obstacles,
+            spacing,
+            exempt_src,
+            exempt_tgt,
+        ) {
             return false;
         }
     }
@@ -184,13 +188,7 @@ fn segment_hits_obstacles(
     false
 }
 
-fn sample_cubic_bezier(
-    p0: Point,
-    p1: Point,
-    p2: Point,
-    p3: Point,
-    samples: usize,
-) -> Vec<Point> {
+fn sample_cubic_bezier(p0: Point, p1: Point, p2: Point, p3: Point, samples: usize) -> Vec<Point> {
     let n = samples.max(2);
     let mut out = Vec::with_capacity(n);
     for i in 0..n {

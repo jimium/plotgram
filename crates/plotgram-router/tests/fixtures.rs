@@ -141,9 +141,12 @@ fn fixture_track_separation() {
         for i in 0..placements.len() {
             for j in (i + 1)..placements.len() {
                 assert_ne!(
-                    placements[i].path.polyline_points().unwrap(), placements[j].path.polyline_points().unwrap(),
+                    placements[i].path.polyline_points().unwrap(),
+                    placements[j].path.polyline_points().unwrap(),
                     "{}: edges {} and {} fully overlap",
-                    fix.name, placements[i].id, placements[j].id
+                    fix.name,
+                    placements[i].id,
+                    placements[j].id
                 );
             }
         }
@@ -186,12 +189,13 @@ fn fixture_group_expect_fail() {
                     fix.name
                 );
             }
-            RouteExpect::Unsupported => {
-                match router.route(&fix.scene) {
-                    Err(LayoutError::UnsupportedRouteScene { .. }) => {}
-                    other => panic!("{}: expected UnsupportedRouteScene, got {other:?}", fix.name),
-                }
-            }
+            RouteExpect::Unsupported => match router.route(&fix.scene) {
+                Err(LayoutError::UnsupportedRouteScene { .. }) => {}
+                other => panic!(
+                    "{}: expected UnsupportedRouteScene, got {other:?}",
+                    fix.name
+                ),
+            },
         }
     }
 }

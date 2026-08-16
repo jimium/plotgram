@@ -41,7 +41,14 @@ pub fn spread_tracks(scene: &RouteScene, placements: &mut [EdgePlacement]) {
     }
     let segments: Vec<Vec<(Point, Point)>> = placements
         .iter()
-        .map(|p| p.path.polyline_points().unwrap().windows(2).map(|w| (w[0], w[1])).collect())
+        .map(|p| {
+            p.path
+                .polyline_points()
+                .unwrap()
+                .windows(2)
+                .map(|w| (w[0], w[1]))
+                .collect()
+        })
         .collect();
 
     let mut corridors: Vec<Corridor> = Vec::new();
@@ -126,8 +133,12 @@ pub fn spread_tracks(scene: &RouteScene, placements: &mut [EdgePlacement]) {
                 continue;
             }
             let edge_id = placements[e].id.as_str();
-            let shifted =
-                shift_on_line(&placements[e].path.polyline_points().unwrap(), cor.horizontal, cor.coord, offset);
+            let shifted = shift_on_line(
+                &placements[e].path.polyline_points().unwrap(),
+                cor.horizontal,
+                cor.coord,
+                offset,
+            );
             if path_clear(&shifted, scene, edge_id) {
                 placements[e].path = EdgePath::polyline(shifted);
             }
@@ -377,8 +388,14 @@ mod tests {
         let report = crate::verify::verify_all(&scene, &p);
         assert!(report.all_pass, "failures: {:?}", report.failures());
         // e0/e1/e2 must not fully coincide after L3+L4 separation.
-        assert_ne!(p[0].path.polyline_points().unwrap(), p[1].path.polyline_points().unwrap());
-        assert_ne!(p[0].path.polyline_points().unwrap(), p[2].path.polyline_points().unwrap());
+        assert_ne!(
+            p[0].path.polyline_points().unwrap(),
+            p[1].path.polyline_points().unwrap()
+        );
+        assert_ne!(
+            p[0].path.polyline_points().unwrap(),
+            p[2].path.polyline_points().unwrap()
+        );
         // e2's shifted corridor run must not dip back to the shared backbone:
         // after leaving the stub, the long horizontal run stays on one y.
         let pts = &p[2].path.polyline_points().unwrap();
@@ -497,11 +514,11 @@ mod tests {
                 source: "bl".into(),
                 target: "br".into(),
                 path: EdgePath::polyline(vec![
-                        p(50.0, 150.0),
-                        p(50.0, 100.0),
-                        p(250.0, 100.0),
-                        p(250.0, 150.0),
-                    ]),
+                    p(50.0, 150.0),
+                    p(50.0, 100.0),
+                    p(250.0, 100.0),
+                    p(250.0, 150.0),
+                ]),
                 from_port: None,
                 to_port: None,
             },
@@ -510,11 +527,11 @@ mod tests {
                 source: "tl".into(),
                 target: "tr".into(),
                 path: EdgePath::polyline(vec![
-                        p(50.0, 50.0),
-                        p(50.0, 100.0),
-                        p(250.0, 100.0),
-                        p(250.0, 50.0),
-                    ]),
+                    p(50.0, 50.0),
+                    p(50.0, 100.0),
+                    p(250.0, 100.0),
+                    p(250.0, 50.0),
+                ]),
                 from_port: None,
                 to_port: None,
             },
@@ -567,7 +584,10 @@ mod tests {
         let before = crate::score::score_scene("before", &scene, &placements);
         spread_tracks(&scene, &mut placements);
         let after = crate::score::score_scene("after", &scene, &placements);
-        assert_eq!(after.crossings, 0, "preference order must avoid stub crosses");
+        assert_eq!(
+            after.crossings, 0,
+            "preference order must avoid stub crosses"
+        );
         // Corridor runs must sit on opposite sides of y=100.
         let run_y = |pts: &[Point]| {
             pts.windows(2)
@@ -577,8 +597,14 @@ mod tests {
         };
         let y0 = run_y(&placements[0].path.polyline_points().unwrap());
         let y1 = run_y(&placements[1].path.polyline_points().unwrap());
-        assert!(y1 < 100.0, "e1 (from above) must ride north of backbone: {y1}");
-        assert!(y0 > 100.0, "e0 (from below) must ride south of backbone: {y0}");
+        assert!(
+            y1 < 100.0,
+            "e1 (from above) must ride north of backbone: {y1}"
+        );
+        assert!(
+            y0 > 100.0,
+            "e0 (from below) must ride south of backbone: {y0}"
+        );
         assert!(
             (y0 - y1).abs() >= scene.params.spacing - 1e-6,
             "gap: y0={y0} y1={y1}"

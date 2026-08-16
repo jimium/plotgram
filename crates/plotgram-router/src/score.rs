@@ -96,7 +96,8 @@ fn count_crossings(placements: &[EdgePlacement]) -> usize {
     let mut count = 0;
     for i in 0..placements.len() {
         for j in (i + 1)..placements.len() {
-            count += crossings_between(&placements[i].path.samples(), &placements[j].path.samples());
+            count +=
+                crossings_between(&placements[i].path.samples(), &placements[j].path.samples());
         }
     }
     count

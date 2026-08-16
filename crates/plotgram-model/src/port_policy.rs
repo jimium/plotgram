@@ -109,10 +109,7 @@ mod tests {
 
     #[test]
     fn diamond_capacity_one() {
-        assert_eq!(
-            policy_for(NodeShape::Diamond).capacity_per_side,
-            Some(1)
-        );
+        assert_eq!(policy_for(NodeShape::Diamond).capacity_per_side, Some(1));
     }
 
     #[test]

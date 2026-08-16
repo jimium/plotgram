@@ -26,11 +26,11 @@ pub enum TokenKind {
     /// Numeric literal.
     NumberLit(f64),
     // Symbols
-    LBrace,  // {
-    RBrace,  // }
-    Colon,   // :
-    Comma,   // ,  (optional attribute-block separator)
-    At,      // @
+    LBrace,    // {
+    RBrace,    // }
+    Colon,     // :
+    Comma,     // ,  (optional attribute-block separator)
+    At,        // @
     Arrow,     // ->
     DashArrow, // -->
     BiArrow,   // <->
@@ -239,23 +239,43 @@ impl<'a> Lexer<'a> {
         match ch {
             '{' => {
                 self.advance();
-                Ok(Token { kind: TokenKind::LBrace, line, column: col })
+                Ok(Token {
+                    kind: TokenKind::LBrace,
+                    line,
+                    column: col,
+                })
             }
             '}' => {
                 self.advance();
-                Ok(Token { kind: TokenKind::RBrace, line, column: col })
+                Ok(Token {
+                    kind: TokenKind::RBrace,
+                    line,
+                    column: col,
+                })
             }
             ':' => {
                 self.advance();
-                Ok(Token { kind: TokenKind::Colon, line, column: col })
+                Ok(Token {
+                    kind: TokenKind::Colon,
+                    line,
+                    column: col,
+                })
             }
             ',' => {
                 self.advance();
-                Ok(Token { kind: TokenKind::Comma, line, column: col })
+                Ok(Token {
+                    kind: TokenKind::Comma,
+                    line,
+                    column: col,
+                })
             }
             '@' => {
                 self.advance();
-                Ok(Token { kind: TokenKind::At, line, column: col })
+                Ok(Token {
+                    kind: TokenKind::At,
+                    line,
+                    column: col,
+                })
             }
             '<' => {
                 // <->
@@ -263,27 +283,51 @@ impl<'a> Lexer<'a> {
                     self.advance();
                     self.advance();
                     self.advance();
-                    Ok(Token { kind: TokenKind::BiArrow, line, column: col })
+                    Ok(Token {
+                        kind: TokenKind::BiArrow,
+                        line,
+                        column: col,
+                    })
                 } else {
                     self.advance();
-                    Err(ParseError::lex(line, col, format!("unexpected character '<'; did you mean '<->'?")))
+                    Err(ParseError::lex(
+                        line,
+                        col,
+                        format!("unexpected character '<'; did you mean '<->'?"),
+                    ))
                 }
             }
             '-' => {
                 self.advance(); // consume '-'
                 if self.peek() == Some('>') {
                     self.advance(); // consume '>'
-                    Ok(Token { kind: TokenKind::Arrow, line, column: col })
+                    Ok(Token {
+                        kind: TokenKind::Arrow,
+                        line,
+                        column: col,
+                    })
                 } else if self.peek() == Some('-') {
                     self.advance(); // consume second '-'
                     if self.peek() == Some('>') {
                         self.advance(); // consume '>'
-                        Ok(Token { kind: TokenKind::DashArrow, line, column: col })
+                        Ok(Token {
+                            kind: TokenKind::DashArrow,
+                            line,
+                            column: col,
+                        })
                     } else {
-                        Err(ParseError::lex(line, col, "unexpected '--'; did you mean '-->'?"))
+                        Err(ParseError::lex(
+                            line,
+                            col,
+                            "unexpected '--'; did you mean '-->'?",
+                        ))
                     }
                 } else {
-                    Err(ParseError::lex(line, col, "unexpected '-'; did you mean '->' or '-->'?"))
+                    Err(ParseError::lex(
+                        line,
+                        col,
+                        "unexpected '-'; did you mean '->' or '-->'?",
+                    ))
                 }
             }
             '"' => self.read_string(line, col),
@@ -291,11 +335,19 @@ impl<'a> Lexer<'a> {
             c if c.is_ascii_lowercase() => self.read_word(line, col),
             '_' => {
                 self.advance();
-                Err(ParseError::lex(line, col, "identifier must start with a lowercase letter [a-z], not '_'"))
+                Err(ParseError::lex(
+                    line,
+                    col,
+                    "identifier must start with a lowercase letter [a-z], not '_'",
+                ))
             }
             _ => {
                 self.advance();
-                Err(ParseError::lex(line, col, format!("unrecognized character '{ch}'")))
+                Err(ParseError::lex(
+                    line,
+                    col,
+                    format!("unrecognized character '{ch}'"),
+                ))
             }
         }
     }
@@ -325,7 +377,11 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 Some('\n') => {
-                    return Err(ParseError::lex(line, col, "unterminated string literal (newline in string)"));
+                    return Err(ParseError::lex(
+                        line,
+                        col,
+                        "unterminated string literal (newline in string)",
+                    ));
                 }
                 Some(c) => {
                     self.advance();
@@ -334,11 +390,21 @@ impl<'a> Lexer<'a> {
             }
         }
         if value.len() > Self::MAX_STRING_LEN {
-            return Err(ParseError::lex(line, col, format!(
-                "string literal too long ({} chars; max {})", value.len(), Self::MAX_STRING_LEN
-            )));
+            return Err(ParseError::lex(
+                line,
+                col,
+                format!(
+                    "string literal too long ({} chars; max {})",
+                    value.len(),
+                    Self::MAX_STRING_LEN
+                ),
+            ));
         }
-        Ok(Token { kind: TokenKind::StringLit(value), line, column: col })
+        Ok(Token {
+            kind: TokenKind::StringLit(value),
+            line,
+            column: col,
+        })
     }
 
     /// §2.3: string max 256 characters.
@@ -367,10 +433,14 @@ impl<'a> Lexer<'a> {
                 }
             }
         }
-        let value: f64 = s.parse().map_err(|_| {
-            ParseError::lex(line, col, format!("invalid number '{s}'"))
-        })?;
-        Ok(Token { kind: TokenKind::NumberLit(value), line, column: col })
+        let value: f64 = s
+            .parse()
+            .map_err(|_| ParseError::lex(line, col, format!("invalid number '{s}'")))?;
+        Ok(Token {
+            kind: TokenKind::NumberLit(value),
+            line,
+            column: col,
+        })
     }
 
     fn read_word(&mut self, line: u32, col: u32) -> Result<Token, ParseError> {
@@ -391,7 +461,10 @@ impl<'a> Lexer<'a> {
             match self.peek() {
                 Some('-') => {
                     // Check next char is lowercase letter or digit (valid segment start)
-                    if self.peek_at(1).is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit()) {
+                    if self
+                        .peek_at(1)
+                        .is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+                    {
                         word.push('-');
                         self.advance();
                         while let Some(c) = self.peek() {
@@ -407,7 +480,10 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 Some('.') => {
-                    if self.peek_at(1).is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit()) {
+                    if self
+                        .peek_at(1)
+                        .is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+                    {
                         word.push('.');
                         self.advance();
                         while let Some(c) = self.peek() {
@@ -428,16 +504,22 @@ impl<'a> Lexer<'a> {
 
         // §2.1/§2.2: length 1–64
         if word.len() > 64 {
-            return Err(ParseError::lex(line, col, format!(
-                "identifier/atom too long ({} chars; max 64)", word.len()
-            )));
+            return Err(ParseError::lex(
+                line,
+                col,
+                format!("identifier/atom too long ({} chars; max 64)", word.len()),
+            ));
         }
 
         // Classify: keyword vs ident vs atom
         let has_extended = word.contains('-') || word.contains('.');
         if has_extended {
             Self::validate_atom_surface(&word, line, col)?;
-            return Ok(Token { kind: TokenKind::Atom(word), line, column: col });
+            return Ok(Token {
+                kind: TokenKind::Atom(word),
+                line,
+                column: col,
+            });
         }
 
         let kind = match word.as_str() {
@@ -449,15 +531,16 @@ impl<'a> Lexer<'a> {
             "false" => TokenKind::False,
             _ => TokenKind::Ident(word),
         };
-        Ok(Token { kind, line, column: col })
+        Ok(Token {
+            kind,
+            line,
+            column: col,
+        })
     }
 
     /// §2.2: dots may not appear at atom boundaries or consecutively.
     fn validate_atom_surface(atom: &str, line: u32, col: u32) -> Result<(), ParseError> {
-        if atom.starts_with('.')
-            || atom.ends_with('.')
-            || atom.contains("..")
-        {
+        if atom.starts_with('.') || atom.ends_with('.') || atom.contains("..") {
             return Err(ParseError::lex(
                 line,
                 col,
@@ -482,76 +565,99 @@ mod tests {
 
     fn kinds(source: &str) -> Vec<TokenKind> {
         let mut lexer = Lexer::new(source);
-        lexer.tokenize().unwrap().into_iter().map(|t| t.kind).collect()
+        lexer
+            .tokenize()
+            .unwrap()
+            .into_iter()
+            .map(|t| t.kind)
+            .collect()
     }
 
     #[test]
     fn basic_tokens() {
         let toks = kinds("diagram { node a {} }");
-        assert_eq!(toks, vec![
-            TokenKind::Diagram,
-            TokenKind::LBrace,
-            TokenKind::Node,
-            TokenKind::Ident("a".into()),
-            TokenKind::LBrace,
-            TokenKind::RBrace,
-            TokenKind::RBrace,
-            TokenKind::Eof,
-        ]);
+        assert_eq!(
+            toks,
+            vec![
+                TokenKind::Diagram,
+                TokenKind::LBrace,
+                TokenKind::Node,
+                TokenKind::Ident("a".into()),
+                TokenKind::LBrace,
+                TokenKind::RBrace,
+                TokenKind::RBrace,
+                TokenKind::Eof,
+            ]
+        );
     }
 
     #[test]
     fn arrows() {
         let toks = kinds("a -> b --> c <-> d");
-        assert_eq!(toks, vec![
-            TokenKind::Ident("a".into()),
-            TokenKind::Arrow,
-            TokenKind::Ident("b".into()),
-            TokenKind::DashArrow,
-            TokenKind::Ident("c".into()),
-            TokenKind::BiArrow,
-            TokenKind::Ident("d".into()),
-            TokenKind::Eof,
-        ]);
+        assert_eq!(
+            toks,
+            vec![
+                TokenKind::Ident("a".into()),
+                TokenKind::Arrow,
+                TokenKind::Ident("b".into()),
+                TokenKind::DashArrow,
+                TokenKind::Ident("c".into()),
+                TokenKind::BiArrow,
+                TokenKind::Ident("d".into()),
+                TokenKind::Eof,
+            ]
+        );
     }
 
     #[test]
     fn atom_with_hyphens_and_dots() {
         let toks = kinds("top-to-bottom common.clean-light");
-        assert_eq!(toks, vec![
-            TokenKind::Atom("top-to-bottom".into()),
-            TokenKind::Atom("common.clean-light".into()),
-            TokenKind::Eof,
-        ]);
+        assert_eq!(
+            toks,
+            vec![
+                TokenKind::Atom("top-to-bottom".into()),
+                TokenKind::Atom("common.clean-light".into()),
+                TokenKind::Eof,
+            ]
+        );
     }
 
     #[test]
     fn string_with_escapes() {
         let toks = kinds(r#""hello \"world\"\n""#);
-        assert_eq!(toks, vec![
-            TokenKind::StringLit("hello \"world\"\n".into()),
-            TokenKind::Eof,
-        ]);
+        assert_eq!(
+            toks,
+            vec![
+                TokenKind::StringLit("hello \"world\"\n".into()),
+                TokenKind::Eof,
+            ]
+        );
     }
 
     #[test]
     fn number_literal() {
         let toks = kinds("42 3.14");
-        assert_eq!(toks, vec![
-            TokenKind::NumberLit(42.0),
-            TokenKind::NumberLit(3.14),
-            TokenKind::Eof,
-        ]);
+        assert_eq!(
+            toks,
+            vec![
+                TokenKind::NumberLit(42.0),
+                TokenKind::NumberLit(3.14),
+                TokenKind::Eof,
+            ]
+        );
     }
 
     #[test]
     fn at_sign() {
         let toks = kinds("@frontend");
-        assert_eq!(toks, vec![
-            TokenKind::At,
-            TokenKind::Ident("frontend".into()),
-            TokenKind::Eof,
-        ]);
+        assert_eq!(
+            toks,
+            vec![
+                TokenKind::At,
+                TokenKind::Ident("frontend".into()),
+                TokenKind::Eof,
+            ]
+        );
     }
 
     #[test]
@@ -575,41 +681,47 @@ mod tests {
     #[test]
     fn line_comments_skipped() {
         let toks = kinds("node a {} // trailing comment\nnode b {}");
-        assert_eq!(toks, vec![
-            TokenKind::Node,
-            TokenKind::Ident("a".into()),
-            TokenKind::LBrace,
-            TokenKind::RBrace,
-            TokenKind::Node,
-            TokenKind::Ident("b".into()),
-            TokenKind::LBrace,
-            TokenKind::RBrace,
-            TokenKind::Eof,
-        ]);
+        assert_eq!(
+            toks,
+            vec![
+                TokenKind::Node,
+                TokenKind::Ident("a".into()),
+                TokenKind::LBrace,
+                TokenKind::RBrace,
+                TokenKind::Node,
+                TokenKind::Ident("b".into()),
+                TokenKind::LBrace,
+                TokenKind::RBrace,
+                TokenKind::Eof,
+            ]
+        );
     }
 
     #[test]
     fn keywords_vs_ident() {
         let toks = kinds("group true false diagram node my_id");
-        assert_eq!(toks, vec![
-            TokenKind::Group,
-            TokenKind::True,
-            TokenKind::False,
-            TokenKind::Diagram,
-            TokenKind::Node,
-            TokenKind::Ident("my_id".into()),
-            TokenKind::Eof,
-        ]);
+        assert_eq!(
+            toks,
+            vec![
+                TokenKind::Group,
+                TokenKind::True,
+                TokenKind::False,
+                TokenKind::Diagram,
+                TokenKind::Node,
+                TokenKind::Ident("my_id".into()),
+                TokenKind::Eof,
+            ]
+        );
     }
 
     #[test]
     fn style_dot_key() {
         // style.fill is lexed as Atom("style.fill")
         let toks = kinds("style.fill");
-        assert_eq!(toks, vec![
-            TokenKind::Atom("style.fill".into()),
-            TokenKind::Eof,
-        ]);
+        assert_eq!(
+            toks,
+            vec![TokenKind::Atom("style.fill".into()), TokenKind::Eof,]
+        );
     }
 
     #[test]
@@ -621,12 +733,15 @@ mod tests {
     #[test]
     fn comma_token() {
         let toks = kinds("a, b");
-        assert_eq!(toks, vec![
-            TokenKind::Ident("a".into()),
-            TokenKind::Comma,
-            TokenKind::Ident("b".into()),
-            TokenKind::Eof,
-        ]);
+        assert_eq!(
+            toks,
+            vec![
+                TokenKind::Ident("a".into()),
+                TokenKind::Comma,
+                TokenKind::Ident("b".into()),
+                TokenKind::Eof,
+            ]
+        );
     }
 
     #[test]

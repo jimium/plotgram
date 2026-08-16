@@ -151,7 +151,9 @@ diagram {
         assert_eq!(out.layout.name, "hierarchical");
         assert_eq!(
             out.layout.options.get("direction"),
-            Some(&plotgram_model::attr::AttrValue::Atom("top-to-bottom".into()))
+            Some(&plotgram_model::attr::AttrValue::Atom(
+                "top-to-bottom".into()
+            ))
         );
         assert_eq!(out.profile, Some(DiagramType::Flowchart));
         assert_eq!(out.meta.title.as_deref(), Some("用户登录"));
@@ -194,7 +196,12 @@ diagram {
         assert_eq!(out.graph.edges.len(), 2);
 
         // Anchors injected
-        let fe = out.graph.groups.iter().find(|g| g.id == "frontend").unwrap();
+        let fe = out
+            .graph
+            .groups
+            .iter()
+            .find(|g| g.id == "frontend")
+            .unwrap();
         let fe_anchors: Vec<_> = fe.nodes.iter().filter(|n| n.is_group_anchor()).collect();
         assert_eq!(fe_anchors.len(), 1);
         assert_eq!(fe_anchors[0].anchor_side(), Some(Side::East));
@@ -217,15 +224,11 @@ diagram {
         let edge = &out.graph.edges[0];
         assert_eq!(
             edge.from_port,
-            Some(plotgram_model::port::PortConstraint::FixedSide {
-                side: Side::South,
-            })
+            Some(plotgram_model::port::PortConstraint::FixedSide { side: Side::South })
         );
         assert_eq!(
             edge.to_port,
-            Some(plotgram_model::port::PortConstraint::FixedSide {
-                side: Side::North,
-            })
+            Some(plotgram_model::port::PortConstraint::FixedSide { side: Side::North })
         );
         assert!(!edge.attrs.contains_key("from_side"));
         assert!(!edge.attrs.contains_key("to_side"));
@@ -254,10 +257,7 @@ diagram {
         )
         .unwrap_err();
         assert!(matches!(err, ParseError::Port(_)));
-        assert!(
-            err.to_string().contains("edge_group"),
-            "unexpected: {err}"
-        );
+        assert!(err.to_string().contains("edge_group"), "unexpected: {err}");
     }
 
     #[test]
@@ -272,8 +272,12 @@ diagram {
         assert_eq!(out.layout.name, "sequence");
         assert_eq!(out.profile, Some(DiagramType::Sequence));
         // Edge declaration order = time axis
-        let ids: Vec<_> = out.graph.edges_in_declaration_order()
-            .iter().map(|e| e.id.as_str()).collect();
+        let ids: Vec<_> = out
+            .graph
+            .edges_in_declaration_order()
+            .iter()
+            .map(|e| e.id.as_str())
+            .collect();
         assert_eq!(ids, ["e0", "e1"]);
     }
 
@@ -301,7 +305,10 @@ diagram {
         let out = parse(r#"diagram { node db "用户库" database mysql }"#).unwrap();
         let n = &out.graph.nodes[0];
         assert_eq!(n.label.as_deref(), Some("用户库"));
-        assert_eq!(n.attrs.get("archetype").and_then(|v| v.as_str()), Some("database"));
+        assert_eq!(
+            n.attrs.get("archetype").and_then(|v| v.as_str()),
+            Some("database")
+        );
         assert_eq!(n.attrs.get("icon").and_then(|v| v.as_str()), Some("mysql"));
     }
 
@@ -341,7 +348,10 @@ diagram {
         // db: archetype fills shape + variant, no icon (database has icon: None)
         let db = &out.graph.nodes[0];
         assert_eq!(db.shape, Some(plotgram_model::NodeShape::Cylinder));
-        assert_eq!(db.attrs.get("variant").and_then(|v| v.as_str()), Some("info"));
+        assert_eq!(
+            db.attrs.get("variant").and_then(|v| v.as_str()),
+            Some("info")
+        );
         assert!(!db.attrs.contains_key("icon"));
 
         // gw: explicit `icon: none` blocks archetype icon fill (gateway has no icon anyway)
@@ -353,13 +363,22 @@ diagram {
         let svc = &out.graph.nodes[2];
         assert_eq!(svc.label.as_deref(), Some("Service"));
         assert_eq!(svc.shape, Some(plotgram_model::NodeShape::RoundedRect));
-        assert_eq!(svc.attrs.get("variant").and_then(|v| v.as_str()), Some("default"));
-        assert_eq!(svc.attrs.get("icon").and_then(|v| v.as_str()), Some("service"));
+        assert_eq!(
+            svc.attrs.get("variant").and_then(|v| v.as_str()),
+            Some("default")
+        );
+        assert_eq!(
+            svc.attrs.get("icon").and_then(|v| v.as_str()),
+            Some("service")
+        );
 
         // custom: explicit shape + variant override archetype defaults
         let custom = &out.graph.nodes[3];
         assert_eq!(custom.shape, Some(plotgram_model::NodeShape::RoundedRect));
-        assert_eq!(custom.attrs.get("variant").and_then(|v| v.as_str()), Some("primary"));
+        assert_eq!(
+            custom.attrs.get("variant").and_then(|v| v.as_str()),
+            Some("primary")
+        );
 
         // unknown_arch: no expansion, no error
         let unk = &out.graph.nodes[4];
@@ -389,7 +408,11 @@ diagram {
         let out = parse(source).unwrap();
 
         // Graph.partition filled
-        let grid = out.graph.partition.as_ref().expect("partition should be set");
+        let grid = out
+            .graph
+            .partition
+            .as_ref()
+            .expect("partition should be set");
         assert_eq!(grid.columns.len(), 3);
         assert!(grid.rows.is_empty());
         assert_eq!(grid.columns[0].id, "customer");
@@ -401,12 +424,17 @@ diagram {
         // cell_col lifted on nodes
         let order = &out.graph.nodes[0];
         assert_eq!(
-            order.partition_cell.as_ref().and_then(|c| c.column.as_deref()),
+            order
+                .partition_cell
+                .as_ref()
+                .and_then(|c| c.column.as_deref()),
             Some("customer")
         );
         let ship = &out.graph.nodes[2];
         assert_eq!(
-            ship.partition_cell.as_ref().and_then(|c| c.column.as_deref()),
+            ship.partition_cell
+                .as_ref()
+                .and_then(|c| c.column.as_deref()),
             Some("warehouse")
         );
     }

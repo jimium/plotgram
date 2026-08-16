@@ -64,12 +64,22 @@ fn main() {
     let doc64 = unit.repeat(11); // 66 source lines
     let doc1k = unit.repeat(171); // 1026 source lines
 
-    let wrap = |mw: f64| MeasureParams { max_width: Some(mw), ..base.clone() };
-    let trunc = MeasureParams { max_width: Some(220.0), max_lines: Some(3), ..base.clone() };
+    let wrap = |mw: f64| MeasureParams {
+        max_width: Some(mw),
+        ..base.clone()
+    };
+    let trunc = MeasureParams {
+        max_width: Some(220.0),
+        max_lines: Some(3),
+        ..base.clone()
+    };
 
     println!("plotgram-content release bench (median of 7 batches)");
     println!("{}", "-".repeat(72));
-    println!("{:<34} {:>10} {:>12} {:>12}", "case", "iters", "per op", "throughput");
+    println!(
+        "{:<34} {:>10} {:>12} {:>12}",
+        "case", "iters", "per op", "throughput"
+    );
 
     let cases: Vec<(&str, u32, Box<dyn FnMut()>)> = vec![
         ("parse: node (6 lines)", 100_000, {
@@ -90,7 +100,13 @@ fn main() {
             })
         }),
         ("measure: node, wrap+trunc+center", 100_000, {
-            let (doc, p) = (parse(node), MeasureParams { align: Align::Center, ..trunc.clone() });
+            let (doc, p) = (
+                parse(node),
+                MeasureParams {
+                    align: Align::Center,
+                    ..trunc.clone()
+                },
+            );
             Box::new(move || {
                 black_box(measure(black_box(&doc), &p));
             })
@@ -127,6 +143,12 @@ fn main() {
     for (name, iters, mut f) in cases {
         let ns = bench(iters, &mut f);
         let ops = 1e9 / ns;
-        println!("{:<34} {:>10} {:>12} {:>9.0} op/s", name, iters, fmt_ns(ns), ops);
+        println!(
+            "{:<34} {:>10} {:>12} {:>9.0} op/s",
+            name,
+            iters,
+            fmt_ns(ns),
+            ops
+        );
     }
 }

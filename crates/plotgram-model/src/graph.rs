@@ -12,8 +12,8 @@
 use crate::attr::AttrMap;
 use crate::partition::{PartitionCell, PartitionGrid};
 use crate::port::{
-    ANCHOR_SIDE_KEY, ANCHOR_SLOT_KEY, FROM_SIDE_KEY, TO_SIDE_KEY, PortConstraint,
-    PortConstraintError, Side, anchor_port_constraint, edge_port_constraint,
+    anchor_port_constraint, edge_port_constraint, PortConstraint, PortConstraintError, Side,
+    ANCHOR_SIDE_KEY, ANCHOR_SLOT_KEY, FROM_SIDE_KEY, TO_SIDE_KEY,
 };
 
 /// Arrow semantics (dsl-spec §7.2: exactly 3 kinds).
@@ -87,10 +87,7 @@ impl std::fmt::Display for NodeStructuralError {
                 )
             }
             Self::AnchorMissingSide { node_id } => {
-                write!(
-                    f,
-                    "node `{node_id}`: `role: group_anchor` requires `side`"
-                )
+                write!(f, "node `{node_id}`: `role: group_anchor` requires `side`")
             }
             Self::EntityHasAnchorFields { node_id } => {
                 write!(
@@ -168,11 +165,10 @@ impl Node {
         if matches!(self.role, NodeRole::Entity) {
             if let Some(v) = self.attrs.get("role") {
                 let atom = v.as_str().unwrap_or_default();
-                self.role = NodeRole::parse(atom).ok_or_else(|| {
-                    NodeStructuralError::InvalidRole {
+                self.role =
+                    NodeRole::parse(atom).ok_or_else(|| NodeStructuralError::InvalidRole {
                         value: v.to_string(),
-                    }
-                })?;
+                    })?;
             }
         }
         if self.host_group.is_none() {
@@ -226,7 +222,12 @@ impl Node {
                 Ok(())
             }
             NodeRole::GroupAnchor => {
-                if self.host_group.as_ref().map(|s| s.is_empty()).unwrap_or(true) {
+                if self
+                    .host_group
+                    .as_ref()
+                    .map(|s| s.is_empty())
+                    .unwrap_or(true)
+                {
                     return Err(NodeStructuralError::AnchorMissingHostGroup {
                         node_id: self.id.clone(),
                     });
@@ -362,7 +363,13 @@ impl Edge {
                 }
             }
         }
-        for k in [FROM_SIDE_KEY, TO_SIDE_KEY, "critical", "weight", "undirected"] {
+        for k in [
+            FROM_SIDE_KEY,
+            TO_SIDE_KEY,
+            "critical",
+            "weight",
+            "undirected",
+        ] {
             self.attrs.remove(k);
         }
         // Strip removed keys only after error check above — they must not linger.
@@ -694,9 +701,12 @@ mod tests {
     #[test]
     fn lift_structural_attrs_to_first_class_fields() {
         let mut e = edge("e", Arrow::Forward);
-        e.attrs.insert("from_side".into(), AttrValue::Atom("south".into()));
-        e.attrs.insert("to_side".into(), AttrValue::Atom("north".into()));
-        e.attrs.insert("style.stroke".into(), AttrValue::Str("#f00".into()));
+        e.attrs
+            .insert("from_side".into(), AttrValue::Atom("south".into()));
+        e.attrs
+            .insert("to_side".into(), AttrValue::Atom("north".into()));
+        e.attrs
+            .insert("style.stroke".into(), AttrValue::Str("#f00".into()));
 
         e.lift_structural_attrs().unwrap();
 
@@ -732,7 +742,8 @@ mod tests {
         }
 
         let mut e = edge("e", Arrow::Forward);
-        e.attrs.insert("undirected".into(), AttrValue::Str("yes".into()));
+        e.attrs
+            .insert("undirected".into(), AttrValue::Str("yes".into()));
         assert!(matches!(
             e.lift_structural_attrs(),
             Err(PortConstraintError::InvalidUndirected { .. })
@@ -763,10 +774,12 @@ mod tests {
     #[test]
     fn lift_node_group_anchor_structural_attrs() {
         let mut n = node("ga_fe");
-        n.attrs.insert("role".into(), AttrValue::Atom("group_anchor".into()));
+        n.attrs
+            .insert("role".into(), AttrValue::Atom("group_anchor".into()));
         n.attrs
             .insert("host_group".into(), AttrValue::Atom("frontend".into()));
-        n.attrs.insert("side".into(), AttrValue::Atom("east".into()));
+        n.attrs
+            .insert("side".into(), AttrValue::Atom("east".into()));
         n.attrs.insert("slot".into(), AttrValue::Num(0.0));
         n.attrs
             .insert("style.fill".into(), AttrValue::Str("#fff".into()));

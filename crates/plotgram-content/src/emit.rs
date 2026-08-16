@@ -105,7 +105,10 @@ fn fmt(v: f64) -> String {
 }
 
 fn xml_escape(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 #[cfg(test)]
@@ -150,7 +153,11 @@ mod tests {
         assert!(svg.contains("&amp;") && svg.contains("&lt;b&gt;"));
         assert!(svg.contains(r#"x2=""#));
         // Chip rect sits exactly on the code run box, painted before text.
-        let code_run = cl.lines[0].runs.iter().find(|r| r.style == RunStyle::Code).unwrap();
+        let code_run = cl.lines[0]
+            .runs
+            .iter()
+            .find(|r| r.style == RunStyle::Code)
+            .unwrap();
         let chip = format!(
             r##"<rect x="{}" y="{}" width="{}" height="{}" rx="2" fill="#f3effe"/>"##,
             fmt(code_run.x),
@@ -158,10 +165,16 @@ mod tests {
             fmt(code_run.width),
             fmt(cl.lines[0].height),
         );
-        assert!(svg.contains(&chip), "chip rect must reuse the run box verbatim");
+        assert!(
+            svg.contains(&chip),
+            "chip rect must reuse the run box verbatim"
+        );
         assert!(svg.find(&chip).unwrap() < svg.find("<text").unwrap());
         // No chip when the paint doesn't ask for one.
-        let no_chip = ContentPaint { code_chip_fill: None, ..paint.clone() };
+        let no_chip = ContentPaint {
+            code_chip_fill: None,
+            ..paint.clone()
+        };
         assert!(!emit_svg(&cl, &no_chip).contains("#f3effe"));
         // Same layout + same paint -> byte-identical fragment (determinism).
         assert_eq!(svg, emit_svg(&cl, &paint));

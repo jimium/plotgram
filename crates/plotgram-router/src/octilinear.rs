@@ -342,10 +342,7 @@ fn near(a: Point, b: Point) -> bool {
 }
 
 fn point_strictly_inside(p: Point, r: Rect) -> bool {
-    p.x > r.x + EPS
-        && p.x < r.right() - EPS
-        && p.y > r.y + EPS
-        && p.y < r.bottom() - EPS
+    p.x > r.x + EPS && p.x < r.right() - EPS && p.y > r.y + EPS && p.y < r.bottom() - EPS
 }
 
 fn find_vertex(verts: &[Point], p: Point) -> Option<usize> {
@@ -658,7 +655,10 @@ mod tests {
         let a = OctilinearEdgeRouter.route(&sc).unwrap();
         let b = OctilinearEdgeRouter.route(&sc).unwrap();
         for (pa, pb) in a.iter().zip(b.iter()) {
-            assert_eq!(pa.path.polyline_points().unwrap(), pb.path.polyline_points().unwrap());
+            assert_eq!(
+                pa.path.polyline_points().unwrap(),
+                pb.path.polyline_points().unwrap()
+            );
         }
     }
 
@@ -683,10 +683,6 @@ mod tests {
         );
         let t0 = std::time::Instant::now();
         let _ = OctilinearEdgeRouter.route(&sc);
-        assert!(
-            t0.elapsed().as_secs_f64() < 2.0,
-            "took {:?}",
-            t0.elapsed()
-        );
+        assert!(t0.elapsed().as_secs_f64() < 2.0, "took {:?}", t0.elapsed());
     }
 }

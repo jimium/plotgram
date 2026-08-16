@@ -12,9 +12,7 @@ impl ParseWarning {
     pub fn unknown_diagram_key(key: impl Into<String>) -> Self {
         let key = key.into();
         Self {
-            message: format!(
-                "unknown diagram attribute `{key}`; ignored (dsl-spec §4.2)"
-            ),
+            message: format!("unknown diagram attribute `{key}`; ignored (dsl-spec §4.2)"),
         }
     }
 }
