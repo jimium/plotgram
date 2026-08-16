@@ -1,0 +1,20 @@
+// 两三角共割点：bcc-isolated 把割点夹在两圆之间，不并入任一侧
+diagram {
+    title: "割点夹心",
+    layout: circular {
+        partitioning: bcc-isolated
+    }
+
+    node a "割点"
+    node b "B"
+    node c "C"
+    node d "D"
+    node e "E"
+
+    a -> b
+    b -> c
+    c -> a
+    a -> d
+    d -> e
+    e -> a
+}

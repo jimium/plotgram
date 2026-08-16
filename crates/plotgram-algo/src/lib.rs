@@ -14,8 +14,10 @@
 
 #![forbid(unsafe_code)]
 
+pub mod bcc;
 pub mod crossing;
 pub mod fas;
+pub mod fiedler;
 pub mod interval_color;
 pub mod linear_arrange;
 pub mod orientation;

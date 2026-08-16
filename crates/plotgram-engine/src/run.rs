@@ -167,7 +167,7 @@ mod tests {
     use super::*;
     use plotgram_model::attr::{AttrMap, AttrValue};
     use plotgram_model::contract::AlgorithmRef;
-    use plotgram_model::geometry::Size;
+    use plotgram_model::geometry::{Point, Size};
     use plotgram_model::graph::{Arrow, Edge, Graph, Node, NodeRole};
     use plotgram_model::result::Decoration;
     use plotgram_model::sizes::NodeSizes;
@@ -183,6 +183,12 @@ mod tests {
             partition_cell: None,
             attrs: AttrMap::new(),
         }
+    }
+
+    fn node_attr(id: &str, key: &str, val: AttrValue) -> Node {
+        let mut n = node(id);
+        n.attrs.insert(key.into(), val);
+        n
     }
 
     fn edge(id: &str, s: &str, t: &str) -> Edge {
@@ -228,6 +234,23 @@ mod tests {
                 .map(|(k, v)| (k.to_string(), v.clone()))
                 .collect(),
         )
+    }
+
+    fn circular_options(pairs: &[(&str, AttrValue)]) -> AlgorithmRef {
+        AlgorithmRef::with_options(
+            "circular",
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect(),
+        )
+    }
+
+    fn circular_cycle() -> AlgorithmRef {
+        circular_options(&[
+            ("partitioning", AttrValue::Atom("single-cycle".into())),
+            ("order", AttrValue::Atom("bfs".into())),
+        ])
     }
 
     #[test]
@@ -842,5 +865,692 @@ mod tests {
         assert!(frame("l").x < frame("r").x);
         assert_eq!(result.edges.len(), 2);
         assert!(result.edges[0].path.polyline_points().unwrap().len() >= 2);
+    }
+
+    #[test]
+    fn circular_single_cycle_places_equal_nodes_on_a_ring() {
+        let graph = Graph {
+            nodes: vec![node("a"), node("b"), node("c"), node("d")],
+            edges: vec![
+                edge("e0", "a", "b"),
+                edge("e1", "b", "c"),
+                edge("e2", "c", "d"),
+                edge("e3", "d", "a"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let result = run(&LayoutContract {
+            layout: circular_cycle(),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["a", "b", "c", "d"]),
+        })
+        .unwrap();
+        assert_eq!(result.nodes.len(), 4);
+        assert_eq!(result.edges.len(), 4);
+        let frame = |id: &str| result.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        let cx = ["a", "b", "c", "d"]
+            .iter()
+            .map(|id| frame(id).center().x)
+            .sum::<f64>()
+            / 4.0;
+        let cy = ["a", "b", "c", "d"]
+            .iter()
+            .map(|id| frame(id).center().y)
+            .sum::<f64>()
+            / 4.0;
+        let radii: Vec<f64> = ["a", "b", "c", "d"]
+            .iter()
+            .map(|id| {
+                let c = frame(id).center();
+                ((c.x - cx).powi(2) + (c.y - cy).powi(2)).sqrt()
+            })
+            .collect();
+        let r0 = radii[0];
+        for r in &radii {
+            assert!(
+                (r - r0).abs() < 1e-6,
+                "equal nodes should share a radius, got {radii:?}"
+            );
+        }
+        assert!(r0 > 1.0, "ring radius should be positive, got {r0}");
+        for e in &result.edges {
+            assert!(e.path.polyline_points().unwrap().len() >= 2);
+        }
+        let ids = ["a", "b", "c", "d"];
+        for i in 0..ids.len() {
+            for j in (i + 1)..ids.len() {
+                let fa = frame(ids[i]);
+                let fb = frame(ids[j]);
+                let overlap_x = fa.right() > fb.x + 1e-6 && fb.right() > fa.x + 1e-6;
+                let overlap_y = fa.bottom() > fb.y + 1e-6 && fb.bottom() > fa.y + 1e-6;
+                assert!(
+                    !(overlap_x && overlap_y),
+                    "frames overlap {} / {}",
+                    ids[i],
+                    ids[j]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn circular_bfs_order_differs_from_declaration() {
+        let graph = Graph {
+            nodes: vec![node("a"), node("b"), node("c"), node("d")],
+            edges: vec![
+                edge("e0", "a", "c"),
+                edge("e1", "c", "b"),
+                edge("e2", "b", "d"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let sizes = sizes(&["a", "b", "c", "d"]);
+        let bfs = run(&LayoutContract {
+            layout: circular_options(&[
+                ("partitioning", AttrValue::Atom("single-cycle".into())),
+                ("order", AttrValue::Atom("bfs".into())),
+            ]),
+            edge_routing: None,
+            graph: graph.clone(),
+            node_sizes: sizes.clone(),
+        })
+        .unwrap();
+        let decl = run(&LayoutContract {
+            layout: circular_options(&[
+                ("partitioning", AttrValue::Atom("single-cycle".into())),
+                ("order", AttrValue::Atom("declaration".into())),
+            ]),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes,
+        })
+        .unwrap();
+        let pos = |r: &LayoutResult, id: &str| {
+            r.nodes.iter().find(|n| n.id == id).unwrap().frame.center()
+        };
+        let same = ["a", "b", "c", "d"].iter().all(|id| {
+            let p = pos(&bfs, id);
+            let q = pos(&decl, id);
+            (p.x - q.x).abs() < 1e-6 && (p.y - q.y).abs() < 1e-6
+        });
+        assert!(!same, "bfs and declaration circle order should differ");
+    }
+
+    #[test]
+    fn circular_two_components_pack_side_by_side() {
+        let graph = Graph {
+            nodes: vec![node("a"), node("b"), node("c"), node("d")],
+            edges: vec![edge("e0", "a", "b"), edge("e1", "c", "d")],
+            groups: vec![],
+            partition: None,
+        };
+        let result = run(&LayoutContract {
+            layout: circular_cycle(),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["a", "b", "c", "d"]),
+        })
+        .unwrap();
+        let frame = |id: &str| result.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        let left_max = frame("a").right().max(frame("b").right());
+        let right_min = frame("c").x.min(frame("d").x);
+        assert!(
+            left_max <= right_min + 1e-6,
+            "second component should sit to the right, left_max={left_max} right_min={right_min}"
+        );
+    }
+
+    #[test]
+    fn circular_named_unimplemented_is_unsupported() {
+        let cases: &[(&[(&str, AttrValue)], &str)] = &[
+            (
+                &[
+                    ("partitioning", AttrValue::Atom("single-cycle".into())),
+                    ("order", AttrValue::Atom("bfs".into())),
+                    ("partition_style", AttrValue::Atom("disk".into())),
+                ],
+                "disk",
+            ),
+            (
+                &[("routing_policy", AttrValue::Atom("automatic".into()))],
+                "automatic",
+            ),
+        ];
+        for (opts, needle) in cases {
+            let graph = Graph {
+                nodes: vec![node("a"), node("b")],
+                edges: vec![edge("e0", "a", "b")],
+                groups: vec![],
+                partition: None,
+            };
+            let err = run(&LayoutContract {
+                layout: circular_options(opts),
+                edge_routing: None,
+                graph,
+                node_sizes: sizes(&["a", "b"]),
+            })
+            .unwrap_err();
+            assert!(
+                matches!(err, LayoutError::Unsupported { .. }),
+                "expected Unsupported for {needle}, got {err}"
+            );
+            let msg = err.to_string();
+            assert!(
+                msg.contains(needle),
+                "Unsupported message should mention `{needle}`, got {msg}"
+            );
+        }
+    }
+
+    #[test]
+    fn circular_default_two_triangles_are_two_rings() {
+        let graph = Graph {
+            nodes: vec![node("a"), node("b"), node("c"), node("d"), node("e")],
+            edges: vec![
+                edge("e0", "a", "b"),
+                edge("e1", "b", "c"),
+                edge("e2", "c", "a"),
+                edge("e3", "a", "d"),
+                edge("e4", "d", "e"),
+                edge("e5", "e", "a"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let result = run(&LayoutContract {
+            layout: AlgorithmRef::new("circular"),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["a", "b", "c", "d", "e"]),
+        })
+        .unwrap();
+        assert_eq!(result.nodes.len(), 5);
+        let frame = |id: &str| result.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        let p = |id: &str| frame(id).center();
+        let cc = circumcenter3(p("a"), p("b"), p("c"));
+        let r = dist(cc, p("a"));
+        assert!(r > 1.0, "triangle abc should have a positive circumradius");
+        assert!(
+            (dist(cc, p("b")) - r).abs() < 1e-4 && (dist(cc, p("c")) - r).abs() < 1e-4,
+            "a,b,c should lie on one partition circle"
+        );
+        assert!(
+            (dist(cc, p("d")) - r).abs() > r * 0.25,
+            "d should not sit on triangle abc's circle (got dist={}, r={r})",
+            dist(cc, p("d"))
+        );
+        assert!(
+            (dist(cc, p("e")) - r).abs() > r * 0.25,
+            "e should not sit on triangle abc's circle (got dist={}, r={r})",
+            dist(cc, p("e"))
+        );
+        let c_de = Point {
+            x: (p("d").x + p("e").x) / 2.0,
+            y: (p("d").y + p("e").y) / 2.0,
+        };
+        let split = dist(cc, c_de);
+        assert!(
+            split > r * 0.5,
+            "the two BCC centers should be separated, dist={split} r={r}"
+        );
+    }
+
+    #[test]
+    fn circular_bcc_isolated_puts_cut_between_rings() {
+        let graph = two_triangles();
+        let compact = run(&LayoutContract {
+            layout: AlgorithmRef::new("circular"),
+            edge_routing: None,
+            graph: graph.clone(),
+            node_sizes: sizes(&["a", "b", "c", "d", "e"]),
+        })
+        .unwrap();
+        let isolated = run(&LayoutContract {
+            layout: circular_options(&[(
+                "partitioning",
+                AttrValue::Atom("bcc-isolated".into()),
+            )]),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["a", "b", "c", "d", "e"]),
+        })
+        .unwrap();
+        let p = |r: &LayoutResult, id: &str| {
+            r.nodes.iter().find(|n| n.id == id).unwrap().frame.center()
+        };
+        let mid = |u: Point, v: Point| Point {
+            x: (u.x + v.x) / 2.0,
+            y: (u.y + v.y) / 2.0,
+        };
+        let a = p(&isolated, "a");
+        let m_bc = mid(p(&isolated, "b"), p(&isolated, "c"));
+        let m_de = mid(p(&isolated, "d"), p(&isolated, "e"));
+        let bc = dist(p(&isolated, "b"), p(&isolated, "c"));
+        assert!(
+            dist(a, m_bc) > bc,
+            "isolated cut should sit off the {{b,c}} disk, dist={} bc={bc}",
+            dist(a, m_bc)
+        );
+        let dot = (m_bc.x - a.x) * (m_de.x - a.x) + (m_bc.y - a.y) * (m_de.y - a.y);
+        assert!(
+            dot < 0.0,
+            "cut should sit between the two rings, dot={dot}"
+        );
+        let a_c = p(&compact, "a");
+        let m_bc_c = mid(p(&compact, "b"), p(&compact, "c"));
+        let bc_c = dist(p(&compact, "b"), p(&compact, "c"));
+        assert!(
+            dist(a_c, m_bc_c) < bc_c,
+            "compact should keep the cut on the {{b,c}} circle"
+        );
+        let same = ["a", "b", "c", "d", "e"].iter().all(|id| {
+            let u = p(&compact, id);
+            let v = p(&isolated, id);
+            (u.x - v.x).abs() < 1e-6 && (u.y - v.y).abs() < 1e-6
+        });
+        assert!(!same, "bcc-isolated geometry must differ from bcc-compact");
+    }
+
+    #[test]
+    fn circular_exterior_routes_non_adjacent_outside() {
+        let graph = Graph {
+            nodes: vec![node("a"), node("b"), node("c"), node("d")],
+            edges: vec![
+                edge("e0", "a", "b"),
+                edge("e1", "b", "c"),
+                edge("e2", "c", "d"),
+                edge("e3", "d", "a"),
+                edge("diag", "a", "c"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let sizes = sizes(&["a", "b", "c", "d"]);
+        let interior = run(&LayoutContract {
+            layout: circular_options(&[
+                ("partitioning", AttrValue::Atom("single-cycle".into())),
+                ("order", AttrValue::Atom("declaration".into())),
+                ("routing_policy", AttrValue::Atom("interior".into())),
+            ]),
+            edge_routing: None,
+            graph: graph.clone(),
+            node_sizes: sizes.clone(),
+        })
+        .unwrap();
+        let exterior = run(&LayoutContract {
+            layout: circular_options(&[
+                ("partitioning", AttrValue::Atom("single-cycle".into())),
+                ("order", AttrValue::Atom("declaration".into())),
+                ("routing_policy", AttrValue::Atom("exterior".into())),
+            ]),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes,
+        })
+        .unwrap();
+        let frame = |r: &LayoutResult, id: &str| r.nodes.iter().find(|n| n.id == id).unwrap().frame;
+        let cx = ["a", "b", "c", "d"]
+            .iter()
+            .map(|id| frame(&exterior, id).center().x)
+            .sum::<f64>()
+            / 4.0;
+        let cy = ["a", "b", "c", "d"]
+            .iter()
+            .map(|id| frame(&exterior, id).center().y)
+            .sum::<f64>()
+            / 4.0;
+        let center = Point { x: cx, y: cy };
+        let r_node = dist(frame(&exterior, "a").center(), center);
+        let ext = exterior.edges.iter().find(|e| e.id == "diag").unwrap();
+        let pts = ext.path.polyline_points().unwrap();
+        assert!(
+            pts.len() > 2,
+            "exterior diagonal should sample an arc, got {} points",
+            pts.len()
+        );
+        let mid = pts[pts.len() / 2];
+        let r_mid = dist(mid, center);
+        assert!(
+            r_mid > r_node + 8.0,
+            "exterior arc midpoint should sit outside the node circle, r_mid={r_mid} r_node={r_node}"
+        );
+        let inn = interior.edges.iter().find(|e| e.id == "diag").unwrap();
+        let ip = inn.path.polyline_points().unwrap();
+        assert_eq!(ip.len(), 2, "interior diagonal should stay a chord");
+        let imid = Point {
+            x: (ip[0].x + ip[1].x) / 2.0,
+            y: (ip[0].y + ip[1].y) / 2.0,
+        };
+        assert!(
+            dist(imid, center) + 1e-6 < r_node,
+            "interior chord midpoint should sit inside the node circle"
+        );
+    }
+
+    #[test]
+    fn circular_self_loop_is_short_arc() {
+        let graph = Graph {
+            nodes: vec![node("a"), node("b"), node("c")],
+            edges: vec![
+                edge("e0", "a", "b"),
+                edge("e1", "b", "c"),
+                edge("e2", "c", "a"),
+                edge("loop", "a", "a"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let result = run(&LayoutContract {
+            layout: circular_options(&[
+                ("partitioning", AttrValue::Atom("single-cycle".into())),
+                ("order", AttrValue::Atom("declaration".into())),
+            ]),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["a", "b", "c"]),
+        })
+        .unwrap();
+        let loop_e = result.edges.iter().find(|e| e.id == "loop").unwrap();
+        let pts = loop_e.path.polyline_points().unwrap();
+        assert!(
+            pts.len() >= 4,
+            "self-loop should be a short arc, got {} points",
+            pts.len()
+        );
+        let ac = result
+            .nodes
+            .iter()
+            .find(|n| n.id == "a")
+            .unwrap()
+            .frame
+            .center();
+        let r_max = pts.iter().map(|p| dist(*p, ac)).fold(0.0_f64, f64::max);
+        assert!(
+            r_max > 20.0,
+            "self-loop arc should leave the node frame, r_max={r_max}"
+        );
+    }
+
+    fn two_triangles() -> Graph {
+        Graph {
+            nodes: vec![node("a"), node("b"), node("c"), node("d"), node("e")],
+            edges: vec![
+                edge("e0", "a", "b"),
+                edge("e1", "b", "c"),
+                edge("e2", "c", "a"),
+                edge("e3", "a", "d"),
+                edge("e4", "d", "e"),
+                edge("e5", "e", "a"),
+            ],
+            groups: vec![],
+            partition: None,
+        }
+    }
+
+    #[test]
+    fn circular_two_runs_are_bit_identical() {
+        let graph = two_triangles();
+        let contract = LayoutContract {
+            layout: AlgorithmRef::new("circular"),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["a", "b", "c", "d", "e"]),
+        };
+        let a = run(&contract).unwrap();
+        let b = run(&contract).unwrap();
+        assert_eq!(a.diagnostics.params_hash, b.diagnostics.params_hash);
+        for (na, nb) in a.nodes.iter().zip(b.nodes.iter()) {
+            assert_eq!(na.id, nb.id);
+            assert_eq!(na.frame.x, nb.frame.x);
+            assert_eq!(na.frame.y, nb.frame.y);
+        }
+    }
+
+    #[test]
+    fn circular_single_cycle_differs_from_bcc_compact() {
+        let graph = two_triangles();
+        let sizes = sizes(&["a", "b", "c", "d", "e"]);
+        let compact = run(&LayoutContract {
+            layout: AlgorithmRef::new("circular"),
+            edge_routing: None,
+            graph: graph.clone(),
+            node_sizes: sizes.clone(),
+        })
+        .unwrap();
+        let cycle = run(&LayoutContract {
+            layout: circular_options(&[
+                ("partitioning", AttrValue::Atom("single-cycle".into())),
+                ("order", AttrValue::Atom("declaration".into())),
+            ]),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes,
+        })
+        .unwrap();
+        let p = |r: &LayoutResult, id: &str| {
+            r.nodes.iter().find(|n| n.id == id).unwrap().frame.center()
+        };
+        let same = ["a", "b", "c", "d", "e"].iter().all(|id| {
+            let u = p(&compact, id);
+            let v = p(&cycle, id);
+            (u.x - v.x).abs() < 1e-6 && (u.y - v.y).abs() < 1e-6
+        });
+        assert!(!same, "single-cycle and bcc-compact must differ on the same topology");
+        let cx = ["a", "b", "c", "d", "e"]
+            .iter()
+            .map(|id| p(&cycle, id).x)
+            .sum::<f64>()
+            / 5.0;
+        let cy = ["a", "b", "c", "d", "e"]
+            .iter()
+            .map(|id| p(&cycle, id).y)
+            .sum::<f64>()
+            / 5.0;
+        let center = Point { x: cx, y: cy };
+        let radii: Vec<f64> = ["a", "b", "c", "d", "e"]
+            .iter()
+            .map(|id| dist(p(&cycle, id), center))
+            .collect();
+        let r0 = radii[0];
+        for r in &radii {
+            assert!(
+                (r - r0).abs() < 1e-4,
+                "single-cycle should keep all nodes on one ring, {radii:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn circular_custom_circle_splits_one_bcc() {
+        let mut nodes = Vec::new();
+        for id in ["n0", "n1", "n2", "n3", "n4", "n5"] {
+            let atom = if matches!(id, "n0" | "n1" | "n2") {
+                "left"
+            } else {
+                "right"
+            };
+            nodes.push(node_attr(id, "circle", AttrValue::Atom(atom.into())));
+        }
+        let graph = Graph {
+            nodes,
+            edges: vec![
+                edge("e0", "n0", "n1"),
+                edge("e1", "n1", "n2"),
+                edge("e2", "n2", "n3"),
+                edge("e3", "n3", "n4"),
+                edge("e4", "n4", "n5"),
+                edge("e5", "n5", "n0"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let ids = ["n0", "n1", "n2", "n3", "n4", "n5"];
+        let sizes = sizes(&ids);
+        let custom = run(&LayoutContract {
+            layout: AlgorithmRef::new("circular"),
+            edge_routing: None,
+            graph: graph.clone(),
+            node_sizes: sizes.clone(),
+        })
+        .unwrap();
+        let unmarked = {
+            let plain = Graph {
+                nodes: ids.iter().map(|id| node(id)).collect(),
+                edges: graph.edges.clone(),
+                groups: vec![],
+                partition: None,
+            };
+            run(&LayoutContract {
+                layout: AlgorithmRef::new("circular"),
+                edge_routing: None,
+                graph: plain,
+                node_sizes: sizes,
+            })
+            .unwrap()
+        };
+        let p = |r: &LayoutResult, id: &str| {
+            r.nodes.iter().find(|n| n.id == id).unwrap().frame.center()
+        };
+        let centroid = |r: &LayoutResult, who: &[&str]| {
+            let n = who.len() as f64;
+            Point {
+                x: who.iter().map(|id| p(r, id).x).sum::<f64>() / n,
+                y: who.iter().map(|id| p(r, id).y).sum::<f64>() / n,
+            }
+        };
+        let left = centroid(&custom, &["n0", "n1", "n2"]);
+        let right = centroid(&custom, &["n3", "n4", "n5"]);
+        let r_left = dist(p(&custom, "n0"), left);
+        assert!(
+            dist(left, right) > r_left * 1.2,
+            "custom groups should be two rings, not one, split={} r={r_left}",
+            dist(left, right)
+        );
+        let gx = ids.iter().map(|id| p(&unmarked, id).x).sum::<f64>() / 6.0;
+        let gy = ids.iter().map(|id| p(&unmarked, id).y).sum::<f64>() / 6.0;
+        let g = Point { x: gx, y: gy };
+        let r0 = dist(p(&unmarked, "n0"), g);
+        for id in ids {
+            assert!(
+                (dist(p(&unmarked, id), g) - r0).abs() < 1e-4,
+                "unmarked 6-cycle is one BCC ring"
+            );
+        }
+    }
+
+    #[test]
+    fn circular_custom_cycle_warns_and_keeps_edges() {
+        let graph = Graph {
+            nodes: vec![
+                node_attr("a0", "circle", AttrValue::Atom("g0".into())),
+                node_attr("a1", "circle", AttrValue::Atom("g0".into())),
+                node_attr("b0", "circle", AttrValue::Atom("g1".into())),
+                node_attr("b1", "circle", AttrValue::Atom("g1".into())),
+                node_attr("c0", "circle", AttrValue::Atom("g2".into())),
+                node_attr("c1", "circle", AttrValue::Atom("g2".into())),
+            ],
+            edges: vec![
+                edge("e0", "a0", "a1"),
+                edge("e1", "b0", "b1"),
+                edge("e2", "c0", "c1"),
+                edge("e3", "a1", "b0"),
+                edge("e4", "b1", "c0"),
+                edge("e5", "c1", "a0"),
+            ],
+            groups: vec![],
+            partition: None,
+        };
+        let result = run(&LayoutContract {
+            layout: AlgorithmRef::new("circular"),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["a0", "a1", "b0", "b1", "c0", "c1"]),
+        })
+        .unwrap();
+        assert_eq!(result.edges.len(), 6);
+        assert!(
+            result
+                .diagnostics
+                .warnings
+                .iter()
+                .any(|w| w.message.contains("cycle")),
+            "cycle in custom partition graph should warn, got {:?}",
+            result.diagnostics.warnings
+        );
+    }
+
+    #[test]
+    fn circular_custom_invalid_circle_id() {
+        let cases: &[(&str, AttrValue, &str)] = &[
+            ("a", AttrValue::Atom(String::new()), "empty"),
+            ("a", AttrValue::Atom("Left".into()), "node-id"),
+            ("a", AttrValue::Num(1.0), "atom"),
+        ];
+        for (id, val, needle) in cases {
+            let graph = Graph {
+                nodes: vec![node_attr(id, "circle", val.clone()), node("b")],
+                edges: vec![edge("e0", id, "b")],
+                groups: vec![],
+                partition: None,
+            };
+            let err = run(&LayoutContract {
+                layout: AlgorithmRef::new("circular"),
+                edge_routing: None,
+                graph,
+                node_sizes: sizes(&[id, "b"]),
+            })
+            .unwrap_err();
+            assert!(
+                matches!(err, LayoutError::InvalidInput { .. }),
+                "expected InvalidInput for {needle}, got {err}"
+            );
+            let msg = err.to_string();
+            assert!(
+                msg.contains(needle),
+                "InvalidInput should mention `{needle}`, got {msg}"
+            );
+        }
+        let mut n = node("a");
+        n.attrs
+            .insert("circle".into(), AttrValue::Atom("one".into()));
+        n.attrs
+            .insert("partition".into(), AttrValue::Atom("two".into()));
+        let graph = Graph {
+            nodes: vec![n, node("b")],
+            edges: vec![edge("e0", "a", "b")],
+            groups: vec![],
+            partition: None,
+        };
+        let err = run(&LayoutContract {
+            layout: AlgorithmRef::new("circular"),
+            edge_routing: None,
+            graph,
+            node_sizes: sizes(&["a", "b"]),
+        })
+        .unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("conflicts"),
+            "conflicting circle/partition should fail, got {msg}"
+        );
+    }
+
+    fn dist(a: Point, b: Point) -> f64 {
+        ((a.x - b.x).powi(2) + (a.y - b.y).powi(2)).sqrt()
+    }
+
+    fn circumcenter3(a: Point, b: Point, c: Point) -> Point {
+        let d = 2.0 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+        assert!(d.abs() > 1e-9, "triangle abc is collinear");
+        let a2 = a.x * a.x + a.y * a.y;
+        let b2 = b.x * b.x + b.y * b.y;
+        let c2 = c.x * c.x + c.y * c.y;
+        Point {
+            x: (a2 * (b.y - c.y) + b2 * (c.y - a.y) + c2 * (a.y - b.y)) / d,
+            y: (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d,
+        }
     }
 }

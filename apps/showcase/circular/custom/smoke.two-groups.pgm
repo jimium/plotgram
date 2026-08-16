@@ -1,0 +1,19 @@
+// 同一 6 环用 circle: 拆成两团；未标时 BCC 会画成一圈
+diagram {
+    title: "作者两团",
+    layout: circular
+
+    node n0 { label: "L0", circle: left }
+    node n1 { label: "L1", circle: left }
+    node n2 { label: "L2", circle: left }
+    node n3 { label: "R0", circle: right }
+    node n4 { label: "R1", circle: right }
+    node n5 { label: "R2", circle: right }
+
+    n0 -> n1
+    n1 -> n2
+    n2 -> n3
+    n3 -> n4
+    n4 -> n5
+    n5 -> n0
+}

@@ -1,0 +1,18 @@
+// 自环短弧：画在节点外侧，不占用圈序（state 允许自环）
+diagram {
+    profile: state,
+    title: "自环短弧",
+    layout: circular {
+        partitioning: single-cycle,
+        order: declaration
+    }
+
+    node a "A"
+    node b "B"
+    node c "C"
+
+    a -> b
+    b -> c
+    c -> a
+    a -> a
+}

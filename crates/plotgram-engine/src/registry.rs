@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use plotgram_engine_api::{EdgeRouter, LayoutAlgorithm};
 
-use plotgram_layout::{HierarchicalLayout, SequenceLayout, TreeLayout};
+use plotgram_layout::{CircularLayout, HierarchicalLayout, SequenceLayout, TreeLayout};
 use plotgram_router::{
     CurvedEdgeRouter, OctilinearEdgeRouter, OrthogonalEdgeRouter, PolylineEdgeRouter,
     StraightEdgeRouter,
@@ -23,6 +23,7 @@ impl Registry {
             Arc::new(HierarchicalLayout) as Arc<dyn LayoutAlgorithm>,
             Arc::new(SequenceLayout),
             Arc::new(TreeLayout),
+            Arc::new(CircularLayout),
         ] {
             layouts.insert(layout.name(), layout);
         }

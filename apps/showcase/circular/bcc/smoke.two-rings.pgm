@@ -1,0 +1,18 @@
+// 两三角共割点：bcc-compact 画成两圈 + 割点桥，不是一个巨圆
+diagram {
+    title: "共点双环",
+    layout: circular
+
+    node a "枢纽"
+    node b "B"
+    node c "C"
+    node d "D"
+    node e "E"
+
+    a -> b
+    b -> c
+    c -> a
+    a -> d
+    d -> e
+    e -> a
+}

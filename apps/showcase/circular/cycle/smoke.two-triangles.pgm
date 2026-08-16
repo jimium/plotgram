@@ -1,0 +1,21 @@
+// 与 bcc/smoke.two-rings 同一拓扑：single-cycle 挤成一圈，对照 BCC 两圈
+diagram {
+    title: "共点双环当单圈",
+    layout: circular {
+        partitioning: single-cycle,
+        order: declaration
+    }
+
+    node a "枢纽"
+    node b "B"
+    node c "C"
+    node d "D"
+    node e "E"
+
+    a -> b
+    b -> c
+    c -> a
+    a -> d
+    d -> e
+    e -> a
+}

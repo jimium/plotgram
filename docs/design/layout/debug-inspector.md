@@ -287,6 +287,7 @@ LayoutDebugTrace    → 决策结构可视化
 | **extension** | hier: `ranks`,`dummies`,`reversed`,`ports`,`channels` | hier 插件 | `kind==hierarchical` |
 | **extension** | seq: `time-grid`,`message-index` | sequence 插件 | `kind==sequence` |
 | **extension** | tree: `depth-bands`,`subtree-frames` | tree 插件 | `kind==tree` |
+| **extension** | circ: `partitions`,`circles`,`backbone` | circular 插件 | `kind==circular` |
 
 壳逻辑：
 

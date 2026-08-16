@@ -107,6 +107,35 @@
 | **参考** | [`19-序列图与一维排列`](../../docs/reference/yfiles/19-序列图与一维排列.md) L2/L3 |
 | **模块** | [`src/linear_arrange.rs`](src/linear_arrange.rs) |
 
+
+---
+
+## 1b. 下一批（Circular 驱动）
+
+不挡 Hier。Circular M1 需要可单测零件；API 仍须满足 §0。
+
+### `bcc` — Tarjan 双连通分量 / 块割树
+
+| | |
+|--|--|
+| **为何重要** | Circular 默认 `bcc-compact`；平面化也可复用 |
+| **独立性** | 无向简单图：节点序 + 边列表 → 块（边集）+ 割点 |
+| **稳定 API 直觉** | `biconnected_components(n, edges) -> BccForest`；邻接按对端下标 |
+| **验收** | 桥、环、割点多块、孤立点；双跑一致 |
+| **参考** | [`14` §3.2](../../docs/reference/yfiles/14-图论与优化工具箱.md)；[partition-and-order](../../docs/design/layout/circular/phases/partition-and-order.md) |
+| **模块** | [`src/bcc.rs`](src/bcc.rs) |
+
+### `fiedler` — 拉普拉斯第二特征向量
+
+| | |
+|--|--|
+| **为何重要** | Circular 圈序默认谱方法 |
+| **独立性** | 对称邻接 → `Vec<f64>`；固定迭代与定向 |
+| **稳定 API 直觉** | `fiedler_vector(n, edges) -> Vec<f64>` |
+| **验收** | 路图两端异号；定向规则使双跑 bit-identical；非有限则 Err |
+| **参考** | [`14` §5.1](../../docs/reference/yfiles/14-图论与优化工具箱.md) |
+| **模块** | [`src/fiedler.rs`](src/fiedler.rs) |
+
 ---
 
 ## 2. 建议落地节奏

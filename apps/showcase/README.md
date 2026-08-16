@@ -65,7 +65,7 @@ manifest 写入 `layout` / `facet`（可 null）/ `role`；SVG 镜像源路径�
 |------|------------|------|
 | tree | `plain` / `compound` | 通常无 PartitionGrid |
 | sequence | （无；文件直接落在 `sequence/`） | M4 生命线 + 消息 + 组合片段框 |
-| circular | `single` / `components` | 单环 vs 多分量 |
+| circular | `cycle` / `bcc` / `custom` | 单环 vs BCC vs 作者 `circle:`；**M3** |
 
 ---
 
@@ -80,7 +80,10 @@ showcase/
 │   └── README.md             # hier facet 说明（可选短注）
 ├── tree/                     # 将来
 ├── sequence/                 # 现行；无 facet（M1 生命线 + 消息）
-├── circular/                 # 将来
+├── circular/                 # M3：cycle/ 单环 + bcc/ 多环 + custom/ 作者分区
+│   ├── cycle/
+│   ├── bcc/
+│   └── custom/
 ├── _backup/                  # 未支持内核的旧 DSL；永不进渲染 / 门禁
 ├── _out/                     # SVG + manifest.json（gitignore；render.sh 派生）
 ├── scripts/                  # 发现 / 增量 / 写 manifest（仅 Python 3 标准库）

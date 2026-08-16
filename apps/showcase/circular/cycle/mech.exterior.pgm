@@ -1,0 +1,27 @@
+// 密圈弦改外弧：同区非邻接走圆周外侧，邻接仍弦
+diagram {
+    title: "外弧对角",
+    layout: circular {
+        partitioning: single-cycle,
+        order: declaration,
+        routing_policy: exterior
+    }
+
+    node n0 "N0"
+    node n1 "N1"
+    node n2 "N2"
+    node n3 "N3"
+    node n4 "N4"
+    node n5 "N5"
+
+    n0 -> n1
+    n1 -> n2
+    n2 -> n3
+    n3 -> n4
+    n4 -> n5
+    n5 -> n0
+
+    n0 -> n2
+    n0 -> n3
+    n1 -> n4
+}
