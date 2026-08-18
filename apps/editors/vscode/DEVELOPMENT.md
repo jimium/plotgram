@@ -1,4 +1,4 @@
-# Plotgram VS Code 扩展 — 本地开发与调试
+# Tautcore VS Code 扩展 — 本地开发与调试
 
 在 VS Code 里查看插件效果，标准做法是使用 **Extension Development Host**（扩展开发宿主窗口）。
 
@@ -22,7 +22,7 @@ npm run build
 
 `npm run build` 会依次执行：
 
-1. `npm run build:wasm` — 从 `crates/plotgram-wasm` 独立打包 WASM 到 `media/wasm/`（Webview）和 `media/node/`（扩展宿主诊断）
+1. `npm run build:wasm` — 从 `crates/tautcore-wasm` 独立打包 WASM 到 `media/wasm/`（Webview）和 `media/node/`（扩展宿主诊断）
 2. `npm run compile` — 编译 TypeScript
 
 > 需要已安装 `wasm-pack`：`cargo install wasm-pack`
@@ -50,7 +50,7 @@ showcase/flowchart/product.linear-chain.dfy
 ### 图形预览
 
 1. 打开 `.dfy` 文件
-2. 点击编辑器右上角的 **预览图标**，或 `Cmd+Shift+P` / `Ctrl+Shift+P` → 输入 **Open Plotgram Preview**
+2. 点击编辑器右上角的 **预览图标**，或 `Cmd+Shift+P` / `Ctrl+Shift+P` → 输入 **Open Tautcore Preview**
 3. 右侧预览面板会通过本地 WASM 渲染 SVG；编辑文件后约 150ms 自动刷新
 
 ### 语法/语义诊断
@@ -62,7 +62,7 @@ showcase/flowchart/product.linear-chain.dfy
 1. 新建或打开 `.md` 文件，写入：
 
 ````markdown
-```plotgram
+```tautcore
 diagram flowchart {
     entity start "Start" { type: start }
     entity end "End" { type: end }
@@ -72,7 +72,7 @@ diagram flowchart {
 ````
 
 2. `Cmd+Shift+V` / `Ctrl+Shift+V` 打开 Markdown 预览
-3. `plotgram` 代码块由 **markdown-it 插件**在扩展宿主侧离线渲染为 SVG（与 `.dfy` 诊断共用 `media/node/` WASM）
+3. `tautcore` 代码块由 **markdown-it 插件**在扩展宿主侧离线渲染为 SVG（与 `.dfy` 诊断共用 `media/node/` WASM）
 
 ---
 
@@ -82,7 +82,7 @@ diagram flowchart {
 |------|------|
 | 改代码后重载 | 在 **Extension Development Host** 窗口按 `Cmd+Shift+P` → **Developer: Reload Window** |
 | 自动编译 | 在 `editors/vscode` 终端运行 `npm run watch`，改 TypeScript 会自动编译 |
-| 更新 WASM | 修改 `plotgram-core` / `plotgram-wasm` 后执行 `npm run build:wasm` |
+| 更新 WASM | 修改 `tautcore-core` / `tautcore-wasm` 后执行 `npm run build:wasm` |
 | 查看扩展日志 | 在原窗口（开发窗口）→ **查看 → 输出** → 下拉选择 **Log (Extension Host)** |
 
 ---
@@ -95,11 +95,11 @@ diagram flowchart {
 
 ### 高亮没出来？
 
-确认文件扩展名是 `.dfy`，且编辑器右下角语言模式显示 **Plotgram**。
+确认文件扩展名是 `.dfy`，且编辑器右下角语言模式显示 **Tautcore**。
 
 ### WASM 加载失败（Failed to fetch）
 
-1. 确认已执行 `npm run build:wasm`，且 `media/wasm/` 下存在 `plotgram_wasm.js` 与 `plotgram_wasm_bg.wasm`
+1. 确认已执行 `npm run build:wasm`，且 `media/wasm/` 下存在 `tautcore_wasm.js` 与 `tautcore_wasm_bg.wasm`
 2. 在 Extension Development Host 窗口执行 **Developer: Reload Window** 后重开预览
 3. 若仍失败，查看 **输出 → Log (Extension Host)** 是否有路径或 CSP 相关报错
 
@@ -133,7 +133,7 @@ npm run build
 npx @vscode/vsce package
 ```
 
-成功后当前目录会出现类似 `plotgram-0.1.0.vsix` 的文件（文件名随 `package.json` 里的 `name` 和 `version` 变化）。
+成功后当前目录会出现类似 `tautcore-0.1.0.vsix` 的文件（文件名随 `package.json` 里的 `name` 和 `version` 变化）。
 
 `package.json` 已配置 `vscode:prepublish`，`vsce` 打包时会自动执行 `npm run build`（含 WASM 构建）。若你本地已构建过，也可直接打包。
 
@@ -147,17 +147,17 @@ npx @vscode/vsce package
 
 1. 打开 VS Code
 2. **扩展** 视图 → 右上角 **⋯** → **从 VSIX 安装…**（Install from VSIX…）
-3. 选择收到的 `plotgram-x.y.z.vsix`
+3. 选择收到的 `tautcore-x.y.z.vsix`
 4. 按提示 **Reload** / 重启 VS Code
 
 安装后验证：
 
 - 打开 `.dfy` 文件 → 语法高亮、Problems 诊断、预览按钮
-- 打开含 ` ```plotgram ` 代码块的 `.md` → Markdown 预览中显示 SVG
+- 打开含 ` ```tautcore ` 代码块的 `.md` → Markdown 预览中显示 SVG
 
 ### 卸载
 
-**扩展** 视图 → 找到 **Plotgram** → **卸载**。
+**扩展** 视图 → 找到 **Tautcore** → **卸载**。
 
 ### 打包注意事项
 
@@ -178,7 +178,7 @@ npx @vscode/vsce package
 
 1. 用 Microsoft 账号登录 [Visual Studio Marketplace 管理页](https://marketplace.visualstudio.com/manage)
 2. 点击 **Create Publisher**
-3. 填写 **Publisher ID**（例如 `your-org-plotgram`，全局唯一、创建后不可改）
+3. 填写 **Publisher ID**（例如 `your-org-tautcore`，全局唯一、创建后不可改）
 4. 填写显示名称等基本信息
 
 ### 2. 更新 package.json
@@ -188,8 +188,8 @@ npx @vscode/vsce package
 ```json
 {
   "publisher": "your-publisher-id",
-  "name": "plotgram",
-  "displayName": "Plotgram",
+  "name": "tautcore",
+  "displayName": "Tautcore",
   "version": "0.1.0",
   "description": "...",
   "license": "MIT",
@@ -208,7 +208,7 @@ npx @vscode/vsce package
 
 说明：
 
-- **`publisher`** 必须与 Marketplace 上的 Publisher ID 一致（当前仓库里是占位值 `plotgram`，发布前要改成你的真实 ID）
+- **`publisher`** 必须与 Marketplace 上的 Publisher ID 一致（当前仓库里是占位值 `tautcore`，发布前要改成你的真实 ID）
 - **`icon`** 建议提供 128×128 PNG（路径相对扩展根目录）
 - Marketplace 详情页会读取扩展根目录的 **`README.md`**（可选但强烈建议），可新建 `editors/vscode/README.md` 专用于市场展示
 
@@ -268,6 +268,6 @@ npx @vscode/vsce publish -p <YOUR_PAT>
 | `.dfy` 语法高亮 | 可用 |
 | 语法/语义诊断 | 可用（WASM validate） |
 | `.dfy` 图形预览 | 可用（WASM render） |
-| Markdown `plotgram` 代码块 | 可用（WASM render） |
+| Markdown `tautcore` 代码块 | 可用（WASM render） |
 
 需求说明见 [REQUIREMENTS.md](./REQUIREMENTS.md)。

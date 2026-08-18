@@ -4,10 +4,10 @@ set -e
 
 PORT=3000
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-WASM_CRATE_DIR="$ROOT_DIR/crates/plotgram-wasm"
-WASM_OUT_DIR="$SCRIPT_DIR/plotgram-wasm"
-WASM_BIN="$WASM_OUT_DIR/plotgram_wasm_bg.wasm"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../../" && pwd)"
+WASM_CRATE_DIR="$ROOT_DIR/crates/tautcore-wasm"
+WASM_OUT_DIR="$SCRIPT_DIR/tautcore-wasm"
+WASM_BIN="$WASM_OUT_DIR/tautcore_wasm_bg.wasm"
 
 echo "🔧 正在同步 WASM 产物..."
 if ! command -v wasm-pack >/dev/null 2>&1; then
@@ -30,10 +30,10 @@ EOF
 
 echo "✅ WASM 产物已更新 ($(date -r "$WASM_BIN" '+%H:%M:%S' 2>/dev/null || echo "md5=$WASM_MD5"), md5=$WASM_MD5)"
 
-# public/ 下的旧副本会劫持 /plotgram-wasm/，务必清理
-if [ -d "$SCRIPT_DIR/public/plotgram-wasm" ]; then
-  echo "⚠️  删除过期的 public/plotgram-wasm（Vite 会优先于源码目录提供该路径）"
-  rm -rf "$SCRIPT_DIR/public/plotgram-wasm"
+# public/ 下的旧副本会劫持 /tautcore-wasm/，务必清理
+if [ -d "$SCRIPT_DIR/public/tautcore-wasm" ]; then
+  echo "⚠️  删除过期的 public/tautcore-wasm（Vite 会优先于源码目录提供该路径）"
+  rm -rf "$SCRIPT_DIR/public/tautcore-wasm"
 fi
 
 # Vite 在 3000 被占用时会静默切到 3001，容易继续打开旧实例

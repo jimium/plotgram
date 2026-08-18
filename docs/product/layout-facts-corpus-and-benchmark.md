@@ -3,7 +3,7 @@
 > 状态：proposed（讨论总结，待验证）  
 > 日期：2026-08-18  
 > 定位：围绕 ADR-007 layout-facts 通道，讨论「PNG + PGM + explain 三元组」对 VLM 的价值、对外 benchmark/语料生意的可行性，以及相对 Mermaid/Graphviz 的差异化路径。  
-> **非 ADR、非引擎设计档**；市场判断是推断，需用真实潜在客户验证。技术契约以 [`ADR-007`](../design/adr/007-layout-facts-llm-channel.md) 与 `crates/plotgram-compile/src/explain.rs` 为准。
+> **非 ADR、非引擎设计档**；市场判断是推断，需用真实潜在客户验证。技术契约以 [`ADR-007`](../design/adr/007-layout-facts-llm-channel.md) 与 `crates/tautcore-compile/src/explain.rs` 为准。
 
 ---
 
@@ -17,7 +17,7 @@
 
 ## 1. layout-facts 能传达多少认知
 
-以 showcase 样例 `hierarchical/fan/auto_edge_grouping.pgm` 的 `--explain` 输出为基准（`layout-facts v0`）：
+以 showcase 样例 `hierarchical/fan/auto_edge_grouping.taut` 的 `--explain` 输出为基准（`layout-facts v0`）：
 
 ```text
 layout-facts v0
@@ -114,7 +114,7 @@ band 3 y≈181: agg
 
 ```text
 普通 VLM 语料:  PNG + 人/GPT 描述     → 可能幻觉、空间不准、不可 diff
-Plotgram 三元组: PNG + PGM + explain   → 同源可验证、可程序化出题、零幻觉标签
+Tautcore 三元组: PNG + PGM + explain   → 同源可验证、可程序化出题、零幻觉标签
 ```
 
 ---
@@ -187,7 +187,7 @@ Plotgram 三元组: PNG + PGM + explain   → 同源可验证、可程序化出�
 
 ### 4.2 能力对比（摘要）
 
-| 维度 | Mermaid / Graphviz | Plotgram（管线做满时） |
+| 维度 | Mermaid / Graphviz | Tautcore（管线做满时） |
 |------|-------------------|------------------------|
 | 产图规模与生态 | 极强 | 弱 |
 | 结构标签 | 有 | 有（PGM） |
@@ -222,7 +222,7 @@ PNG + PGM + explain + measure + diff delta + debug trace
 **4. 管线即产品：ingest → relayout → re-explain**
 
 ```text
-Mermaid / Graphviz / draw.io → 规范化 graph → plotgram 布局 → PNG + explain + measure
+Mermaid / Graphviz / draw.io → 规范化 graph → tautcore 布局 → PNG + explain + measure
 ```
 
 卖「专业布局引擎漂洗后的可信标签」，非卖 PGM 作者格式。
@@ -267,7 +267,7 @@ Mermaid / Graphviz / draw.io → 规范化 graph → plotgram 布局 → PNG + e
   → 闭源 holdout 做评测服务
 ```
 
-| 场景 | Plotgram 相对 Mermaid 语料 |
+| 场景 | Tautcore 相对 Mermaid 语料 |
 |------|---------------------------|
 | 训 VLM 认结构 | 弱 |
 | 评 VLM 空间关系 | 强 |

@@ -11,20 +11,20 @@ source "$(dirname "$0")/gate-switch.sh"
 gate_skip_unless_enabled "check-builder-entry.sh"
 
 # 门面存在性
-if ! rg -q 'fn from_contract\(' crates/plotgram-core/src/layout/kernel/coordinate/layout_contract.rs \
-  && ! rg -q 'fn from_contract\(' crates/plotgram-core/src/layout/kernel/coordinate/model.rs; then
+if ! rg -q 'fn from_contract\(' crates/tautcore-core/src/layout/kernel/coordinate/layout_contract.rs \
+  && ! rg -q 'fn from_contract\(' crates/tautcore-core/src/layout/kernel/coordinate/model.rs; then
   echo "FAIL: CoordinateProblem::from_contract missing"
   exit 1
 fi
 
-if ! rg -q 'pub fn solve_from_contract\(' crates/plotgram-core/src/layout/atlas/solve.rs; then
+if ! rg -q 'pub fn solve_from_contract\(' crates/tautcore-core/src/layout/atlas/solve.rs; then
   echo "FAIL: atlas solve_from_contract missing (Atlas metric entry)"
   exit 1
 fi
 
 # 内联结构体字面量（排除 struct/impl 定义与测试）
 inline_hits="$(
-  rg -n 'CoordinateProblem\s*\{' crates/plotgram-core/src/layout -g '*.rs' \
+  rg -n 'CoordinateProblem\s*\{' crates/tautcore-core/src/layout -g '*.rs' \
     | rg -v 'pub struct CoordinateProblem' \
     | rg -v 'impl CoordinateProblem' \
     | rg -v '_tests\.rs:' \

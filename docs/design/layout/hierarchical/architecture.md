@@ -2,7 +2,7 @@
 
 > 状态：**现行架构**（与代码同步；缺口见 [roadmap](roadmap.md)）
 > 引擎注册名：`hierarchical`
-> 代码落点：`crates/plotgram-layout/src/layout/hierarchical/`
+> 代码落点：`crates/tautcore-layout/src/layout/hierarchical/`
 > 约束入口：[写权纪律](../write-authority.md) · [AGENTS.md](../../../../AGENTS.md) §1
 > 证据：[from-yfiles-reference](notes/from-yfiles-reference.md) · [`docs/reference/yfiles/`](../../../reference/yfiles/00-索引与阅读指南.md)
 > 否决路线：[notes/anti-patterns.md](notes/anti-patterns.md)
@@ -121,7 +121,7 @@ LayoutAlgorithm
 ### 2.4 模块边界（代码）
 
 ```text
-plotgram-layout/src/layout/hierarchical/
+tautcore-layout/src/layout/hierarchical/
   params.rs          # HierarchicalParams / Preset / bind（入口一次）
   model.rs           # PlanGraph / RealGraph / ElemKey（稳定序）
   compose/           # cycle · rank · properify · order · ports
@@ -134,7 +134,7 @@ plotgram-layout/src/layout/hierarchical/
   group_frame.rs     # pad / 组壳契约
   debug.rs           # LayoutDebugTrace extension
 
-plotgram-algo/       # VPSC · FAS · crossing count · orientation · ortho normalize
+tautcore-algo/       # VPSC · FAS · crossing count · orientation · ortho normalize
 ```
 
 `LayoutContract` **保持** `AlgorithmRef { name, options: AttrMap }`；Hier 入口 `HierarchicalParams::bind` 一次，之后各相只读 typed params（见已实现 `params.rs`）。

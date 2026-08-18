@@ -12,19 +12,19 @@ let pendingUpdate;
 
 function getRuntime() {
   if (!runtimePromise) {
-    if (!globalThis.__plotgramRuntimePromise) {
+    if (!globalThis.__tautcoreRuntimePromise) {
       runtimePromise = Promise.reject(
-        new Error('Plotgram runtime 未初始化，请重新打开预览面板'),
+        new Error('Tautcore runtime 未初始化，请重新打开预览面板'),
       );
     } else {
-      runtimePromise = globalThis.__plotgramRuntimePromise;
+      runtimePromise = globalThis.__tautcoreRuntimePromise;
     }
   }
   return runtimePromise;
 }
 
 function clearDiagramError() {
-  const existing = document.querySelector('.plotgram-preview-error');
+  const existing = document.querySelector('.tautcore-preview-error');
   existing?.remove();
 }
 
@@ -53,7 +53,7 @@ function showResult(result) {
 
   if (result.errors.length > 0) {
     const err = document.createElement('pre');
-    err.className = 'error plotgram-preview-error';
+    err.className = 'error tautcore-preview-error';
     err.textContent = result.errors.join('\n');
     diagram.appendChild(err);
   }
@@ -84,7 +84,7 @@ window.addEventListener('message', (event) => {
       if (diagram) {
         diagram.innerHTML = '';
         const err = document.createElement('pre');
-        err.className = 'error plotgram-preview-error';
+        err.className = 'error tautcore-preview-error';
         err.textContent = error instanceof Error ? error.message : String(error);
         diagram.appendChild(err);
       }

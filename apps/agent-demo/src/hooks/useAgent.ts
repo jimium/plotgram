@@ -27,7 +27,7 @@ import {
   type ToolCall,
 } from '@agent/index';
 import { createProxyLLMClient } from '@lib/agentProxy';
-import { renderSource, type PlotgramWasm, type RenderFormat } from '@lib/wasm';
+import { renderSource, type TautcoreWasm, type RenderFormat } from '@lib/wasm';
 
 /** LLM 请求超时时间(毫秒) — DeepSeek 流式可能较慢，给足 90s */
 const LLM_TIMEOUT_MS = 90_000;
@@ -47,7 +47,7 @@ export interface ToolCallTraceItem {
 }
 
 interface UseAgentOptions {
-  wasm: PlotgramWasm | null;
+  wasm: TautcoreWasm | null;
   ready: boolean;
 }
 

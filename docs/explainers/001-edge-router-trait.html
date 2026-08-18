@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EdgeRouter Trait 设计解读 · Plotgram Explainers 001</title>
+<title>EdgeRouter Trait 设计解读 · Tautcore Explainers 001</title>
 <style>
   :root {
     --bg: #f7f8fa;
@@ -169,15 +169,15 @@
 
 <header class="hero">
   <div class="wrap">
-    <span class="kicker">Plotgram Explainers · 001</span>
+    <span class="kicker">Tautcore Explainers · 001</span>
     <h1>EdgeRouter Trait 设计解读</h1>
     <p class="sub">9 行代码，定义了一个"独立边路由器"的完整契约——
       它读什么（<b>RouteScene</b>）、写什么（<b>EdgePlacement.path</b>）、
       如何被找到（<b>name()</b>）、如何失败（<b>LayoutError</b>）。
       本页带你把这条管线上的每个组件都看懂。</p>
     <div class="meta">
-      对应源码：<code>crates/plotgram-engine-api/src/traits.rs</code> L54–62
-      &nbsp;·&nbsp; 协作方：<code>scene.rs</code> / <code>run.rs</code> / <code>registry.rs</code> / <code>plotgram-router</code>
+      对应源码：<code>crates/tautcore-engine-api/src/traits.rs</code> L54–62
+      &nbsp;·&nbsp; 协作方：<code>scene.rs</code> / <code>run.rs</code> / <code>registry.rs</code> / <code>tautcore-router</code>
     </div>
   </div>
 </header>
@@ -220,11 +220,11 @@
     <span class="kw">fn</span> <span class="fn">route</span>(&amp;<span class="kw">self</span>, scene: &amp;<span class="ty">RouteScene</span>) -&gt; <span class="ty">Result</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">EdgePlacement</span>&gt;, <span class="ty">LayoutError</span>&gt;;
 }</pre>
 
-  <p>它属于 <code class="inline">plotgram-engine-api</code> crate——<b>契约层</b>。
+  <p>它属于 <code class="inline">tautcore-engine-api</code> crate——<b>契约层</b>。
   这个 crate 只有 trait 和数据结构，<b>没有任何算法</b>。真正的路由算法
-  （OVG 搜索图 + A*）住在 <code class="inline">plotgram-router</code> crate 里的
+  （OVG 搜索图 + A*）住在 <code class="inline">tautcore-router</code> crate 里的
   <code class="inline">OrthogonalEdgeRouter</code>，它 <code class="inline">impl EdgeRouter</code>。
-  引擎（<code class="inline">plotgram-engine</code>）通过注册表按名字拿到
+  引擎（<code class="inline">tautcore-engine</code>）通过注册表按名字拿到
   <code class="inline">Arc&lt;dyn EdgeRouter&gt;</code> 来调用——引擎不认识具体算法，只认识这个 trait。</p>
 
   <div class="note key">
@@ -238,7 +238,7 @@
 <!-- ═══════════════ 2 ═══════════════ -->
 <section id="s2">
   <h2 class="sec"><span class="num">2</span>全景：它在管线中的位置</h2>
-  <p class="lead">先看数据从 <code class="inline">.pgm</code> 源文件到 SVG 的完整旅程，
+  <p class="lead">先看数据从 <code class="inline">.taut</code> 源文件到 SVG 的完整旅程，
   再看 <code class="inline">engine::run</code> 内部布局与路由的交接。</p>
 
   <figure class="diagram">
@@ -256,7 +256,7 @@
       <text x="20" y="28" font-size="13" fill="#5b6472" font-weight="600">主管线（数据流）</text>
       <g font-size="13" text-anchor="middle">
         <rect x="20"  y="42" width="80"  height="40" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
-        <text x="60"  y="67">.pgm</text>
+        <text x="60"  y="67">.taut</text>
         <rect x="130" y="42" width="90"  height="40" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
         <text x="175" y="67">parse</text>
         <rect x="250" y="42" width="100" height="40" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
@@ -301,7 +301,7 @@
         <rect x="760" y="158" width="140" height="70" rx="10" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
         <text x="830" y="183" text-anchor="middle" font-weight="700" fill="#047857">EdgeRouter</text>
         <text x="830" y="202" text-anchor="middle" fill="#5b6472">::route(&amp;scene)</text>
-        <text x="830" y="218" text-anchor="middle" fill="#94a3b8" font-size="11">plotgram-router</text>
+        <text x="830" y="218" text-anchor="middle" fill="#94a3b8" font-size="11">tautcore-router</text>
       </g>
       <g stroke="#2563eb" stroke-width="2" fill="none">
         <line x1="260" y1="193" x2="296" y2="193" marker-end="url(#arrB)"/>
@@ -327,13 +327,13 @@
       <g font-size="12">
         <text x="60" y="382" font-weight="700" fill="#5b6472">颜色 = crate 归属：</text>
         <rect x="200" y="370" width="14" height="14" rx="3" fill="#ede9fe" stroke="#7c3aed"/>
-        <text x="220" y="382">plotgram-engine（facade）</text>
+        <text x="220" y="382">tautcore-engine（facade）</text>
         <rect x="400" y="370" width="14" height="14" rx="3" fill="#dbeafe" stroke="#2563eb"/>
-        <text x="420" y="382">plotgram-engine-api（契约）</text>
+        <text x="420" y="382">tautcore-engine-api（契约）</text>
         <rect x="620" y="370" width="14" height="14" rx="3" fill="#d1fae5" stroke="#059669"/>
-        <text x="640" y="382">plotgram-router（算法）</text>
+        <text x="640" y="382">tautcore-router（算法）</text>
         <rect x="200" y="394" width="14" height="14" rx="3" fill="#fef3c7" stroke="#d97706"/>
-        <text x="220" y="406">plotgram-model（共享数据：EdgePlacement 等）</text>
+        <text x="220" y="406">tautcore-model（共享数据：EdgePlacement 等）</text>
       </g>
     </svg>
     <figcaption>图 1 · 主管线与 engine::run 内部的布局↔路由交接。
@@ -448,7 +448,7 @@
       </g>
     </svg>
     <figcaption>图 2 · RouteScene 的六个字段与子类型。
-    黄色卡片均属 <code>plotgram-model</code> / <code>engine-api</code> 的纯数据；
+    黄色卡片均属 <code>tautcore-model</code> / <code>engine-api</code> 的纯数据；
     灰色字体的参数是 M1+ 才实现的旋钮。</figcaption>
   </figure>
 
@@ -944,13 +944,13 @@ boundary_permissions[<span class="str">"e0"</span>] = [
     <div class="card amber">
       <h4>路由夹具与验证</h4>
       <p>JSON 场景夹具与 verify 验收门（正交性 / 贴附 / 避障 / 确定性）。</p>
-      <span class="sig">crates/plotgram-router/tests/ + src/verify.rs</span>
+      <span class="sig">crates/tautcore-router/tests/ + src/verify.rs</span>
     </div>
   </div>
 </section>
 
 <footer>
-  Plotgram Explainers · 001 · 解读对象：<code>traits.rs</code> L54–62（EdgeRouter trait）。
+  Tautcore Explainers · 001 · 解读对象：<code>traits.rs</code> L54–62（EdgeRouter trait）。
   本页为解释性读物，若与设计档冲突以 <code>docs/design/</code> 为准。
 </footer>
 

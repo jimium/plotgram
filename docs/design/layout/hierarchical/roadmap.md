@@ -34,7 +34,7 @@ FAS(+环 reroot) → rank / properify / order（含 chain-block sift）
 
 | 缺口 | 观感 | 归属 |
 |------|------|------|
-| Weak 穿组 **构造**清零（门禁已硬；绕行走顶/底缝；落地 Main 不跨外国组） | 同层兄弟横线仍穿框（tenant / platform / plotgram / multi-ns / supply-chain）；hybrid / blue-green 已摘豁免 | Channel 基片 / 组通道 |
+| Weak 穿组 **构造**清零（门禁已硬；绕行走顶/底缝；落地 Main 不跨外国组） | 同层兄弟横线仍穿框（tenant / platform / tautcore / multi-ns / supply-chain）；hybrid / blue-green 已摘豁免 | Channel 基片 / 组通道 |
 | `channel-group-fallback` 触发数 | fallback 后等同无组 | 上条 |
 | `group_anchor` 仍当普通节点分层 | 贴框语义不纯 | 组专项（ADR-004） |
 | 次轴：扇出主臂下短链贴父槽 | 检验图相对 yFiles 仍偏左 | P4 `J` / 权重，见 [anti-patterns §4](notes/anti-patterns.md) |

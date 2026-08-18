@@ -11,7 +11,7 @@
 | 21 | [Hierarchical 统一内核与泳道语义](21-Hierarchical统一内核与泳道语义-可行性与演进建议-2026-07.md) | **立场**：要什么、不要什么。group 一等公民、flowchart/arch 去双轨、四布局内核、双路由；DSL swimlane/table 非第一需求 |
 | 22 | [Atlas 总纲](22-Atlas下一代布局与路由架构-总纲-2026-07.md) | **设计**：五病灶诊断、B1–B6 公理、术语表、三相架构（组合/度量/落笔）、算法 |
 | 23 | [Atlas 分阶段推进方案](23-Atlas分阶段推进方案-2026-07.md) | **执行**：Stage 0–7、影子对拍、验收口径、退化窗口、决策记录 |
-| 24 | [Channel 端口挂接增强需求](24-Atlas-channel端口挂接与候选端点增强需求-2026-07.md) | **可执行需求（已落地）**：PortSlot 身份 / 按侧挂接 / 候选端点选路（R1–R5）。实现说明见 [`channel/README.md`](../../crates/plotgram-core/src/layout/atlas/channel/README.md) |
+| 24 | [Channel 端口挂接增强需求](24-Atlas-channel端口挂接与候选端点增强需求-2026-07.md) | **可执行需求（已落地）**：PortSlot 身份 / 按侧挂接 / 候选端点选路（R1–R5）。实现说明见 [`channel/README.md`](../../crates/tautcore-core/src/layout/atlas/channel/README.md) |
 | 25 | [相 I 可行率探针报告](25-Atlas-相I可行率探针报告-2026-07.md) | **实证**：三集 77 图 / 1152 边的粒度、容量与性能测量。旧口径读数修正见 27 号文 §5；**L1–L8 后新口径重采见 §8** |
 | 26 | [channel 模块图解](26-Atlas-channel模块图解-2026-07.html) | **图解**：通道图抽象的可视化说明（HTML） |
 | 27 | [channel 审查与改造需求](27-Atlas-channel模块审查与改造需求-2026-07.md) | **审查**：粒度与性能结案；合法性缺口 + **L1–L8** 合法化改造（编号刻意不用 R*，以免与 24 号文 R1–R5 撞车） |

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 一键构建并发布 Plotgram Agent API 服务
+# 一键构建并发布 Tautcore Agent API 服务
 #
-# 流程：rsync 源码 → shanxun:/opt/plotgram → cargo build → 复制二进制 → 重启服务
+# 流程：rsync 源码 → shanxun:/opt/tautcore → cargo build → 复制二进制 → 重启服务
 # （shanxun 已装 Rust 1.96 + rsproxy.cn 镜像，2 核 1.8G 编译约 4-5 分钟）
 #
 # 用法:
@@ -13,8 +13,8 @@
 #
 # 环境变量:
 #   DEPLOY_HOST   SSH 目标（默认 shanxun）
-#   REMOTE_SRC    服务器源码目录（默认 /opt/plotgram）
-#   REMOTE_DIR    部署目录（默认 /opt/plotgram-agent-api）
+#   REMOTE_SRC    服务器源码目录（默认 /opt/tautcore）
+#   REMOTE_DIR    部署目录（默认 /opt/tautcore-agent-api）
 
 set -euo pipefail
 
@@ -23,8 +23,8 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 # Agent API 部署在 shanxun（与 CDN 同机），直接覆盖 common.sh 的默认值。
 # 注意：不能用 ${VAR:-default}，因为 common.sh 已经把这些变量设为 demo 站的默认值。
 DEPLOY_HOST="shanxun"
-REMOTE_SRC="${REMOTE_SRC:-/opt/plotgram}"
-REMOTE_DIR="/opt/plotgram-agent-api"
+REMOTE_SRC="${REMOTE_SRC:-/opt/tautcore}"
+REMOTE_DIR="/opt/tautcore-agent-api"
 
 SKIP_SYNC=false
 SKIP_BUILD=false
@@ -35,7 +35,7 @@ usage() {
   cat <<'EOF'
 用法: apps/deploy/deploy-agent-api.sh [选项]
 
-同步源码到 shanxun:/opt/plotgram，本地编译，部署到 /opt/plotgram-agent-api 并重启。
+同步源码到 shanxun:/opt/tautcore，本地编译，部署到 /opt/tautcore-agent-api 并重启。
 
 选项:
   --skip-sync    跳过 rsync 同步，用服务器上已有代码编译
@@ -66,9 +66,9 @@ sync_source() {
   rsync -az --delete \
     --exclude='target' \
     --exclude='node_modules' \
-    --exclude='apps/agent-demo/plotgram-wasm' \
-    --exclude='apps/playground/plotgram-wasm' \
-    --exclude='apps/studio/plotgram-wasm' \
+    --exclude='apps/agent-demo/tautcore-wasm' \
+    --exclude='apps/playground/tautcore-wasm' \
+    --exclude='apps/studio/tautcore-wasm' \
     --exclude='apps/agent-demo/dist' \
     --exclude='apps/playground/dist' \
     --exclude='apps/website/dist' \
@@ -80,20 +80,20 @@ sync_source() {
 # ─── 远程编译 ───────────────────────────────────────────
 build_remote() {
   require_cmd ssh
-  log "在 $DEPLOY_HOST 上编译 (cargo build --release -p plotgram-server)..."
+  log "在 $DEPLOY_HOST 上编译 (cargo build --release -p tautcore-server)..."
   log "  目录: $REMOTE_SRC"
   log "  镜像: rsproxy.cn (配置在 ~/.cargo/config.toml)"
   ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=10 "$DEPLOY_HOST" \
-    "cd $REMOTE_SRC && source ~/.cargo/env 2>/dev/null; cargo build --release -p plotgram-server 2>&1 | tail -15"
+    "cd $REMOTE_SRC && source ~/.cargo/env 2>/dev/null; cargo build --release -p tautcore-server 2>&1 | tail -15"
 
   # 验证二进制存在
-  if ! ssh "$DEPLOY_HOST" "test -f $REMOTE_SRC/target/release/plotgram-server"; then
-    die "编译失败：二进制不存在 $REMOTE_SRC/target/release/plotgram-server"
+  if ! ssh "$DEPLOY_HOST" "test -f $REMOTE_SRC/target/release/tautcore-server"; then
+    die "编译失败：二进制不存在 $REMOTE_SRC/target/release/tautcore-server"
   fi
 
   local size
-  size=$(ssh "$DEPLOY_HOST" "du -h $REMOTE_SRC/target/release/plotgram-server | cut -f1")
-  log "编译完成: $REMOTE_SRC/target/release/plotgram-server ($size)"
+  size=$(ssh "$DEPLOY_HOST" "du -h $REMOTE_SRC/target/release/tautcore-server | cut -f1")
+  log "编译完成: $REMOTE_SRC/target/release/tautcore-server ($size)"
 }
 
 # ─── 部署二进制 + 脚本 ─────────────────────────────────
@@ -102,8 +102,8 @@ deploy_binary() {
   log "确保部署目录存在..."
   ssh "$DEPLOY_HOST" "mkdir -p '$REMOTE_DIR'"
 
-  log "复制二进制 → $REMOTE_DIR/plotgram-server.new"
-  ssh "$DEPLOY_HOST" "cp $REMOTE_SRC/target/release/plotgram-server $REMOTE_DIR/plotgram-server.new && chmod +x $REMOTE_DIR/plotgram-server.new"
+  log "复制二进制 → $REMOTE_DIR/tautcore-server.new"
+  ssh "$DEPLOY_HOST" "cp $REMOTE_SRC/target/release/tautcore-server $REMOTE_DIR/tautcore-server.new && chmod +x $REMOTE_DIR/tautcore-server.new"
 
   log "同步 start.sh / stop.sh / .env.example..."
   rsync -az \
@@ -123,7 +123,7 @@ restart_service() {
   ssh "$DEPLOY_HOST" "cd '$REMOTE_DIR' && ./stop.sh || true"
 
   log "替换二进制..."
-  ssh "$DEPLOY_HOST" "cd '$REMOTE_DIR' && mv -f plotgram-server.new plotgram-server && chmod +x plotgram-server"
+  ssh "$DEPLOY_HOST" "cd '$REMOTE_DIR' && mv -f tautcore-server.new tautcore-server && chmod +x tautcore-server"
 
   log "启动新服务..."
   ssh "$DEPLOY_HOST" "cd '$REMOTE_DIR' && ./start.sh"
@@ -141,7 +141,7 @@ restart_service() {
 
 # ─── 主流程 ─────────────────────────────────────────────
 main() {
-  log "=== 发布 Plotgram Agent API ==="
+  log "=== 发布 Tautcore Agent API ==="
   log "  部署服务器: $DEPLOY_HOST"
   log "  源码目录:   $REMOTE_SRC"
   log "  部署目录:   $REMOTE_DIR"

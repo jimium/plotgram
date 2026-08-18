@@ -1,0 +1,21 @@
+[package]
+name = "tautcore-raster"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "SVG rasterizer for Tautcore — convert SVG to PNG / WebP"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "tautcore-raster"
+path = "src/main.rs"
+
+[dependencies]
+resvg = "0.44"
+usvg = "0.44"
+image = { version = "0.25", features = ["png", "webp"] }
+thiserror.workspace = true
+clap = { version = "4", features = ["derive"] }

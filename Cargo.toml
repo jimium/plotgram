@@ -1,18 +1,18 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/plotgram-model",
-    "crates/plotgram-content",
-    "crates/plotgram-parse",
-    "crates/plotgram-compile",
-    "crates/plotgram-engine-api",
-    "crates/plotgram-algo",
-    "crates/plotgram-router",
-    "crates/plotgram-layout",
-    "crates/plotgram-engine",
-    "crates/plotgram-render",
-    "crates/plotgram-cli",
-    "crates/plotgram-wasm",
+    "crates/tautcore-model",
+    "crates/tautcore-content",
+    "crates/tautcore-parse",
+    "crates/tautcore-compile",
+    "crates/tautcore-engine-api",
+    "crates/tautcore-algo",
+    "crates/tautcore-router",
+    "crates/tautcore-layout",
+    "crates/tautcore-engine",
+    "crates/tautcore-render",
+    "crates/tautcore-cli",
+    "crates/tautcore-wasm",
 ]
 
 [workspace.package]
@@ -20,20 +20,20 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 rust-version = "1.75"
-repository = "https://github.com/your-org/plotgram"
+repository = "https://github.com/your-org/tautcore"
 description = "A chart description language and rendering engine designed for AI Agents — Turn anything into a diagram"
 
 [workspace.dependencies]
-plotgram-model = { path = "crates/plotgram-model" }
-plotgram-content = { path = "crates/plotgram-content" }
-plotgram-parse = { path = "crates/plotgram-parse" }
-plotgram-compile = { path = "crates/plotgram-compile" }
-plotgram-engine-api = { path = "crates/plotgram-engine-api" }
-plotgram-algo = { path = "crates/plotgram-algo" }
-plotgram-router = { path = "crates/plotgram-router" }
-plotgram-layout = { path = "crates/plotgram-layout" }
-plotgram-engine = { path = "crates/plotgram-engine" }
-plotgram-render = { path = "crates/plotgram-render" }
+tautcore-model = { path = "crates/tautcore-model" }
+tautcore-content = { path = "crates/tautcore-content" }
+tautcore-parse = { path = "crates/tautcore-parse" }
+tautcore-compile = { path = "crates/tautcore-compile" }
+tautcore-engine-api = { path = "crates/tautcore-engine-api" }
+tautcore-algo = { path = "crates/tautcore-algo" }
+tautcore-router = { path = "crates/tautcore-router" }
+tautcore-layout = { path = "crates/tautcore-layout" }
+tautcore-engine = { path = "crates/tautcore-engine" }
+tautcore-render = { path = "crates/tautcore-render" }
 wasm-bindgen = "0.2"
 console_error_panic_hook = "0.1"
 serde = { version = "1", features = ["derive"] }

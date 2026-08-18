@@ -2,12 +2,12 @@
 
 > 状态：现行  
 > 引擎注册名：`hierarchical`  
-> 代码：`crates/plotgram-layout/src/layout/hierarchical/`  
+> 代码：`crates/tautcore-layout/src/layout/hierarchical/`  
 > **架构真源**：[architecture.md](architecture.md)
 
 ## 签名
 
-有向流、节点分层（rank）、层内定序减交叉；主方向多数边同向。plotgram 的**主布局核**。
+有向流、节点分层（rank）、层内定序减交叉；主方向多数边同向。tautcore 的**主布局核**。
 
 ## 基本逻辑
 

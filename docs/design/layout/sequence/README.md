@@ -2,8 +2,8 @@
 
 > 状态：现行设计档（重建中；目标架构已立）
 > 引擎注册名：`sequence`
-> 代码：`crates/plotgram-layout/src/layout/sequence/`（与 Hier 同 crate；**M4 已落地**）
-> 参考实现：`crates/v1/plotgram-core/src/layout/recipes/sequence.rs`
+> 代码：`crates/tautcore-layout/src/layout/sequence/`（与 Hier 同 crate；**M4 已落地**）
+> 参考实现：`crates/v1/tautcore-core/src/layout/recipes/sequence.rs`
 > **目标架构真源**：[architecture.md](architecture.md)
 
 > **ADR-009**：`LayoutResult.decorations` / `LayoutOutput.decorations` 已落地（方案 A）。M1 写出 `Lifeline` / `Activation`；M2 写 `Lifeline.gaps`（notch）；M4 写 `FragmentFrame`（组合片段框，不进 `Graph::groups`）。
@@ -46,7 +46,7 @@
 | 键 | 默认 | 说明 |
 |----|------|------|
 | `lifeline_gap_style` | `notch` | `none` / `notch`；`hop` 硬失败 |
-| `lifeline_order` | `declaration` | `greedy` / `local` 走 `plotgram-algo` 一维排列 |
+| `lifeline_order` | `declaration` | `greedy` / `local` 走 `tautcore-algo` 一维排列 |
 | 节点 `lifeline_pin` | — | 槽位（`0`…）或 `left` / `right`；优化不得覆盖 |
 | 节点 `lifeline_before` | — | 该生命线必须在指定 id 左侧 |
 | 边 `fragment` | — | 片段 id；`a.b` / `"a/b"` / `"a,b"` = 同时属于多层。嵌套由区间包含推断；部分交叠硬失败。一等写法：`fragment <kind> <id> { … }`（dsl-spec §8.2） |

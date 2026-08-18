@@ -28,26 +28,26 @@
 ## Phase 2: Tier A — 零风险清理（预计 ~150 行）
 
 - [x] Task 2.0: 建立临时备份基础设施
-  - [x] SubTask 2.0.1: `mkdir -p /tmp/plotgram-simplify-r2-backup/{tier-a/{a-1-debug-log,a-2-arch-pack-flow-aspect,a-3-pressure-budget-zero},tier-b,tier-c,tier-d}`
+  - [x] SubTask 2.0.1: `mkdir -p /tmp/tautcore-simplify-r2-backup/{tier-a/{a-1-debug-log,a-2-arch-pack-flow-aspect,a-3-pressure-budget-zero},tier-b,tier-c,tier-d}`
   - [x] SubTask 2.0.2: 创建 `NOTES.md` 写入 header
   - [x] SubTask 2.0.3: 采 Phase 2 before 基线 `./benchmarks/snapshot.sh --tag tier-a-before`
 - [x] Task 2.1: A.1 统一 DEBUG 日志为 `perf_log!`
   - [x] SubTask 2.1.1: 备份 `space_budget.rs` / `phases/refine.rs` / `phases/port_slot.rs` 到 `tier-a/a-1-debug-log/originals/`
-  - [x] SubTask 2.1.2: 改 `space_budget.rs:354` 的 `PLOTGRAM_DEBUG_EDGE_PRESSURE` 守卫块为 `perf_log!`
-  - [x] SubTask 2.1.3: 改 `phases/refine.rs:181` 的 `PLOTGRAM_DEBUG_EDGE_ORDER` 守卫块为 `perf_log!`
-  - [x] SubTask 2.1.4: 改 `phases/port_slot.rs:806` 的 `PLOTGRAM_DEBUG_PORT_PRESSURE` 守卫块为 `perf_log!`
+  - [x] SubTask 2.1.2: 改 `space_budget.rs:354` 的 `TAUTCORE_DEBUG_EDGE_PRESSURE` 守卫块为 `perf_log!`
+  - [x] SubTask 2.1.3: 改 `phases/refine.rs:181` 的 `TAUTCORE_DEBUG_EDGE_ORDER` 守卫块为 `perf_log!`
+  - [x] SubTask 2.1.4: 改 `phases/port_slot.rs:806` 的 `TAUTCORE_DEBUG_PORT_PRESSURE` 守卫块为 `perf_log!`
   - [x] SubTask 2.1.5: 删除 3 处 `var_os(...)` 读取
-  - [x] SubTask 2.1.6: `cargo build -p plotgram-core` + `cargo check -p plotgram-wasm --target wasm32-unknown-unknown`（WASM check 因沙箱缺 wasm32 target 降级为代码审查，详见 NOTES.md A.1）
-  - [x] SubTask 2.1.7: `cargo test -p plotgram-core --lib`（921 passed / 19 failed，无新增失败）
+  - [x] SubTask 2.1.6: `cargo build -p tautcore-core` + `cargo check -p tautcore-wasm --target wasm32-unknown-unknown`（WASM check 因沙箱缺 wasm32 target 降级为代码审查，详见 NOTES.md A.1）
+  - [x] SubTask 2.1.7: `cargo test -p tautcore-core --lib`（921 passed / 19 failed，无新增失败）
   - [x] SubTask 2.1.8: 采 after 基线 + `compare.sh` vs before（PASS）
   - [x] SubTask 2.1.9: 笔记 + 门禁 PASS 保留
-- [x] Task 2.2: A.2 删除 `PLOTGRAM_ARCH_PACK` / `PLOTGRAM_FLOW_ASPECT` 实验开关
+- [x] Task 2.2: A.2 删除 `TAUTCORE_ARCH_PACK` / `TAUTCORE_FLOW_ASPECT` 实验开关
   - [x] SubTask 2.2.1: Grep 全仓库 + 部署脚本 + playground 配置，确认无生产 setter
   - [x] SubTask 2.2.2: 备份 `group_frame/spec.rs` + `macro_block.rs` + `group_sizing.rs` + `group_divide.rs`
-  - [x] SubTask 2.2.3: 删除 `PLOTGRAM_ARCH_PACK` 分支（`architecture_pack_enabled()` 函数 + doc），简化 `resolve_architecture` 直接用 `TrackSizing::Equal`；级联删除死代码 `position_macro_blocks_packed` (113 行) + `PACK_ASPECT_TARGET` 常量
-  - [x] SubTask 2.2.4: 删除 `PLOTGRAM_FLOW_ASPECT` 分支（`flowchart_aspect_enabled()` 函数 + doc），简化 `choose_arrangement_mode` / `parse_group_sizing`
+  - [x] SubTask 2.2.3: 删除 `TAUTCORE_ARCH_PACK` 分支（`architecture_pack_enabled()` 函数 + doc），简化 `resolve_architecture` 直接用 `TrackSizing::Equal`；级联删除死代码 `position_macro_blocks_packed` (113 行) + `PACK_ASPECT_TARGET` 常量
+  - [x] SubTask 2.2.4: 删除 `TAUTCORE_FLOW_ASPECT` 分支（`flowchart_aspect_enabled()` 函数 + doc），简化 `choose_arrangement_mode` / `parse_group_sizing`
   - [x] SubTask 2.2.5: 编译 + WASM check（代码审查）+ 单测 + 基线 + compare（PASS）+ 笔记
-- [x] Task 2.3: A.3 移除 `PLOTGRAM_PRESSURE_BUDGET=0` 分支
+- [x] Task 2.3: A.3 移除 `TAUTCORE_PRESSURE_BUDGET=0` 分支
   - [x] SubTask 2.3.1: Grep 确认 `=0` 分支无测试/CI 显式触发（congestion-baseline.rs 是校准二进制，不在门禁管线）
   - [x] SubTask 2.3.2: 备份 `space_budget.rs` + `bin/congestion-baseline.rs`
   - [x] SubTask 2.3.3: 删除 `space_budget.rs` `enrich_from_pressure` 顶部 `=0` 守卫块；删除 `congestion-baseline.rs` `env::set_var` 默认设置 + 同步更新文件头 doc / help / note
@@ -60,33 +60,33 @@
 
 ## Phase 3: Tier B — 低风险合并（预计 ~100 行 + 减阶段）
 
-> 实测结果（2026-07-20）：B.1 PASS 保留（-3 行）；B.2 编排合并几何字节级一致但 cloud-native median_ms 退化 +18.54% 超阈值，按门禁规则回滚。Tier B 累计 -3 行。详见 `docs/布局路由算法简化重构方案-2026-07.md` §10 + `/tmp/plotgram-simplify-r2-backup/NOTES.md`。
+> 实测结果（2026-07-20）：B.1 PASS 保留（-3 行）；B.2 编排合并几何字节级一致但 cloud-native median_ms 退化 +18.54% 超阈值，按门禁规则回滚。Tier B 累计 -3 行。详见 `docs/布局路由算法简化重构方案-2026-07.md` §10 + `/tmp/tautcore-simplify-r2-backup/NOTES.md`。
 
 - [x] Task 3.0: 采 Tier B before 基线 `./benchmarks/snapshot.sh --tag tier-b-before`（2026-07-20-061403）
 - [x] Task 3.1: B.1 D 阶段 `min_gap` + `dock_sep` 合并调用入口（PASS 保留，pipeline.rs 467→464 行）
-  - [x] SubTask 3.1.1: 备份 `pipeline.rs`（`/tmp/plotgram-simplify-r2-backup/tier-b/b-1-d-separation-merge/originals/pipeline.rs`）
+  - [x] SubTask 3.1.1: 备份 `pipeline.rs`（`/tmp/tautcore-simplify-r2-backup/tier-b/b-1-d-separation-merge/originals/pipeline.rs`）
   - [x] SubTask 3.1.2: 读 `pipeline.rs:258-268` 现状（D 期两次 `enforce_reverse_pair_*` 调用）
   - [x] SubTask 3.1.3: 选 spec §B.1 方案 B（pipeline.rs 抽 helper `enforce_d_stage_separation` 包装，keep-list 约束 dock_sep 不可重构内部状态共享，方案 A 不可行）
   - [x] SubTask 3.1.4: 实施合并（新增 helper + 调用点替换为 1 行）
   - [x] SubTask 3.1.5: 编译 + WASM check（代码审查）+ 单测（921/19 不变）+ 基线 b-1-after + compare PASS
   - [x] SubTask 3.1.6: 重点核 `cloud-native` (4ab0e916c26b91e7) / `user-auth` (dbd04803f810) node_fp 不变；tight_sev/exact_sev 全不变
 - [x] Task 3.2: B.2 Architecture_v2 后处理 7 Phase → 4 Phase 编排合并（**FAIL → 回滚**）
-  - [x] SubTask 3.2.1: 备份 `architecture_v2/pipeline.rs`（`/tmp/plotgram-simplify-r2-backup/tier-b/b-2-arch-phase-merge/originals/architecture_v2_pipeline.rs`，228 行）
+  - [x] SubTask 3.2.1: 备份 `architecture_v2/pipeline.rs`（`/tmp/tautcore-simplify-r2-backup/tier-b/b-2-arch-phase-merge/originals/architecture_v2_pipeline.rs`，228 行）
   - [x] SubTask 3.2.2: 读 `architecture_v2/pipeline.rs:54-64` 现状 + 7 Phase 定义
   - [x] SubTask 3.2.3: 合并 Phase 1（`OverlapAndClampPhase` = 原 5 + 5.5）
   - [x] SubTask 3.2.4: 合并 Phase 2（`AlignmentPhase` = 原 5.6 + 5.6'，rebalance 3→2）
   - [x] SubTask 3.2.5: 合并 Phase 3（`GroupBoundsAndOverlapPhase` = 原 6 + 6.2）
   - [x] SubTask 3.2.6: 保留 Phase 4（`GroupAlignmentPhase` = 原 6.3，rebalance + enforce_gaps；enforce_gaps 4→3）
-  - [x] SubTask 3.2.7: 编译 + WASM check（代码审查）+ 单测（921/19 不变）+ 基线 b-2-after + compare **FAIL**：`product.cloud-native.pgm: median_ms 18.99 → 22.51 (118.54% > +10%)`
+  - [x] SubTask 3.2.7: 编译 + WASM check（代码审查）+ 单测（921/19 不变）+ 基线 b-2-after + compare **FAIL**：`product.cloud-native.taut: median_ms 18.99 → 22.51 (118.54% > +10%)`
   - [x] SubTask 3.2.8: 重点核 architecture 5 样本 node_fp **全部字节级一致**（硬约束满足）；但 median_ms 退化超 spec §3.3 +10% 阈值，按门禁规则回滚。回滚后 compare vs tier-b-before PASS 零漂移确认
 - [x] Task 3.3: Tier B 收尾
   - [x] SubTask 3.3.1: 采 Tier B final 基线（= `b-2-rollback`，2026-07-20-064930；B.2 回滚后重采）
   - [x] SubTask 3.3.2: `compare.sh tier-b-before tier-b-final` PASS（24 样例全持平）
-  - [x] SubTask 3.3.3: 更新方案文档（§10）+ 笔记（`/tmp/plotgram-simplify-r2-backup/NOTES.md`）
+  - [x] SubTask 3.3.3: 更新方案文档（§10）+ 笔记（`/tmp/tautcore-simplify-r2-backup/NOTES.md`）
 
 ## Phase 4: Tier C — 中风险结构精简（预计 ~700 行）
 
-> 实测结果（2026-07-20）：C.1 SKIP（评估后判无安全保守简化空间，记 keep-list）；C.2 SKIP（前置验证失败：grid.rs/pierce.rs 经 EdgeFeatures 喂 run.rs 边序 + space_budget 几何改写，活跃生产链路，记 keep-list）；C.3 PASS 保留（保守方案：仅删 dead options，-69 行）。Tier C 累计 -69 行。详见 `docs/布局路由算法简化重构方案-2026-07.md` §11 + `/tmp/plotgram-simplify-r2-backup/NOTES.md`。
+> 实测结果（2026-07-20）：C.1 SKIP（评估后判无安全保守简化空间，记 keep-list）；C.2 SKIP（前置验证失败：grid.rs/pierce.rs 经 EdgeFeatures 喂 run.rs 边序 + space_budget 几何改写，活跃生产链路，记 keep-list）；C.3 PASS 保留（保守方案：仅删 dead options，-69 行）。Tier C 累计 -69 行。详见 `docs/布局路由算法简化重构方案-2026-07.md` §11 + `/tmp/tautcore-simplify-r2-backup/NOTES.md`。
 
 - [x] Task 4.0: 采 Tier C before 基线 `./benchmarks/snapshot.sh --tag tier-c-before`（2026-07-20-065823）
 - [x] Task 4.1: C.1 Scoring 惩罚项合并 — **SKIP（评估后判无安全保守简化空间，记 keep-list）**
@@ -107,7 +107,7 @@
   - [x] SubTask 4.2.6: ~~FAIL 回滚 + 记 keep-list~~ → **整体 SKIP**（任务说明预案：「活跃消费者则跳过 C.2」；记 keep-list 入 `docs/总结经验/简化重构经验-哪些不可精简-2026-07.md` §2.6）
 - [x] Task 4.3: C.3 `route_annotation.rs` `validate_route_edit` 精简 — **PASS（保守方案：仅删 dead options，-69 行）**
   - [x] SubTask 4.3.1: 备份 `route_annotation.rs` + `edge/mod.rs`（`tier-c/c-3-route-annotation/originals/`）
-  - [x] SubTask 4.3.2: 读 `route_annotation.rs` 全文（765 行）+ Grep 4 个 crate（plotgram-wasm / plotgram-cli / plotgram-eval / plotgram-server）确认 `try_shape_edit` / `freeze_route_annotations` / `vertex_role` / `VertexRole` 零外部 caller
+  - [x] SubTask 4.3.2: 读 `route_annotation.rs` 全文（765 行）+ Grep 4 个 crate（tautcore-wasm / tautcore-cli / tautcore-eval / tautcore-server）确认 `try_shape_edit` / `freeze_route_annotations` / `vertex_role` / `VertexRole` 零外部 caller
   - [x] ~~SubTask 4.3.3: 合并为 `validate_route_edit_fast`（只查穿组+穿节点硬错误，移除 pierce_depth/near_miss 软校验）~~ → **改为保守方案**：仅删 dead options（`VertexRole` enum / `freeze_route_annotations` 简单包装 / `try_shape_edit` / `vertex_role` + 1 测试 `try_shape_edit_reverts_on_stub_failure`），保留 `validate_route_edit` / `RouteEditObstacleCtx` / `RouteEditValidateOpts` / `RouteEditKind` / `RouteEditViolation` 全套（活跃调用方在 `sanitize.rs` + `grid_snap.rs`）
   - [x] SubTask 4.3.4: 保留 `ProtectedRun`（keep-list 未触碰）
   - [x] SubTask 4.3.5: 编译 + WASM check（代码审查）+ 单测（920/19，删 1 个 dead test）+ 基线 c-3-after (2026-07-20-070541) + compare vs tier-c-before PASS（24 样例全持平）
@@ -119,11 +119,11 @@
 
 ## Phase 5: Tier D — 高风险架构级（帕累托评判，预计 ~600 行）
 
-> 实测结果（2026-07-20）：D.1 PASS（保守变体：删除 spline/bezier 密采样路径 + 非正交原图保留原边 + degraded 标注，-27 行）。详见 `docs/布局路由算法简化重构方案-2026-07.md` §12 + §13 + `/tmp/plotgram-simplify-r2-backup/NOTES.md`。
+> 实测结果（2026-07-20）：D.1 PASS（保守变体：删除 spline/bezier 密采样路径 + 非正交原图保留原边 + degraded 标注，-27 行）。详见 `docs/布局路由算法简化重构方案-2026-07.md` §12 + §13 + `/tmp/tautcore-simplify-r2-backup/NOTES.md`。
 
 - [x] Task 5.0: 采 Tier D before 基线 `./benchmarks/snapshot.sh --tag tier-d-before`（2026-07-20-073020）
 - [x] Task 5.1: D.1 `refine/spline_fallback.rs` 简化为 dogleg + degraded
-  - [x] SubTask 5.1.1: 备份 `refine/spline_fallback.rs` + `refine/mod.rs`（`/tmp/plotgram-simplify-r2-backup/tier-d/d-1-spline-fallback/originals/`）
+  - [x] SubTask 5.1.1: 备份 `refine/spline_fallback.rs` + `refine/mod.rs`（`/tmp/tautcore-simplify-r2-backup/tier-d/d-1-spline-fallback/originals/`）
   - [x] SubTask 5.1.2: 读 `spline_fallback.rs` 1002 行现状 + `refine/mod.rs` 调用点 + 各 diagram_type 默认 router（Flowchart/Architecture=orthogonal; State=circular; Er=spline; Mindmap=organic; Sequence=straight）
   - [x] SubTask 5.1.3: 评估 dogleg 覆盖率：`use_orthogonal_fallback=true`（原边正交 OR Architecture）覆盖 Flowchart/Architecture；`use_orthogonal_fallback=false` 覆盖 State/Er/Mindmap，product-gate 中 saas-schema (ER) 实际触发 fallback candidates=2 accepted=2
   - [x] SubTask 5.1.4: 实施简化：删除 Bezier + 多段样条密采样分支（手册 §3.5 ★ 红线）；激进变体（非正交也走 dogleg）首次 FAIL（saas-schema tight_sev 0→3436.747），改保守变体（非正交保留原边 + degraded 标注）PASS
@@ -138,7 +138,7 @@
   - [x] SubTask 5.2.3: 全轮累计：`compare.sh tier-a-before tier-d-final`（tier-a-before tag = 2026-07-20-053914）PASS（24 样例全持平，累计 -298 行）
   - [x] SubTask 5.2.4: 更新 `/workspace/docs/布局路由算法简化重构方案-2026-07.md` 追加 "## 12. 第二轮 Tier D 执行结论" + "## 13. 第二轮总执行结论" 章节
   - [x] SubTask 5.2.5: 更新 `/workspace/docs/总结经验/简化重构经验-哪些不可精简-2026-07.md` 追加本轮新 keep-list（D.1 第 15 项：非正交原图 fallback 不能改走 dogleg）
-  - [x] SubTask 5.2.6: 笔记收尾：在 `/tmp/plotgram-simplify-r2-backup/NOTES.md` 追加 Tier D 完整执行章节 + 全轮总结章节（含改动/基线/门禁/处置/经验）
+  - [x] SubTask 5.2.6: 笔记收尾：在 `/tmp/tautcore-simplify-r2-backup/NOTES.md` 追加 Tier D 完整执行章节 + 全轮总结章节（含改动/基线/门禁/处置/经验）
 
 # Task Dependencies
 

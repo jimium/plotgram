@@ -1,7 +1,7 @@
 # yFiles 布局算法与路由风格
 
 > 日期：2026-07-28  
-> 定位：plotgram 架构决策的**基础信息参考**（学理念与能力边界，不复刻全量栈）  
+> 定位：tautcore 架构决策的**基础信息参考**（学理念与能力边界，不复刻全量栈）  
 > 可读版：[layouts-and-routing.html](layouts-and-routing.html)  
 > 上游产品文档：[yFiles Automatic Layouts](https://docs.yfiles.com/yfiles-html/dguide/automatic-layouts-main-chapter/)  
 > 仓库纪律：[`AGENTS.md`](../../AGENTS.md) §1 · [`写权纪律`](../design/layout/write-authority.md)
@@ -18,7 +18,7 @@ yFiles for HTML 把自动图布局分成三类，**不要混用职责**：
 | **Edge routing**（`ILayoutStage`） | 节点冻结后的独立路由 | 不动 | 写 | 不动 |
 | **Labeling** | 只摆标签 | 不动 | 不动 | 写 |
 
-本文说的「profile」**不是** yFiles 产品专有名词，而是：各 Layout **内建路由档** + **可后接独立 Router** 的能力表。plotgram 的图种 profile / 内建路由 vs 独立路由，应对齐这一产品边界。
+本文说的「profile」**不是** yFiles 产品专有名词，而是：各 Layout **内建路由档** + **可后接独立 Router** 的能力表。tautcore 的图种 profile / 内建路由 vs 独立路由，应对齐这一产品边界。
 
 ---
 
@@ -41,7 +41,7 @@ yFiles for HTML 把自动图布局分成三类，**不要混用职责**：
 - **特色**  
   - 节点分到 rank 层，多数边朝主方向  
   - 层内序优化交叉；端口 / 边组 / 增量 / group 一等公民  
-  - plotgram Atlas 主路径最接近的产品族  
+  - tautcore Atlas 主路径最接近的产品族  
 - **路由笔记**：默认 orthogonal；bus 靠 edge grouping；递归边另有 policy  
 
 ### OrganicLayout（力导向）
@@ -188,7 +188,7 @@ yFiles for HTML 把自动图布局分成三类，**不要混用职责**：
 
 ---
 
-## 6. 对 plotgram 的映射提示
+## 6. 对 tautcore 的映射提示
 
 - **轻量子集**：Hier ≈ Atlas 三相（组合 → 度量 → Ink）；Tree / Sequence / Circular 为其它内核。  
 - **Hier 正交真源**：Channel Ink（独立正交 OVG 已删）。  

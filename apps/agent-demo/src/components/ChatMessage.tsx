@@ -43,7 +43,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
       <div className="chat-msg-column">
         <div className="chat-msg-header">
           <span className="chat-msg-name">
-            {isUser ? '我' : 'Plotgram Agent'}
+            {isUser ? '我' : 'Tautcore Agent'}
           </span>
           <span className="chat-msg-role">
             {isUser ? '提问者' : 'AI 助手'}

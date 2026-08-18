@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 停止 plotgram-agent-api
+# 停止 tautcore-agent-api
 #
 # 用法: ./stop.sh
 #   先发 SIGTERM（优雅退出），5 秒后仍存活则 SIGKILL
@@ -7,12 +7,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PID_FILE="$SCRIPT_DIR/plotgram-server.pid"
+PID_FILE="$SCRIPT_DIR/tautcore-server.pid"
 
 if [[ ! -f "$PID_FILE" ]]; then
     echo "▸ 未找到 PID 文件 ($PID_FILE)，进程可能已停止"
     # 兜底：按进程名清理残留
-    PIDS=$(pgrep -f "plotgram-server" 2>/dev/null || true)
+    PIDS=$(pgrep -f "tautcore-server" 2>/dev/null || true)
     if [[ -n "$PIDS" ]]; then
         echo "⚠ 发现残留进程: $PIDS，尝试清理..."
         echo "$PIDS" | xargs kill 2>/dev/null || true

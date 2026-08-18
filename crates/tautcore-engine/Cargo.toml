@@ -1,0 +1,13 @@
+[package]
+name = "tautcore-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Tautcore layout engine facade: run + registry"
+
+[dependencies]
+tautcore-model = { workspace = true }
+tautcore-engine-api = { workspace = true }
+tautcore-algo = { workspace = true }
+tautcore-layout = { workspace = true }
+tautcore-router = { workspace = true }

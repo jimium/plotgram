@@ -212,7 +212,7 @@ fn multilevel(g: Graph) -> Coords {
 
 ---
 
-## 8. plotgram 落地建议
+## 8. tautcore 落地建议
 
 1. **只实现一条 organic 主线**：`PivotMDS 初始化 → SGD stress（sparse pairs）→ PRISM 消重叠 → 装箱`。全链确定性可控、无退火调参、代码量可控。
 2. 需要交互实时时，另加 `ForceAtlas2 + BH + local speed` 的模拟器，与静态布局共用坐标模型。

@@ -38,7 +38,7 @@
 
 ## 2. 输入语义
 
-### 2.1 已有类型（`plotgram-engine-api::scene`）
+### 2.1 已有类型（`tautcore-engine-api::scene`）
 
 ```text
 GroupBoundary     = { group_id, rect }

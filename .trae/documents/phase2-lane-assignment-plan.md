@@ -29,7 +29,7 @@
 
 #### 1. 新建 `lane_assignment.rs`
 
-**路径**：`crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/lane_assignment.rs`
+**路径**：`crates/tautcore-core/src/layout/edge/edge_routing_orthogonal/lane_assignment.rs`
 
 **公开 API**：
 ```rust
@@ -165,7 +165,7 @@ pub lane_shifts_failed: usize,
 
 #### 1. 新建 `channel_load.rs`
 
-**路径**：`crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/channel_load.rs`
+**路径**：`crates/tautcore-core/src/layout/edge/edge_routing_orthogonal/channel_load.rs`
 
 **数据结构**：
 ```rust
@@ -356,16 +356,16 @@ ortho_stats.max_channel_load = load_map.max_load();
 
 ### 编译
 ```bash
-cargo build --release -p plotgram-core
+cargo build --release -p tautcore-core
 ```
 
 ### 单元测试
 ```bash
-cargo test --release -p plotgram-core
+cargo test --release -p tautcore-core
 ```
 
 ### SVG 验证
-生成 `showcase/architecture/c.layout-stress-nested.pgm` 的 SVG：
+生成 `showcase/architecture/c.layout-stress-nested.taut` 的 SVG：
 - E6/E9 的 V 段分离到不同 x，gap ≥ 8px（Phase 2）
 - 无正交性破坏、无节点穿透
 - reroute 后高负载通道边数减少（Phase 3）

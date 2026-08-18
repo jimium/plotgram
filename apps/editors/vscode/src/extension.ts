@@ -1,17 +1,17 @@
 import * as vscode from 'vscode';
-import { PlotgramDiagnostics } from './diagnostics';
-import { extendPlotgramMarkdownIt } from './markdown/markdownItPlugin';
+import { TautcoreDiagnostics } from './diagnostics';
+import { extendTautcoreMarkdownIt } from './markdown/markdownItPlugin';
 import { PreviewPanel } from './preview/panel';
 
 export function activate(context: vscode.ExtensionContext) {
-  const diagnostics = new PlotgramDiagnostics(context.extensionPath);
+  const diagnostics = new TautcoreDiagnostics(context.extensionPath);
   diagnostics.activate(context);
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('plotgram.openPreview', () => {
+    vscode.commands.registerCommand('tautcore.openPreview', () => {
       const editor = vscode.window.activeTextEditor;
-      if (!editor || editor.document.languageId !== 'plotgram') {
-        void vscode.window.showWarningMessage('请在 Plotgram (.pgm) 文件中打开预览。');
+      if (!editor || editor.document.languageId !== 'tautcore') {
+        void vscode.window.showWarningMessage('请在 Tautcore (.taut) 文件中打开预览。');
         return;
       }
       PreviewPanel.show(context.extensionUri, editor.document);
@@ -20,7 +20,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   return {
     extendMarkdownIt(md: unknown) {
-      return extendPlotgramMarkdownIt(md as Parameters<typeof extendPlotgramMarkdownIt>[0], context.extensionPath);
+      return extendTautcoreMarkdownIt(md as Parameters<typeof extendTautcoreMarkdownIt>[0], context.extensionPath);
     },
   };
 }

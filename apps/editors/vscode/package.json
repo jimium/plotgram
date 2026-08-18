@@ -1,9 +1,9 @@
 {
-  "name": "plotgram",
-  "displayName": "Plotgram",
-  "description": "Plotgram DSL language support, diagram preview, and Markdown embedding",
+  "name": "tautcore",
+  "displayName": "Tautcore",
+  "description": "Tautcore DSL language support, diagram preview, and Markdown embedding",
   "version": "0.1.0",
-  "publisher": "plotgram",
+  "publisher": "tautcore",
   "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
@@ -13,43 +13,43 @@
     "Visualization"
   ],
   "activationEvents": [
-    "onLanguage:plotgram"
+    "onLanguage:tautcore"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "languages": [
       {
-        "id": "plotgram",
+        "id": "tautcore",
         "aliases": [
-          "Plotgram",
-          "plotgram"
+          "Tautcore",
+          "tautcore"
         ],
         "extensions": [
-          ".pgm"
+          ".taut"
         ],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
       {
-        "language": "plotgram",
-        "scopeName": "source.plotgram",
-        "path": "./syntaxes/plotgram.tmLanguage.json"
+        "language": "tautcore",
+        "scopeName": "source.tautcore",
+        "path": "./syntaxes/tautcore.tmLanguage.json"
       }
     ],
     "commands": [
       {
-        "command": "plotgram.openPreview",
-        "title": "Open Plotgram Preview",
-        "category": "Plotgram",
+        "command": "tautcore.openPreview",
+        "title": "Open Tautcore Preview",
+        "category": "Tautcore",
         "icon": "$(preview)"
       }
     ],
     "menus": {
       "editor/title": [
         {
-          "command": "plotgram.openPreview",
-          "when": "resourceLangId == plotgram",
+          "command": "tautcore.openPreview",
+          "when": "resourceLangId == tautcore",
           "group": "navigation"
         }
       ]

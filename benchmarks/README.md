@@ -34,7 +34,7 @@ benchmarks/
 | [`sets/mech-set.txt`](./sets/mech-set.txt) | `mech` + 双用途 `product` | 机制探针 / 拥堵校准 | 默认不门禁（机制断言另跑） |
 | [`sets/demo-observe-set.txt`](./sets/demo-observe-set.txt) | `demo` | 观测 / 可债 | 正确性硬；质量 WARN |
 
-日常宣称「无退化」默认只引用 **product-gate**。文件名首段即角色（`{role}.{slug}.pgm`），无需 manifest overrides。
+日常宣称「无退化」默认只引用 **product-gate**。文件名首段即角色（`{role}.{slug}.taut`），无需 manifest overrides。
 
 ## 速查
 

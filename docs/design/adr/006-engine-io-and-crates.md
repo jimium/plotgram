@@ -1,12 +1,12 @@
 # ADR-006: Engine 入口、边写者与 crate 拆分
 
 > 状态：accepted  
-> 日期：2026-07-30（修订：算法实现收拢为 engine 内模块；2026-07-31 增加 `plotgram-algo` 零件 crate）  
+> 日期：2026-07-30（修订：算法实现收拢为 engine 内模块；2026-07-31 增加 `tautcore-algo` 零件 crate）  
 > 关联：ADR-001、ADR-005、[`model-boundary.md`](../model-boundary.md)
 
 ## 背景
 
-布局与路由体量大，Trait 若留在门面 `plotgram-engine`，将来抽出 Hier 独立 crate 会环依赖。内建正交与独立 EdgeRouter 需共用无策略原语。
+布局与路由体量大，Trait 若留在门面 `tautcore-engine`，将来抽出 Hier 独立 crate 会环依赖。内建正交与独立 EdgeRouter 需共用无策略原语。
 
 早期曾为 stub 单独建 `layout-hierarchical` / `route-core` / `route-orthogonal` 三个 crate，粒度过碎。现收拢为 **engine 内模块**，模块边界按「日后原样搬出」来画。
 
@@ -14,9 +14,9 @@
 
 ### 1. 入口
 
-- Engine 只收 [`LayoutContract`](../../crates/plotgram-model/src/contract.rs)：`layout`、`edge_routing`、`graph`、**`node_sizes`**。  
+- Engine 只收 [`LayoutContract`](../../crates/tautcore-model/src/contract.rs)：`layout`、`edge_routing`、`graph`、**`node_sizes`**。  
 - **不**收 `profile` / theme。缺 `node_sizes` → 错误。  
-- 出口：[`LayoutResult`](../../crates/plotgram-model/src/result.rs)。
+- 出口：[`LayoutResult`](../../crates/tautcore-model/src/result.rs)。
 
 ### 2. 边几何写者（`edge_routing`）
 
@@ -31,19 +31,19 @@
 
 | Crate | 职责 |
 |-------|------|
-| `plotgram-model` | 数据 |
-| `plotgram-engine-api` | `LayoutAlgorithm` / `EdgeRouter` / `LayoutError` / `RouteScene`（**禁止**放进 model 或门面） |
-| `plotgram-algo` | **共享算法零件**（VPSC / FAS / 交叉计数 / orientation / track / 正交规范化等）；无管线、无 Contract；见 [`PARTS.md`](../../crates/plotgram-algo/PARTS.md) |
-| `plotgram-router` | **独立边路由**：`core`（无策略原语）+ `orthogonal`（OVG/A* router）+ `verify` + `score`；不依赖 engine 门面 |
-| `plotgram-engine` | `run` + 注册表 + **in-tree** `layout::*`（消费 algo + router） |
-| `plotgram-compile` | 构建 |
-| `plotgram-parse` / `content` / `render` / `cli` | 各司其职 |
+| `tautcore-model` | 数据 |
+| `tautcore-engine-api` | `LayoutAlgorithm` / `EdgeRouter` / `LayoutError` / `RouteScene`（**禁止**放进 model 或门面） |
+| `tautcore-algo` | **共享算法零件**（VPSC / FAS / 交叉计数 / orientation / track / 正交规范化等）；无管线、无 Contract；见 [`PARTS.md`](../../crates/tautcore-algo/PARTS.md) |
+| `tautcore-router` | **独立边路由**：`core`（无策略原语）+ `orthogonal`（OVG/A* router）+ `verify` + `score`；不依赖 engine 门面 |
+| `tautcore-engine` | `run` + 注册表 + **in-tree** `layout::*`（消费 algo + router） |
+| `tautcore-compile` | 构建 |
+| `tautcore-parse` / `content` / `render` / `cli` | 各司其职 |
 
 **engine 内模块（可后拆）：**
 
 ```text
-plotgram-engine
-  layout/hierarchical/     → 将来 plotgram-layout-hierarchical
+tautcore-engine
+  layout/hierarchical/     → 将来 tautcore-layout-hierarchical
   run / registry / finalize
 ```
 
@@ -53,21 +53,21 @@ plotgram-engine
 model ← engine-api
          algo（零件；当前可不依赖 model）
               ↑
-         plotgram-router（core + orthogonal + verify + score）
+         tautcore-router（core + orthogonal + verify + score）
               ↑
          layout 实现 ← engine 门面（只组装，实现不依赖 run）
 ```
 
 - **禁止**实现模块依赖 `run` / 注册表的「门面逻辑」形成环。  
-- **禁止** `plotgram-algo` 依赖 `plotgram-engine`。  
-- **禁止** `plotgram-router` 依赖 `plotgram-engine`（只能反向）。  
-- 内建 Ink 属于 hierarchical，可调用 `algo` 与 `plotgram_router::core`；不是 `EdgeRouter`。
+- **禁止** `tautcore-algo` 依赖 `tautcore-engine`。  
+- **禁止** `tautcore-router` 依赖 `tautcore-engine`（只能反向）。  
+- 内建 Ink 属于 hierarchical，可调用 `algo` 与 `tautcore_router::core`；不是 `EdgeRouter`。
 
 ### 4. 何时再拆 layout/route crate
 
 当某个 `layout/*` 或 `route/*` **体量与编译时间**明显拖累 engine、或需独立发布/feature 裁剪时，再抽成 workspace 成员；Trait 已在 `engine-api`，搬迁成本可控。
 
-**例外（已提前拆）**：`plotgram-algo` 在零件阶段即独立 —— 理由是编译隔离（v1 教训）与 M0 地基可并行验收；**不**再拆成多个微 crate（禁止 `plotgram-vpsc` 等）。
+**例外（已提前拆）**：`tautcore-algo` 在零件阶段即独立 —— 理由是编译隔离（v1 教训）与 M0 地基可并行验收；**不**再拆成多个微 crate（禁止 `tautcore-vpsc` 等）。
 
 ### 5. Group 尺寸
 
@@ -75,7 +75,7 @@ model ← engine-api
 
 ## 含义
 
-- **零件**：优先落在 `plotgram-algo`（见 PARTS.md），带表驱动单测；再由 layout/route 接线。  
+- **零件**：优先落在 `tautcore-algo`（见 PARTS.md），带表驱动单测；再由 layout/route 接线。  
 - **布局/路由算法**：先加 `engine` 内模块 + 注册；长大再 extract。  
 - 构建：`compile`（parse → measure → `engine::run` → render）；CLI 保持薄。
 

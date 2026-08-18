@@ -14,32 +14,32 @@ export interface ValidationResult {
   warnings: string[];
 }
 
-interface PlotgramNodeWasm {
+interface TautcoreNodeWasm {
   version(): string;
   validate(source: string): string;
   render(source: string): string;
 }
 
-let cached: PlotgramNodeWasm | null | undefined;
+let cached: TautcoreNodeWasm | null | undefined;
 
 function wasmEntryPath(extensionPath: string): string {
-  return path.join(extensionPath, 'media', 'node', 'plotgram_wasm.js');
+  return path.join(extensionPath, 'media', 'node', 'tautcore_wasm.js');
 }
 
 export function isNodeWasmAvailable(extensionPath: string): boolean {
   return fs.existsSync(wasmEntryPath(extensionPath));
 }
 
-export function getNodeWasm(extensionPath: string): PlotgramNodeWasm {
+export function getNodeWasm(extensionPath: string): TautcoreNodeWasm {
   if (cached === undefined) {
     const entry = wasmEntryPath(extensionPath);
     if (!fs.existsSync(entry)) {
       throw new Error(
-        '未找到 Plotgram WASM 产物，请在 editors/vscode 目录执行: npm run build:wasm',
+        '未找到 Tautcore WASM 产物，请在 editors/vscode 目录执行: npm run build:wasm',
       );
     }
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    cached = require(entry) as PlotgramNodeWasm;
+    cached = require(entry) as TautcoreNodeWasm;
   }
   return cached!;
 }

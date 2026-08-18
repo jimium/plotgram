@@ -1,8 +1,8 @@
-# Plotgram 产品与商业化备忘
+# Tautcore 产品与商业化备忘
 
 > 状态：proposed（讨论总结，待验证）  
 > 日期：2026-08-17  
-> 定位：从「重建 plotgram」到「如何立足市场」的战略共识。**非 ADR、非引擎设计档**；市场判断是推断，需用真实潜在客户验证。引擎设计与写权纪律仍以 `docs/design/` 与 `AGENTS.md` 为准。
+> 定位：从「重建 tautcore」到「如何立足市场」的战略共识。**非 ADR、非引擎设计档**；市场判断是推断，需用真实潜在客户验证。引擎设计与写权纪律仍以 `docs/design/` 与 `AGENTS.md` 为准。
 
 ---
 
@@ -18,9 +18,9 @@
 
 ## 1. 现状（我们有什么）
 
-**布局内核**（`crates/plotgram-layout/src/layout/`）：`hierarchical`（主核，Sugiyama）、`tree`、`sequence`、`circular`。
+**布局内核**（`crates/tautcore-layout/src/layout/`）：`hierarchical`（主核，Sugiyama）、`tree`、`sequence`、`circular`。
 
-**独立边路由**（`plotgram-router/`）：`orthogonal`（reduced OVG + A*）、`straight`、`polyline`、`octilinear`、`curved`；`bus` 后置。
+**独立边路由**（`tautcore-router/`）：`orthogonal`（reduced OVG + A*）、`straight`、`polyline`、`octilinear`、`curved`；`bus` 后置。
 
 **引擎之外的差异化**（真正的护城河）：
 
@@ -39,7 +39,7 @@
 
 **不在红海跟 Mermaid 拼人类手写图**（饱和、网络效应强、模型对 Mermaid 训练量碾压级）。
 
-**赢在 AI 生成图**：LLM 生成图的三痛点恰好是 Plotgram 的强项——语法不可靠、布局丑、无法「改一版再校验」。
+**赢在 AI 生成图**：LLM 生成图的三痛点恰好是 Tautcore 的强项——语法不可靠、布局丑、无法「改一版再校验」。
 
 **定位**：AI agent 的**确定性渲染/布局后端**，不是「又一个画图 DSL」。
 
@@ -71,8 +71,8 @@
 
 ### 4.1 Agent skill（最强分发渠道）
 
-- **Skill 是知识层，不是运行时**：教 agent「何时用、怎么写 `.pgm`、怎么调引擎画与迭代」；渲染靠运行时。
-- **运行时默认走 CLI**（本地、免费、隐私、零门槛），**托管 API 是可选付费升级**，经 `PLOTGRAM_API_URL` + key 切换 transport，skill 正文不写死。
+- **Skill 是知识层，不是运行时**：教 agent「何时用、怎么写 `.taut`、怎么调引擎画与迭代」；渲染靠运行时。
+- **运行时默认走 CLI**（本地、免费、隐私、零门槛），**托管 API 是可选付费升级**，经 `TAUTCORE_API_URL` + key 切换 transport，skill 正文不写死。
 - **`--explain` 必须免费**：它是让 agent 闭环「画完 → 读交叉数/绕向 → 自己迭代」的核心，也是 Mermaid 给不了 agent 的钩子。
 - **平台覆盖**：Zed / Claude Code / Claude Desktop = `SKILL.md`（`name` + `description` frontmatter + 指令体 + 支持文件）；Cursor = MCP + `.cursor/rules`（不原生用 SKILL.md）。
 
@@ -96,7 +96,7 @@
 | **嵌入引擎 SDK / 托管引擎 API** | graph → 图，SLA、确定性缓存、不养 Rust 工具链、support | **强** | yFiles 靠这个卖了几十年；已有现成预算 |
 | **团队资产治理** | 私有 theme/profile/archetype + RBAC/SSO/审计 + 版本 | **强** | 锁定 + 治理，换平台成本高 |
 | **专有资产** | 主题包 / archetype 目录 / 布局质量 benchmark / eval 集 | 中 | 资产独立于引擎代码，可单独收费 |
-| 纯渲染端点 / 确定性规模 + SLA | 「render .pgm → SVG」 | **弱** | 可自托管，卖的是信任不是功能 |
+| 纯渲染端点 / 确定性规模 + SLA | 「render .taut → SVG」 | **弱** | 可自托管，卖的是信任不是功能 |
 
 **目标客户**（谁会用、什么场景）：
 
@@ -118,7 +118,7 @@
 
 | 开源（MIT，铺量） | 可闭源 / 可收费 |
 |------------------|----------------|
-| `engine` / `layout` / `router` / `parse` / `render` | 托管引擎服务（重建 `plotgram-server`） |
+| `engine` / `layout` / `router` / `parse` / `render` | 托管引擎服务（重建 `tautcore-server`） |
 | CLI / WASM / skill | 团队资产治理（私有 theme/profile/archetype + RBAC/SSO/审计） |
 | 基础主题 | 高级主题 / archetype 资产包 |
 | `--explain` 布局事实 | benchmark / eval 数据集（ADR-007「优先做 eval 集」） |
@@ -146,6 +146,6 @@
 1. **需求验证**：从 observability / IaC / BI 血缘 / 工作流 中选 3 个场景，各配「客户是谁、今天怎么解决、你的差异化、怎么触达」，直接拿去对潜在客户。
 2. **Organic 内核**：AI 生成图最高频场景（网络 / 知识图谱），当前空白，是否优先立项。
 3. **Studio 抽离成本**：`apps/studio/src/agent/` 的 `AgentLoop` / `tools` 抽成服务端 API 的距离，决定墙 1 落地时长。
-4. **托管服务重建**：`plotgram-server` 当前缺 crate（README 有雏形、代码无），落地需重建。
+4. **托管服务重建**：`tautcore-server` 当前缺 crate（README 有雏形、代码无），落地需重建。
 5. **付费墙顺序**：先墙 2（团队资产治理，复用已有规范、成本最低、与 skill 漏斗咬合最紧）？还是先墙 1（收入天花板高但投入大）？
 6. **Benchmark 商业化**：见 [layout-facts-corpus-and-benchmark.md](layout-facts-corpus-and-benchmark.md) §6 开放问题（DLUB 题型、垂直选型、import 优先级）。

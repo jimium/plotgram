@@ -2,7 +2,7 @@
 
 > 状态：M3 已落地（节点 `circle` 自定义分区；`single-cycle` 与 BCC 几何可区分）。默认仍是 `bcc-compact` + `spectral`。`automatic` / disk 仍 `Unsupported`
 > 引擎注册名：`circular`
-> 代码：`crates/plotgram-layout/src/layout/circular/`
+> 代码：`crates/tautcore-layout/src/layout/circular/`
 > **目标架构真源**：[architecture.md](architecture.md)
 
 ## 签名

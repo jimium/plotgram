@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { loadWasm, renderSource, diffSources, formatSource, type PlotgramWasm, type ChangeJson } from '../lib/wasm';
+import { loadWasm, renderSource, diffSources, formatSource, type TautcoreWasm, type ChangeJson } from '../lib/wasm';
 import { AuditAnimator } from './AuditAnimator';
 import { withBase } from '../lib/baseUrl';
 
@@ -195,7 +195,7 @@ function StaticSvg({ svg, label, labelClass }: { svg: string; label: string; lab
 }
 
 export default function AuditApp() {
-  const [wasm, setWasm] = useState<PlotgramWasm | null>(null);
+  const [wasm, setWasm] = useState<TautcoreWasm | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [scenarioIdx, setScenarioIdx] = useState(0);
   const [phase, setPhase] = useState<Phase>('before');

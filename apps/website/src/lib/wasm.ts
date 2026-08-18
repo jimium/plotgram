@@ -1,4 +1,4 @@
-// website 端极简 WASM 加载器：从 CDN 加载 plotgram-wasm（与 playground 共享产物）。
+// website 端极简 WASM 加载器：从 CDN 加载 tautcore-wasm（与 playground 共享产物）。
 
 /** 单格式渲染结果。 */
 export interface RenderResult {
@@ -24,7 +24,7 @@ export interface DiagnosticErrorJson {
   suggestion?: { text: string; fix?: unknown } | null;
 }
 
-export interface PlotgramWasm {
+export interface TautcoreWasm {
   default: (input?: unknown) => Promise<unknown>;
   version: () => string;
   render: (source: string, format: string) => string;
@@ -32,41 +32,41 @@ export interface PlotgramWasm {
   render_from_md_outline: (source: string, format: string, optionsJson: string) => string;
 }
 
-let modulePromise: Promise<PlotgramWasm> | null = null;
+let modulePromise: Promise<TautcoreWasm> | null = null;
 
-/** CDN 上 plotgram-wasm 的 common 根目录（website / playground / agent 三端共用）。 */
+/** CDN 上 tautcore-wasm 的 common 根目录（website / playground / agent 三端共用）。 */
 function wasmCdnBase(): string {
   const fromEnv = import.meta.env.VITE_WASM_CDN_BASE as string | undefined;
   if (fromEnv) return fromEnv.endsWith('/') ? fromEnv : `${fromEnv}/`;
-  return 'https://assets.plotgram.cn/plotgram-wasm/';
+  return 'https://assets.plotgram.cn/tautcore-wasm/';
 }
 
-/** plotgram_wasm.js 加载地址（开发走本地 vite 中间件，生产走 CDN common 路径）。 */
-function plotgramWasmJsUrl(): string {
+/** tautcore_wasm.js 加载地址（开发走本地 vite 中间件，生产走 CDN common 路径）。 */
+function tautcoreWasmJsUrl(): string {
   if (import.meta.env.DEV) {
-    return `../../plotgram-wasm/plotgram_wasm.js`;
+    return `../../tautcore-wasm/tautcore_wasm.js`;
   }
-  return `${wasmCdnBase()}plotgram_wasm.js`;
+  return `${wasmCdnBase()}tautcore_wasm.js`;
 }
 
 /** wasm 二进制加载地址。 */
-function plotgramWasmBinaryUrl(): string {
+function tautcoreWasmBinaryUrl(): string {
   if (import.meta.env.DEV) {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${origin}/plotgram-wasm/plotgram_wasm_bg.wasm`;
+    return `${origin}/tautcore-wasm/tautcore_wasm_bg.wasm`;
   }
-  return `${wasmCdnBase()}plotgram_wasm_bg.wasm`;
+  return `${wasmCdnBase()}tautcore_wasm_bg.wasm`;
 }
 
 /** 懒加载并初始化 WASM 模块（全局单例）。 */
-export function loadWasm(): Promise<PlotgramWasm> {
+export function loadWasm(): Promise<TautcoreWasm> {
   if (!modulePromise) {
     modulePromise = (async () => {
       const mod = (await import(
         /* @vite-ignore */ // @ts-ignore WASM 产物由 wasm-pack 生成
-        plotgramWasmJsUrl()
-      )) as unknown as PlotgramWasm;
-      await mod.default({ module_or_path: plotgramWasmBinaryUrl() });
+        tautcoreWasmJsUrl()
+      )) as unknown as TautcoreWasm;
+      await mod.default({ module_or_path: tautcoreWasmBinaryUrl() });
       return mod;
     })();
   }
@@ -100,7 +100,7 @@ export interface WasmRenderOptions {
 }
 
 /** 渲染 SVG，返回单格式结果。 */
-export function renderSvg(wasm: PlotgramWasm, source: string, options?: WasmRenderOptions): RenderResult {
+export function renderSvg(wasm: TautcoreWasm, source: string, options?: WasmRenderOptions): RenderResult {
   const json = options
     ? wasm.render_with_options(source, 'svg', JSON.stringify(options))
     : wasm.render(source, 'svg');
@@ -114,7 +114,7 @@ export function renderSvg(wasm: PlotgramWasm, source: string, options?: WasmRend
 }
 
 /** 从 Markdown 大纲渲染 SVG（ATX 标题模式，仅 mindmap）。 */
-export function renderMdOutlineSvg(wasm: PlotgramWasm, source: string, options?: WasmRenderOptions): RenderResult {
+export function renderMdOutlineSvg(wasm: TautcoreWasm, source: string, options?: WasmRenderOptions): RenderResult {
   const optionsJson = options ? JSON.stringify(options) : '';
   const json = wasm.render_from_md_outline(source, 'svg', optionsJson);
   return safeParse<RenderResult>(json, {

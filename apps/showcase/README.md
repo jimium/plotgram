@@ -1,4 +1,4 @@
-# Plotgram Showcase
+# Tautcore Showcase
 
 经典示例集 + 视觉监视画廊 + 质量门禁数据源。
 
@@ -10,7 +10,7 @@
 showcase/
   {layout}/                 ← 全局统一：引擎注册名（ADR-001）
     [{facet}/]              ← 可选：该内核自己的能力里程碑分桶
-      {role}.{slug}.pgm     ← 全局统一：smoke / product / demo / stress / mech
+      {role}.{slug}.taut     ← 全局统一：smoke / product / demo / stress / mech
 ```
 
 | 层 | 谁定义 | 全库是否同一套 |
@@ -19,7 +19,7 @@ showcase/
 | **facet** | **各内核自定** | ❌ 不统一词汇；没有则文件直接落在 `{layout}/` |
 | **role** | 本 README | ✅ 统一 |
 
-夹具只保证：`discover` 扫 `{layout}/**/*.pgm`；画廊按 `layout` →（可选）`facet` → `role` 过滤。空 facet 目录可占位（如 `partition/`），不进门禁。
+夹具只保证：`discover` 扫 `{layout}/**/*.taut`；画廊按 `layout` →（可选）`facet` → `role` 过滤。空 facet 目录可占位（如 `partition/`），不进门禁。
 
 ### 不变式
 
@@ -33,19 +33,19 @@ showcase/
 ### 路径解析
 
 ```text
-hierarchical/flat/smoke.decision-loop.pgm
+hierarchical/flat/smoke.decision-loop.taut
 └ layout ─┘ └facet┘ └role┘ └──── slug ────┘
 
-hierarchical/group-weak/product.cloud-native.pgm
-tree/single-layer/smoke.root-branches.pgm   # 现行；facet = placer 族
-sequence/smoke.ping-pong.pgm                # 现行；无 facet
+hierarchical/group-weak/product.cloud-native.taut
+tree/single-layer/smoke.root-branches.taut   # 现行；facet = placer 族
+sequence/smoke.ping-pong.taut                # 现行；无 facet
 ```
 
 - `layout` = 路径第一段  
 - `facet` = 第二段（若存在且不是文件名）  
 - `role` = 文件名第一段（`.` 前）  
 
-manifest 写入 `layout` / `facet`（可 null）/ `role`；SVG 镜像源路径：`_out/{path 去 .pgm}.svg`。
+manifest 写入 `layout` / `facet`（可 null）/ `role`；SVG 镜像源路径：`_out/{path 去 .taut}.svg`。
 
 ---
 
@@ -154,8 +154,8 @@ showcase/
 路径相对 `showcase/`，**必须含 layout**（及 facet，若有）：
 
 ```text
-hierarchical/flat/smoke.decision-loop.pgm
-hierarchical/group-weak/product.cloud-native.pgm
+hierarchical/flat/smoke.decision-loop.taut
+hierarchical/group-weak/product.cloud-native.taut
 ```
 
 | 清单 | 角色 |
@@ -172,7 +172,7 @@ hierarchical/group-weak/product.cloud-native.pgm
 
 见 [`docs/specs/dsl/dsl-spec.md`](../docs/specs/dsl/dsl-spec.md)。
 
-```plotgram
+```tautcore
 diagram {
     profile: flowchart
     title: "..."
@@ -193,12 +193,12 @@ diagram {
 
 | 主题 | 文件 | facet |
 |------|------|-------|
-| 冒烟决策环 | `hierarchical/flat/smoke.decision-loop.pgm` | flat |
-| 扁平 REST | `hierarchical/flat/product.flat-rest-api.pgm` | flat |
-| 三层架构 | `hierarchical/flat/product.three-tier.pgm` | flat |
-| 云原生 | `hierarchical/group-weak/product.cloud-native.pgm` | group-weak |
-| 跨部门泳道 | `hierarchical/group-strong-macro/product.swimlane-order-process.pgm` | group-strong-macro |
-| yFiles 管道压测 | `hierarchical/flat/stress.layout-stress-yfiles-pipeline.pgm` | flat |
-| D2 对照 | `hierarchical/group-weak/product.d2-cell-tower-network.pgm` | group-weak |
-| 树冒烟三分支 | `tree/single-layer/smoke.root-branches.pgm` | single-layer |
-| 组织架构 | `tree/single-layer/product.org-chart.pgm` | single-layer |
+| 冒烟决策环 | `hierarchical/flat/smoke.decision-loop.taut` | flat |
+| 扁平 REST | `hierarchical/flat/product.flat-rest-api.taut` | flat |
+| 三层架构 | `hierarchical/flat/product.three-tier.taut` | flat |
+| 云原生 | `hierarchical/group-weak/product.cloud-native.taut` | group-weak |
+| 跨部门泳道 | `hierarchical/group-strong-macro/product.swimlane-order-process.taut` | group-strong-macro |
+| yFiles 管道压测 | `hierarchical/flat/stress.layout-stress-yfiles-pipeline.taut` | flat |
+| D2 对照 | `hierarchical/group-weak/product.d2-cell-tower-network.taut` | group-weak |
+| 树冒烟三分支 | `tree/single-layer/smoke.root-branches.taut` | single-layer |
+| 组织架构 | `tree/single-layer/product.org-chart.taut` | single-layer |

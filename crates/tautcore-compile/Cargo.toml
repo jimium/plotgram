@@ -1,0 +1,22 @@
+[package]
+name = "tautcore-compile"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Tautcore build pipeline: parse → measure → layout → render"
+
+[dependencies]
+tautcore-model = { workspace = true }
+tautcore-parse = { workspace = true }
+tautcore-content = { workspace = true }
+tautcore-engine = { workspace = true }
+tautcore-engine-api = { workspace = true }
+tautcore-layout = { workspace = true }
+tautcore-render = { workspace = true }
+tautcore-router = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+insta = { version = "1", features = ["json"] }

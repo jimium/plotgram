@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Plotgram 部署公共库
+# Tautcore 部署公共库
 #
 # 各站点发布脚本 source 本文件后即可使用：
 #   source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -31,7 +31,7 @@ ASSET_REMOTE_DIR="${ASSET_REMOTE_DIR:-/var/www/assets.pg.agcli.cn}"
 CDN_BASE="${CDN_BASE:-https://assets.plotgram.cn/}"
 
 # SSH ControlMaster socket 路径（按 host+user 区分，%C 哈希）
-_DEPLOY_SSH_CONTROL_PATH="/tmp/plotgram-deploy-ssh-%C"
+_DEPLOY_SSH_CONTROL_PATH="/tmp/tautcore-deploy-ssh-%C"
 _DEPLOY_SSH_OPTS=(-o ControlMaster=auto -o ControlPath="$_DEPLOY_SSH_CONTROL_PATH" -o ControlPersist=120)
 
 # ─── 基础工具 ───────────────────────────────────────────

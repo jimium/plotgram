@@ -1,6 +1,6 @@
-# Plotgram Brand
+# Tautcore Brand
 
-正式品牌资产。方向定稿：**S2a22（文本环绕节点）+ S5（plot / gram 双色字标）**。
+正式品牌资产。方向定稿：**S2a22（文本环绕节点）+ S5（taut / core 双色字标）**。
 
 ## 文件
 
@@ -27,7 +27,7 @@
 - 三根横线 = 书写 / DSL / 文本行
 - **黄金比**缩短 + 右下节点圆 = 文本环绕并收束成节点
 - 底行与圆**底部对齐**，形成稳定的「环绕」负形
-- 字标拆词：`plot` + `gram`（仅彩色主品牌拆色）
+- 字标拆词：`taut` + `core`（仅彩色主品牌拆色）
 
 ## 视觉原则
 
@@ -75,28 +75,28 @@
 所有 lockup 字标为 **Space Grotesk Bold outlined paths**，无 `<text>`。
 
 - 彩色：`plot` + `gram` 双色；词间 gap ≈2px
-- 单色：整词 `plotgram` 同色
+- 单色：整词 `tautcore` 同色
 - 源字体：`fonts/SpaceGrotesk-Bold.ttf`（OFL）
 
 ## 使用
 
 ```html
 <!-- 主品牌：产品顶栏 / 官网 -->
-<img src="/assets/brand/logo.svg" alt="Plotgram" />
-<img src="/assets/brand/logo-dark.svg" alt="Plotgram" />
+<img src="/assets/brand/logo.svg" alt="Tautcore" />
+<img src="/assets/brand/logo-dark.svg" alt="Tautcore" />
 
 <!-- Favicon（务必用 16px 稿） -->
 <link rel="icon" href="/assets/brand/logo-icon-16.svg" type="image/svg+xml" />
 
 <!-- 方标：按显示像素选 -->
-<img src="/assets/brand/logo-icon-16.svg" width="16" height="16" alt="Plotgram" />
-<img src="/assets/brand/logo-icon-32.svg" width="32" height="32" alt="Plotgram" />
-<img src="/assets/brand/logo-icon-64.svg" width="64" height="64" alt="Plotgram" />
-<img src="/assets/brand/logo-icon.svg" width="48" height="48" alt="Plotgram" />
+<img src="/assets/brand/logo-icon-16.svg" width="16" height="16" alt="Tautcore" />
+<img src="/assets/brand/logo-icon-32.svg" width="32" height="32" alt="Tautcore" />
+<img src="/assets/brand/logo-icon-64.svg" width="64" height="64" alt="Tautcore" />
+<img src="/assets/brand/logo-icon.svg" width="48" height="48" alt="Tautcore" />
 
 <!-- 全黑 / 全白（透明底） -->
-<img src="/assets/brand/logo-mono.svg" alt="Plotgram" />
-<img src="/assets/brand/logo-mono-white.svg" alt="Plotgram" />
+<img src="/assets/brand/logo-mono.svg" alt="Tautcore" />
+<img src="/assets/brand/logo-mono-white.svg" alt="Tautcore" />
 
 <!-- 文档 / CLI：无圆角底 -->
 <img src="/assets/brand/logo-mark.svg" width="20" height="20" alt="" />
@@ -128,7 +128,7 @@
 ## 演进记录
 
 1. 旧品牌：Drawquill / Drawify，紫青渐变 D 形标
-2. 探索：`options/preview-plotgram-*.html`
+2. 探索：`options/preview-tautcore-*.html`
 3. 定稿：S2a22 + S5 双色
 4. 精修：黄金比线长、字距、path 化
 5. 体系：16/32/64 尺寸分级、全黑/全白单色、无圆角底 mark

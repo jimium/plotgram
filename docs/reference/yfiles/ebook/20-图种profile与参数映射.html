@@ -335,7 +335,7 @@ pub struct DemandBoard {
         <h3>检验 2：反向审计（grep 测试）</h3>
         <div class="code-block">
           <span class="lang-tag">shell</span>
-          <pre><code class="language-plaintext">在 plotgram-engine 里 grep：diagram_type | profile | DiagramType
+          <pre><code class="language-plaintext">在 tautcore-engine 里 grep：diagram_type | profile | DiagramType
                             "flowchart" | "sequence" | "er" | "mindmap"
 期望结果：0 命中</code></pre>
         </div>
@@ -365,7 +365,7 @@ pub struct DemandBoard {
             <!-- 中间：引擎 -->
             <g transform="translate(260,55)">
               <rect class="highlight-bg" x="0" y="0" width="160" height="82" rx="8"/>
-              <text x="80" y="28" text-anchor="middle" class="label" font-size="13">plotgram-engine</text>
+              <text x="80" y="28" text-anchor="middle" class="label" font-size="13">tautcore-engine</text>
               <text x="80" y="48" text-anchor="middle" class="hi" font-size="11">零 diagram_type 分支</text>
               <text x="80" y="66" text-anchor="middle" class="muted" font-size="10">同一代码路径</text>
             </g>
@@ -404,8 +404,8 @@ pub struct DemandBoard {
             <g transform="translate(60,205)">
               <rect class="node-muted" x="0" y="0" width="500" height="62" rx="6"/>
               <text x="250" y="22" text-anchor="middle" class="label" font-size="12">CI 守卫（ADR-001 唯一可执行守卫）</text>
-              <text x="250" y="42" text-anchor="middle" class="muted" font-size="11">grep 'diagram_type | flowchart | sequence | er | mindmap' plotgram-engine  ⇒  0 命中</text>
-              <text x="250" y="56" text-anchor="middle" class="hi" font-size="10">且引擎 crate 不依赖 plotgram-model::profile</text>
+              <text x="250" y="42" text-anchor="middle" class="muted" font-size="11">grep 'diagram_type | flowchart | sequence | er | mindmap' tautcore-engine  ⇒  0 命中</text>
+              <text x="250" y="56" text-anchor="middle" class="hi" font-size="10">且引擎 crate 不依赖 tautcore-model::profile</text>
             </g>
 
             <defs>
@@ -415,7 +415,7 @@ pub struct DemandBoard {
           <div class="fig-caption"><span class="fnum">图 20.3</span>同一引擎、同一代码路径，不同 profile 参数 → 不同图种结果；grep 守卫是 ADR-001 唯一可执行守卫</div>
         </figure>
 
-        <p>可以做成 CI 检查（一个几行的脚本 + <code>#[deny]</code>/<code>grep</code> gate）。<strong>这是 ADR-001 唯一的可执行守卫。</strong> 建议同时禁止引擎依赖 <code>plotgram-model::profile</code>（crate 依赖层面的硬约束，比 grep 更强）。</p>
+        <p>可以做成 CI 检查（一个几行的脚本 + <code>#[deny]</code>/<code>grep</code> gate）。<strong>这是 ADR-001 唯一的可执行守卫。</strong> 建议同时禁止引擎依赖 <code>tautcore-model::profile</code>（crate 依赖层面的硬约束，比 grep 更强）。</p>
 
         <h3>检验 3：参数正交性审计</h3>
         <p>对参数表两两检查：</p>

@@ -1,0 +1,73 @@
+{
+  "version": "0.2",
+  "id": "common.dual-channel",
+  "name": "Dual Channel",
+  "meta": {
+    "author": "Tautcore",
+    "description": "双通道边界：浅凹 fill 建体 + 略深 stroke 轻分工；edge 保持可追迹、不降权。比默认凹井更浅一档，接近现状的温和变体",
+    "tags": [
+      "light",
+      "clean",
+      "dual-channel",
+      "embed-friendly",
+      "subtle"
+    ]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#F5F5F5",
+      "border_strong": "#7A7A86",
+      "neutral_fill": "#FFFFFF",
+      "neutral_stroke": "#C9C9C9",
+      "edge_stroke": "#8F8F99",
+      "group_fill": "#ECEEF2",
+      "group_stroke": "#7A7A86"
+    }
+  },
+  "defaults": {
+    "group": {
+      "fill": "{colors.group_fill}",
+      "stroke": "{colors.group_stroke}",
+      "stroke_width": 1.35,
+      "stroke_dasharray": "none"
+    },
+    "edge": {
+      "stroke": "{colors.edge_stroke}",
+      "stroke_width": 1.35,
+      "stroke_opacity": 1.0
+    }
+  },
+  "diagrams": {
+    "flowchart": {
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "#ECEEF2", "stroke": "#7A7A86", "stroke_width": 1.35, "border_radius": 10.0, "stroke_dasharray": "none" },
+            { "fill": "#E4E6EB", "stroke": "#8A8A96", "stroke_width": 1.15, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#DBDEE4", "stroke": "#9A9AA5", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#D4D7DE", "stroke": "#9A9AA5", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" }
+          ]
+        }
+      }
+    },
+    "architecture": {
+      "group": {
+        "fill": "{colors.group_fill}",
+        "stroke": "{colors.group_stroke}",
+        "stroke_width": 1.35,
+        "stroke_dasharray": "none"
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "#ECEEF2", "stroke": "#7A7A86", "stroke_width": 1.35, "border_radius": 10.0, "stroke_dasharray": "none" },
+            { "fill": "#E4E6EB", "stroke": "#8A8A96", "stroke_width": 1.15, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#DBDEE4", "stroke": "#9A9AA5", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#D4D7DE", "stroke": "#9A9AA5", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -2,11 +2,11 @@
 
 ## 1. 总体架构
 
-Plotgram Studio 是 LLM 驱动的 Agent 绘图工作台,核心是 Agent Loop 循环引擎。Agent 通过 Tool-Calling 操控 plotgram-wasm,用户用自然语言对话驱动图表生成与迭代。
+Tautcore Studio 是 LLM 驱动的 Agent 绘图工作台,核心是 Agent Loop 循环引擎。Agent 通过 Tool-Calling 操控 tautcore-wasm,用户用自然语言对话驱动图表生成与迭代。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Plotgram Studio (React)                    │
+│                    Tautcore Studio (React)                    │
 ├──────────────────────────────┬──────────────────────────────┤
 │     预览区(SVG 渲染)          │     对话区(自然语言交互)      │
 ├──────────────────────────────┴──────────────────────────────┤
@@ -20,9 +20,9 @@ Plotgram Studio 是 LLM 驱动的 Agent 绘图工作台,核心是 Agent Loop 循
 ├──────────────────────────────────────────────────────────────┤
 │                   LLM 客户端(OpenAI 兼容)                    │
 ├──────────────────────────────────────────────────────────────┤
-│                   plotgram-wasm 桥接层                        │
+│                   tautcore-wasm 桥接层                        │
 ├──────────────────────────────────────────────────────────────┤
-│                   plotgram-core (Rust)                        │
+│                   tautcore-core (Rust)                        │
 │   parse → prepare → validate → layout → scene → encode       │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -64,7 +64,7 @@ IDLE
 
 ## 3. Tool 设计
 
-Agent 通过 6 个 Tool 操控 plotgram-wasm。
+Agent 通过 6 个 Tool 操控 tautcore-wasm。
 
 ### 3.1 Tool 清单
 
@@ -79,7 +79,7 @@ Agent 通过 6 个 Tool 操控 plotgram-wasm。
 
 ### 3.2 新增 WASM 绑定
 
-Studio 需要在 plotgram-wasm crate 新增 2 个导出:
+Studio 需要在 tautcore-wasm crate 新增 2 个导出:
 
 #### diff_sources
 
@@ -88,7 +88,7 @@ Studio 需要在 plotgram-wasm crate 新增 2 个导出:
 pub fn diff_sources(old_source: &str, new_source: &str) -> String
 ```
 
-复用 plotgram-core 的 `diff::diff` 函数,比较两份 DSL 的 AST 差异,返回 `DiffResult` JSON。
+复用 tautcore-core 的 `diff::diff` 函数,比较两份 DSL 的 AST 差异,返回 `DiffResult` JSON。
 
 #### apply_patch
 
@@ -97,9 +97,9 @@ pub fn diff_sources(old_source: &str, new_source: &str) -> String
 pub fn apply_patch(source: &str, patch_json: &str) -> String
 ```
 
-复用 plotgram-core 的 `diff::apply_patch` 函数,应用 Change 列表到 AST,返回新 DSL 源码。
+复用 tautcore-core 的 `diff::apply_patch` 函数,应用 Change 列表到 AST,返回新 DSL 源码。
 
-> 注意:apply_patch 需要将修改后的 AST 反序列化为 DSL 文本。当前 plotgram-core 只有 DSL→AST 的单向解析,需新增 `ast_to_source` 能力。详见 [tasks.md](tasks.md) 的 P1 阶段。
+> 注意:apply_patch 需要将修改后的 AST 反序列化为 DSL 文本。当前 tautcore-core 只有 DSL→AST 的单向解析,需新增 `ast_to_source` 能力。详见 [tasks.md](tasks.md) 的 P1 阶段。
 
 ### 3.3 Tool Schema
 
@@ -182,9 +182,9 @@ Anthropic 的响应格式在 [src/lib/llm.ts](../src/lib/llm.ts) 中转换为统
 
 通过环境变量配置(见 `.env.example`),API Key 仅存 localStorage,不发送到任何第三方。
 
-## 6. 与 plotgram-core 的关系
+## 6. 与 tautcore-core 的关系
 
-Studio **不修改** plotgram-core 的管线架构,只通过 WASM 消费其能力:
+Studio **不修改** tautcore-core 的管线架构,只通过 WASM 消费其能力:
 
 ```
 Studio 需要的 core 能力        现状        需要做的
@@ -205,11 +205,11 @@ ast_to_source (AST→DSL)       core 无      需在 core 新增
 - **API Key 本地存储**:LLM API Key 仅存浏览器 localStorage,不上传
 - **无后端**:纯前端 WASM 应用,除 LLM API 外不与任何服务器通信
 - **CSP 策略**:生产构建建议配置 Content-Security-Policy
-- **输入校验**:DSL 经 plotgram-core 校验,防止注入
+- **输入校验**:DSL 经 tautcore-core 校验,防止注入
 
 ## 8. 性能考量
 
-- **WASM 单例**:plotgram-wasm 模块全局单例,避免重复加载
+- **WASM 单例**:tautcore-wasm 模块全局单例,避免重复加载
 - **对话历史压缩**:超过 20 条消息自动压缩,避免上下文过长
 - **渲染防抖**:DSL 变更后防抖 300ms 再渲染
 - **Tool 结果截断**:日志展示时截断过长结果

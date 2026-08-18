@@ -1,0 +1,10 @@
+[package]
+name = "tautcore-parse"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Tautcore DSL (.taut) parser: source → Graph + profile expand"
+
+[dependencies]
+tautcore-model = { workspace = true }
+thiserror = { workspace = true }

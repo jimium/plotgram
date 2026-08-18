@@ -1,7 +1,7 @@
 /**
  * Agent 类型定义
  *
- * 与 plotgram-wasm 的 diff/patch/render 类型对齐，
+ * 与 tautcore-wasm 的 diff/patch/render 类型对齐，
  * DiffResult 归一化为带 stats 的展示格式（供 DiffSummary 使用）。
  */
 

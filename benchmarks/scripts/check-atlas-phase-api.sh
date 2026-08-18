@@ -10,8 +10,8 @@ source "$(dirname "$0")/gate-switch.sh"
 gate_skip_unless_enabled "check-atlas-phase-api.sh"
 
 fail=0
-INK="crates/plotgram-core/src/layout/atlas/ink.rs"
-PIPE="crates/plotgram-core/src/layout/atlas/pipeline.rs"
+INK="crates/tautcore-core/src/layout/atlas/ink.rs"
+PIPE="crates/tautcore-core/src/layout/atlas/pipeline.rs"
 
 # 1) ink 不得出现 DiagramType
 if rg -n 'DiagramType' "$INK" | rg -v '^\S+:\s*//' | rg -v '^\S+:\s*//!' | rg -v '^\S+:\s*///' | rg -q .; then
@@ -47,7 +47,7 @@ if ! rg -q 'assert_channel_provenance_coverage' "$PIPE"; then
 fi
 
 # 5) solve 公开入口：solve_from_contract 存在（度量相契约入口，非内联 CoordinateProblem）
-if ! rg -q 'pub fn solve_from_contract\(' crates/plotgram-core/src/layout/atlas/solve.rs; then
+if ! rg -q 'pub fn solve_from_contract\(' crates/tautcore-core/src/layout/atlas/solve.rs; then
   echo "FAIL: solve_from_contract missing"
   fail=1
 fi

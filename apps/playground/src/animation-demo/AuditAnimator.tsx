@@ -307,7 +307,7 @@ export function AuditAnimator({
 
     const newTitle = Array.from(newSvg.children).find((c) => c.tagName === 'text') as SVGElement | undefined;
     if (newTitle) newTitle.style.opacity = '0.001';
-    const newAttr = newSvg.querySelector('g.plotgram-attribution') as SVGGElement | null;
+    const newAttr = newSvg.querySelector('g.tautcore-attribution') as SVGGElement | null;
     if (newAttr) newAttr.style.opacity = '0.001';
 
     prevNodes.forEach((g) => {
@@ -373,7 +373,7 @@ export function AuditAnimator({
         });
         const prevTitle = Array.from(prevSvgEl!.children).find((c) => c.tagName === 'text') as SVGElement | undefined;
         if (prevTitle) { setTransitions(prevTitle, ['opacity'], duration, EASE_IN); prevTitle.style.opacity = '0'; }
-        const prevAttrEl = prevSvgEl!.querySelector('g.plotgram-attribution') as SVGGElement | null;
+        const prevAttrEl = prevSvgEl!.querySelector('g.tautcore-attribution') as SVGGElement | null;
         if (prevAttrEl) { setTransitions(prevAttrEl, ['opacity'], duration, EASE_IN); prevAttrEl.style.opacity = '0'; }
 
         window.setTimeout(() => {

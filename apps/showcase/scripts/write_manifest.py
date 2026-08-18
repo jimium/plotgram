@@ -22,9 +22,9 @@ Manifest schema:
     ]
   }
 
-Path shape: `{layout}/[{facet}/]{role}.{slug}.pgm`
+Path shape: `{layout}/[{facet}/]{role}.{slug}.taut`
 `changed` = (this hash != prev hash) OR (sample not in prev).
-SVG mirrors source: `_out/{path without .pgm}.svg`.
+SVG mirrors source: `_out/{path without .taut}.svg`.
 """
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def facet_of(path: str) -> str | None:
 
 
 def svg_rel_for(path: str) -> str:
-    stem = path[:-4] if path.endswith(".pgm") else path
+    stem = path[:-4] if path.endswith(".taut") else path
     return f"_out/{stem}.svg"
 
 

@@ -11,11 +11,11 @@ source "$(dirname "$0")/gate-switch.sh"
 gate_skip_unless_enabled "check-product-penetration.sh"
 
 SAMPLES=(
-  apps/showcase/flowchart/product.linear-chain.pgm
-  apps/showcase/flowchart/product.user-auth.pgm
-  apps/showcase/flowchart/product.swimlane-order-process.pgm
-  apps/showcase/architecture/product.ecommerce-platform.pgm
-  apps/showcase/architecture/product.cloud-native.pgm
+  apps/showcase/flowchart/product.linear-chain.taut
+  apps/showcase/flowchart/product.user-auth.taut
+  apps/showcase/flowchart/product.swimlane-order-process.taut
+  apps/showcase/architecture/product.ecommerce-platform.taut
+  apps/showcase/architecture/product.cloud-native.taut
 )
 
 fail=0
@@ -26,7 +26,7 @@ for s in "${SAMPLES[@]}"; do
     continue
   fi
   set +e
-  out="$(cargo run -q -p plotgram-cli -- lint "$s" --profile strict --format json 2>/dev/null)"
+  out="$(cargo run -q -p tautcore-cli -- lint "$s" --profile strict --format json 2>/dev/null)"
   rc=$?
   set -e
   if [[ -z "${out}" ]]; then

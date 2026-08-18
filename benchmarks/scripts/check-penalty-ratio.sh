@@ -13,7 +13,7 @@ fail=0
 
 # ── Atlas / LexCost 硬轨 ──────────────────────────────────
 # 1) LexCost 定义在中立 kernel/cost.rs
-if ! rg -q 'pub struct LexCost' crates/plotgram-core/src/layout/kernel/cost.rs; then
+if ! rg -q 'pub struct LexCost' crates/tautcore-core/src/layout/kernel/cost.rs; then
   echo "FAIL: LexCost missing in layout/kernel/cost.rs"
   fail=1
 fi
@@ -21,8 +21,8 @@ fi
 # 2) 禁止对 LexCost 做跨层字段求和的 Add / 标量折叠 API
 bad_lex="$(
   rg -n 'impl\s+(Add|AddAssign).*LexCost|fn\s+\w*as_scalar\w*|fn\s+\w*total_cost\w*|fn\s+\w*sum_layers\w*' \
-    crates/plotgram-core/src/layout/kernel/cost.rs \
-    crates/plotgram-core/src/layout/atlas \
+    crates/tautcore-core/src/layout/kernel/cost.rs \
+    crates/tautcore-core/src/layout/atlas \
     || true
 )"
 if [[ -n "${bad_lex}" ]]; then
@@ -32,14 +32,14 @@ if [[ -n "${bad_lex}" ]]; then
 fi
 
 # 3) channel 搜索必须用 LexCost（非裸 f64 罚项表驱动）
-if ! rg -q 'LexCost' crates/plotgram-core/src/layout/atlas/channel/search.rs; then
+if ! rg -q 'LexCost' crates/tautcore-core/src/layout/atlas/channel/search.rs; then
   echo "FAIL: atlas/channel/search.rs must use LexCost"
   fail=1
 fi
 
 # ── 旧 objectives 软轨（WARN，不阻断）──────────────────────
-if [[ -f crates/plotgram-core/src/layout/routing/objectives.rs ]]; then
-  out="$(cargo test -p plotgram-core --lib layout::routing::objectives::tests -- --nocapture 2>&1)" || true
+if [[ -f crates/tautcore-core/src/layout/routing/objectives.rs ]]; then
+  out="$(cargo test -p tautcore-core --lib layout::routing::objectives::tests -- --nocapture 2>&1)" || true
   if echo "$out" | rg -q "test result: FAILED|FAILED\."; then
     echo "WARN: legacy soft ranking ratio/items exceed caps (routing/objectives.rs) — Atlas LexCost is the hard gate"
     echo "$out" | tail -20
@@ -47,7 +47,7 @@ if [[ -f crates/plotgram-core/src/layout/routing/objectives.rs ]]; then
 
   violations="$(
     rg -n '^\s*(pub(\([^)]*\))?\s+)?const\s+\w*PENALTY\w*\s*:' \
-      crates/plotgram-core/src/layout/routing \
+      crates/tautcore-core/src/layout/routing \
       --glob '!**/objectives.rs' \
       || true
   )"

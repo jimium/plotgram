@@ -5,7 +5,7 @@
 
 本文是 Sequence **边几何**的真源。它不是 Hier Channel，也不是独立 `EdgeRouter`。
 
-> **前置**：本文 `AttachSpec.side` 用本核私有 `LifelineSide`（`East | West | Center`），**不**是 [`model::port::Side`](../../../../crates/plotgram-model/src/port.rs)（封闭四值，无 `Center`）。§3.3 说明对外 `PortRef` 的映射规则。§11 失败表已对齐当前 [`LayoutError`](../../../../crates/plotgram-engine-api/src/error.rs) 变体。
+> **前置**：本文 `AttachSpec.side` 用本核私有 `LifelineSide`（`East | West | Center`），**不**是 [`model::port::Side`](../../../../crates/tautcore-model/src/port.rs)（封闭四值，无 `Center`）。§3.3 说明对外 `PortRef` 的映射规则。§11 失败表已对齐当前 [`LayoutError`](../../../../crates/tautcore-engine-api/src/error.rs) 变体。
 
 ---
 
@@ -92,7 +92,7 @@ else:
 
 ### 3.3 与 PortRef 的关系
 
-对外 [`EdgePlacement.from_port / to_port`](../../../../crates/plotgram-model/src/result.rs) 是 `Option<PortRef>`，`PortRef.side: model::port::Side`（封闭四值 NSEW）。映射规则：
+对外 [`EdgePlacement.from_port / to_port`](../../../../crates/tautcore-model/src/result.rs) 是 `Option<PortRef>`，`PortRef.side: model::port::Side`（封闭四值 NSEW）。映射规则：
 
 | `AttachSpec.side` (`LifelineSide`) | `PortRef` | 说明 |
 |-------------------------------------|-----------|------|
@@ -278,13 +278,13 @@ lifeline_crossings[L].push(row_or_segment_key)
 
 ## 11. 失败表
 
-对齐当前 [`LayoutError`](../../../../crates/plotgram-engine-api/src/error.rs) 变体：`MissingNodeSize` / `UnknownLayout` / `UnknownRouter` / `LayoutCannotDeferEdges` / `UnsupportedRouteScene` / `Unsupported` / `InvalidInput` / `InternalInvariant` / `Message(String)`。
+对齐当前 [`LayoutError`](../../../../crates/tautcore-engine-api/src/error.rs) 变体：`MissingNodeSize` / `UnknownLayout` / `UnknownRouter` / `LayoutCannotDeferEdges` / `UnsupportedRouteScene` / `Unsupported` / `InvalidInput` / `InternalInvariant` / `Message(String)`。
 
-Sequence 经 [`seq_err`](../../../../crates/plotgram-layout/src/layout/sequence/mod.rs) 把带前缀的诊断分到后三类（`invariant:` → `InternalInvariant`，`unsupported:` → `Unsupported`，其余 → `InvalidInput`）。`Message` 留给尚未迁移的其它内核。
+Sequence 经 [`seq_err`](../../../../crates/tautcore-layout/src/layout/sequence/mod.rs) 把带前缀的诊断分到后三类（`invariant:` → `InternalInvariant`，`unsupported:` → `Unsupported`，其余 → `InvalidInput`）。`Message` 留给尚未迁移的其它内核。
 
 | 情况 | `LayoutError` 变体 | 备注 |
 |------|---------------------|------|
-| `edge_routing: Some(_)`（S6 禁 Router） | [`LayoutCannotDeferEdges { layout: "sequence" }`](../../../../crates/plotgram-engine-api/src/error.rs) | 本核 `layout()` 入口自检（见 [architecture §1.2](../architecture.md)），门面不替 layout 拦 |
+| `edge_routing: Some(_)`（S6 禁 Router） | [`LayoutCannotDeferEdges { layout: "sequence" }`](../../../../crates/tautcore-engine-api/src/error.rs) | 本核 `layout()` 入口自检（见 [architecture §1.2](../architecture.md)），门面不替 layout 拦 |
 | 消息端点不是参与者节点（非顶层 Entity / 是 GroupAnchor） | `InvalidInput` | Display 保留 `sequence: invalid: …` |
 | Self 但 route ≠ SelfLoop | `InternalInvariant` | verifier |
 | Sync 但 y 不共线（InkVerifier） | `InternalInvariant` | 同上 |

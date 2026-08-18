@@ -12,7 +12,7 @@
 
 ## 1. 核心武器：VPSC（Variable Placement with Separation Constraints）
 
-**这是约束布局的基础设施，建议作为 plotgram 的公共求解器。**
+**这是约束布局的基础设施，建议作为 tautcore 的公共求解器。**
 
 ### 1.1 问题
 $$\min \sum_i w_i (x_i - x_i^{des})^2 \quad\text{s.t.}\quad x_j - x_i \ge g_{ij}\ \forall (i,j)\in C$$
@@ -75,7 +75,7 @@ Dwyer–Koren–Marriott 2006 *IPSep-CoLa: Incremental Procedure for Separation 
 - **包含（containment）**：组内节点在组框内 ⇒ 组框边界作为变量参与。
 - **页面边界**。
 
-**这是"organic + 语义约束"的最佳落点**，也是 WebCola 的核心。若 plotgram 要做"知识图谱但要体现层级"，此路线优于强行分层。
+**这是"organic + 语义约束"的最佳落点**，也是 WebCola 的核心。若 tautcore 要做"知识图谱但要体现层级"，此路线优于强行分层。
 
 ---
 
@@ -163,9 +163,9 @@ Misue–Eades–Lai–Sugiyama 1995 定义三个需保持的性质：
 
 ---
 
-## 7. 与 plotgram 的对接建议
+## 7. 与 tautcore 的对接建议
 
-1. **把 VPSC 做成 crate 内的公共求解器**（`plotgram-engine` 的 `solver` 模块），供：层内间距、消重叠、nudging、正交紧致化、组框边距共用。这是本文库里**投入产出比最高的单一建议**。
+1. **把 VPSC 做成 crate 内的公共求解器**（`tautcore-engine` 的 `solver` 模块），供：层内间距、消重叠、nudging、正交紧致化、组框边距共用。这是本文库里**投入产出比最高的单一建议**。
 2. **约束分两类明确区分**：
    - *离散约束*（层、序、端口）→ 影响 P2/P3，必须在对应相实现（受约束排序用 PAV 投影）；
    - *几何约束*（对齐、间距、包含、边界）→ 统一进 VPSC。

@@ -3,7 +3,7 @@
 > 状态：**现行目标架构 v1**（驱动重建；非当前能力声明）
 > 日期：2026-08-15
 > 引擎注册名：`circular`
-> 代码落点：`crates/plotgram-layout/src/layout/circular/`（与 Hier / Tree / Sequence 同 crate；见 [ADR-006](../../adr/006-engine-io-and-crates.md)）
+> 代码落点：`crates/tautcore-layout/src/layout/circular/`（与 Hier / Tree / Sequence 同 crate；见 [ADR-006](../../adr/006-engine-io-and-crates.md)）
 > 约束入口：[写权纪律](../write-authority.md) · [AGENTS.md](../../../../AGENTS.md) §1
 > 证据：[05 §4](../../../reference/yfiles/05-树与径向布局.md) · [14 BCC / Fiedler](../../../reference/yfiles/14-图论与优化工具箱.md) · [产品条](../../../reference/yFiles-layouts-and-routing.md)
 > 上游：[Circular Layout](https://docs.yfiles.com/yfiles-html/dguide/circular_layout/) · [CircularLayout API](https://docs.yfiles.com/yfiles-html/api/CircularLayout.html)
@@ -105,7 +105,7 @@ LayoutOutput
 ### 2.3 模块边界（目标）
 
 ```text
-plotgram-layout/layout/circular/
+tautcore-layout/layout/circular/
   params.rs
   compose/           # 分区 · 圈序 · 块割树
   plan.rs            # CircPlan
@@ -114,7 +114,7 @@ plotgram-layout/layout/circular/
   ink/
   verify.rs
 
-plotgram-algo/
+tautcore-algo/
   bcc.rs             # Tarjan 双连通分量 + 块割树（目标零件）
   fiedler.rs         # 拉普拉斯第二特征向量 → 圈序（目标零件）
 ```
@@ -205,7 +205,7 @@ routes:     edge_id → CircRoute
 | `declaration` | 显式或单点 | 成员声明序 |
 | `from-sketch` | 后置 | 按输入极角 |
 
-`linear_arrange`（Sequence 次轴）是**直线** MinLA，不能直接当圆序；圆序写者在本核。谱零件进 `plotgram-algo`。
+`linear_arrange`（Sequence 次轴）是**直线** MinLA，不能直接当圆序；圆序写者在本核。谱零件进 `tautcore-algo`。
 
 ### 5.2 半径
 
@@ -231,7 +231,7 @@ r = max(相邻约束, min_radius, Demand Radius)
 
 yFiles：`backboneLayout` = `RadialTreeLayout`，另有 `placeChildrenOnCommonRadius`、`maximumDeviationAngle`、`minimumEdgeLength`、`compactnessFactor`。
 
-plotgram：Compose 已写出分区树；Metric **BackboneWriter** 用 balloon 约束排分区圆：
+tautcore：Compose 已写出分区树；Metric **BackboneWriter** 用 balloon 约束排分区圆：
 
 ```text
 每个子分区圆半径 R_i（含子节点外延）
@@ -344,7 +344,7 @@ yFiles 用 Stage。本核：Compose 打标；自环 = 节点外侧短弧（Ink �
 | 里程碑 | 交付 | 验收 | 前置 |
 |--------|------|------|------|
 | **M0** | 单环（分量内全体 CYCLE）· 声明序/BFS · 弦 · 四则有限坐标 · 未知策略硬失败 | 简单环可出图；showcase `circular/cycle` smoke | algo 可后补谱 |
-| **M1（已落地）** | Tarjan BCC + `bcc-compact` · 谱序 · Demand 半径 · balloon 骨架 | 多 BCC 不挤成一圈；深桥不重叠 | M0 · `plotgram-algo` BCC/Fiedler |
+| **M1（已落地）** | Tarjan BCC + `bcc-compact` · 谱序 · Demand 半径 · balloon 骨架 | 多 BCC 不挤成一圈；深桥不重叠 | M0 · `tautcore-algo` BCC/Fiedler |
 | **M2（已落地）** | `bcc-isolated` · `exterior` 同区外弧 · 自环短弧 | 密圈交叉下降可观测；割点夹在两圆间 | M1 |
 | **M3（已落地）** | 节点 `circle` 自定义分区 · `single-cycle` 显式与 BCC 切换 | 同一拓扑两政策几何可区分 | M1 |
 | **后置** | 见 [deferred.md](deferred.md)：disk/organic/compact-disk · automatic 外弧 · bundling · from-sketch · star · 射线标签 · 共半径关闭 | 显式 `Unsupported` 直至落地 | — |

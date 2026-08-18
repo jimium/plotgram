@@ -2,10 +2,10 @@
 
 > 状态：MVP 已落地
 > 注册名：`curved`
-> 代码：`crates/plotgram-router/src/curved.rs`
+> 代码：`crates/tautcore-router/src/curved.rs`
 > 约束：[写权纪律](../../layout/write-authority.md) · [routing README](../README.md) · [ADR-006](../../adr/006-engine-io-and-crates.md)
 
-平滑曲线边路径：节点与端口冻结后，优先写出 [`EdgePath::Cubic`](../../../crates/plotgram-model/src/result.rs)；穿障则回退为平滑折线（`EdgePath::Polyline`）。独立于布局核，可手写 `RouteScene` 夹具开发。
+平滑曲线边路径：节点与端口冻结后，优先写出 [`EdgePath::Cubic`](../../../crates/tautcore-model/src/result.rs)；穿障则回退为平滑折线（`EdgePath::Polyline`）。独立于布局核，可手写 `RouteScene` 夹具开发。
 
 > 成功路径写原生三次贝塞尔 IR；Render 画 SVG `C`。verify / score / ascii 可对 Cubic 做固定点数采样。
 

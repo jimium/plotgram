@@ -1,6 +1,6 @@
 # 27 · Atlas channel 模块审查与改造需求（2026-07-26）
 
-> 审查对象：[`crates/plotgram-core/src/layout/atlas/channel/`](../../crates/plotgram-core/src/layout/atlas/channel/)（substrate / graph / search / derive / bundle）
+> 审查对象：[`crates/tautcore-core/src/layout/atlas/channel/`](../../crates/tautcore-core/src/layout/atlas/channel/)（substrate / graph / search / derive / bundle）
 > 依据报告：[`25-Atlas-相I可行率探针报告`](25-Atlas-相I可行率探针报告-2026-07.md)
 > 上游规格：[`22-Atlas下一代布局与路由架构-总纲`](22-Atlas下一代布局与路由架构-总纲-2026-07.md) §3.1 / §5.1 I.4 / I.6
 > 推进计划：[`23-Atlas分阶段推进方案`](23-Atlas分阶段推进方案-2026-07.md)
@@ -73,7 +73,7 @@
 | demo | 699 | 25（3.6%） | 101（14.4%） |
 | **合计** | **1152** | **27（2.3%）** | **116（10.1%）** |
 
-最严重：`demo.plotgram-core-mod-deps` 29 条成功边里 **16 条**（55%）借道穿了无关组。
+最严重：`demo.tautcore-core-mod-deps` 29 条成功边里 **16 条**（55%）借道穿了无关组。
 
 > **这两个数字都是下界。** 检测只能识别「路径进入了组 scope 的轨道」；根轨道几何贯穿组框那一类（上一段说的情况）在当前模型里**没有任何可观测量**——组框的几何范围压根没进 Substrate。真实违规率只会更高。
 
@@ -104,7 +104,7 @@ track T10 的 8 条转移中：
 
 后果：
 - **有效容量 = 标称 × 2**。25 号文 §3 的容量扫描表要按「每轴有效容量 = 2×cap」重读：product/stress 的「饱和点 cap=4」实为有效 8，demo 的 cap=8 实为有效 16。这张表目前不能直接用来定容量常数。
-- **搜索开销翻倍**。性能报告 §7.2 提到 `plotgram-core-mod-deps` 有 12078 条转移，其中 gate 部分有一半是冗余边。
+- **搜索开销翻倍**。性能报告 §7.2 提到 `tautcore-core-mod-deps` 有 12078 条转移，其中 gate 部分有一半是冗余边。
 
 **(b) 轴向倒置。** `MainLow`（主轴低端 = 顶边界）挂的是 **Cross**（水平缝）轨道；`CrossLow`（左边界）挂的是 **Main**（垂直走廊）轨道。物理上正相反：穿越顶/底边界的是**垂直走廊**，穿越左/右边界的是**水平缝**。`PortSide::required_orient` 把这个关系写对了（`MainLow` 要 Cross 宿主轨道 —— 那是端口挂接，语义不同），但 gate 侧没有对应约束，于是写反了也没人拦。
 
@@ -403,7 +403,7 @@ Main  gap 0 / order_count  同理恒假
 
 | 原问题 | 现状 | 定案 |
 |---|---|---|
-| 24 号文文件缺失 | **已恢复**：[24-Atlas-channel端口挂接…](24-Atlas-channel端口挂接与候选端点增强需求-2026-07.md) | 文件本身保留，规格真源仍以落地实现 + [`channel/README.md`](../../crates/plotgram-core/src/layout/atlas/channel/README.md)「端口挂接与候选端点」为准 |
+| 24 号文文件缺失 | **已恢复**：[24-Atlas-channel端口挂接…](24-Atlas-channel端口挂接与候选端点增强需求-2026-07.md) | 文件本身保留，规格真源仍以落地实现 + [`channel/README.md`](../../crates/tautcore-core/src/layout/atlas/channel/README.md)「端口挂接与候选端点」为准 |
 | 24 号文 R1–R5 与本文改造项撞号 | 本文已改用 **L1–L8** | **禁止**再给合法化需求编 R*；口头/注释说「R1」时必须带「24 号文」前缀 |
 | 代码里 26 处「24 号文」引用 | 文件已在，链接不再悬空 | **保留**「24 号文」引用即可；可选在旁加 README 锚点作第二入口。**不要**为消歧去重写 24 号文或把代码改成只指 README——两套文档号并存时，靠「24=端口 / 27=合法化(L*)」分工，不靠删文档 |
 
@@ -421,7 +421,7 @@ Main  gap 0 / order_count  同理恒假
 | §3 观察 3「自适应容量是正确的生产答案」 | 撤回。`max(下限, boundary_degree)` 是把容量设成需求；正确解是 L4（容量作输出） |
 | §4.1「stress-deep 峰值 lane 33 是 flat 口径失真，不构成 channel 表达缺陷」 | 撤回。根因是 `span_weight` 恒 1 + 全 link + 最小 id 平局（F4），是 channel 可修的模型缺陷 |
 | §4.1 / §4.2 峰值 lane 10/33/25、gate 需求 ≤18 | 保留为**改造前基线**。L3 落地后应显著下降，差值即改造效果 |
-| §4.3 高压图清单 | **保留且加强**。`demo.plotgram-core-mod-deps`（穿组 16/29）、`demo.k8s-multi-namespace-overview` 应作为 L1–L3 的首要回归样本 |
+| §4.3 高压图清单 | **保留且加强**。`demo.tautcore-core-mod-deps`（穿组 16/29）、`demo.k8s-multi-namespace-overview` 应作为 L1–L3 的首要回归样本 |
 | §6.1「channel 可以进入默认路径推进 Stage 1+」 | **推迟**。先做 L1–L4 合法化，按 §5.1 重采后再判 |
 | §7 性能数据 | **全部保留**，且是本次审查里最扎实的一节。channel 本体 ≈35 ms / 1152 边、blueprint 占 94–98%，两个结论都不受 F1–F4 影响 |
 

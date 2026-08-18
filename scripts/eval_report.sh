@@ -25,7 +25,7 @@ done
 mkdir -p "$OUTPUT_DIR"
 
 echo "▶ 生成 Markdown 评估报告..."
-cargo run -p plotgram-eval --bin eval -- batch "$PROJECT_DIR/showcase" -o "$OUTPUT_FILE" 2>&1 | tail -5
+cargo run -p tautcore-eval --bin eval -- batch "$PROJECT_DIR/showcase" -o "$OUTPUT_FILE" 2>&1 | tail -5
 
 echo ""
 echo "✓ 报告已生成: $OUTPUT_FILE"

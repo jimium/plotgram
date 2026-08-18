@@ -2,7 +2,7 @@
 
 > 日期：2026-07-31  
 > 状态：讨论纪要（现行设计参考，非进度债单）  
-> 范围：读完 [`docs/reference/yfiles/`](../../../../reference/yfiles/00-索引与阅读指南.md) 后，对**构造 Hierarchical**、**重建 `plotgram-engine`**、**从 v1 Atlas 迁移**的启发收敛  
+> 范围：读完 [`docs/reference/yfiles/`](../../../../reference/yfiles/00-索引与阅读指南.md) 后，对**构造 Hierarchical**、**重建 `tautcore-engine`**、**从 v1 Atlas 迁移**的启发收敛  
 > 相关：[architecture.md](../architecture.md) · [scope.md](../scope.md) · [写权纪律](../../write-authority.md) · [reference 13 选型与路线图](../../../../reference/yfiles/13-实现路线图与选型.md)
 
 本文是一次对照阅读的纪要，方便慢慢消化。算法细节仍以 reference 各篇为准；实现进度不写在这里。  
@@ -189,7 +189,7 @@ M4  边界 dummy 连续块 + 组框进约束求解（收掉三路径）
 拿尚未支持的图种（如 BPMN、甘特）**只用参数表表达**；填不出的格 = 缺的通用能力（应扩参数域 / 机制），不是图种分支。  
 提前暴露缺 `group_order_policy` / `bundling` / `port_granularity` 等，避免 M4 做到一半改 Contract。
 
-引擎侧应用 CI / crate 边界守卫：grep `DiagramType` / `profile` 在 `plotgram-engine` 内应为 0（20 §6 检验 2）。
+引擎侧应用 CI / crate 边界守卫：grep `DiagramType` / `profile` 在 `tautcore-engine` 内应为 0（20 §6 检验 2）。
 
 ---
 

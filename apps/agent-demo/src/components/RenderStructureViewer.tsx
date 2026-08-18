@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { Alert, Empty, Space, Spin, Tag, Typography } from 'antd';
-import { lintSource, parseSource, type PlotgramWasm, type DiagnosticErrorJson } from '@lib/wasm';
+import { lintSource, parseSource, type TautcoreWasm, type DiagnosticErrorJson } from '@lib/wasm';
 
 const { Text, Paragraph } = Typography;
 
 interface RenderStructureViewerProps {
   source: string;
-  wasm: PlotgramWasm | null;
+  wasm: TautcoreWasm | null;
   ready: boolean;
 }
 

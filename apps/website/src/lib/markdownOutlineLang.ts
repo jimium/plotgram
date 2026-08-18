@@ -2,7 +2,7 @@ import { StreamLanguage, LanguageSupport, type StreamParser } from '@codemirror/
 import { tags as t } from '@lezer/highlight';
 
 // 轻量 Markdown 大纲语法高亮：仅识别 ATX 标题 / 列表项 / HTML 注释 / 行内格式，
-// 与 plotgram 的 md-outline 导入解析器（ATX 标题模式）保持一致。
+// 与 tautcore 的 md-outline 导入解析器（ATX 标题模式）保持一致。
 
 interface MdOutlineState {
   inString: boolean;
@@ -32,7 +32,7 @@ const parser: StreamParser<MdOutlineState> = {
       return 'heading';
     }
 
-    // HTML 注释（plotgram:entity-id 等元信息）
+    // HTML 注释（tautcore:entity-id 等元信息）
     if (stream.match(/^<!--/)) {
       while (!stream.eol()) {
         if (stream.match('-->')) break;

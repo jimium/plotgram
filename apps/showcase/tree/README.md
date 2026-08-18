@@ -24,13 +24,13 @@
 
 | 文件 | 主题 |
 |------|------|
-| [`smoke.root-branches.pgm`](single-layer/smoke.root-branches.pgm) | 单根三子 |
-| [`smoke.orientation-ltr.pgm`](single-layer/smoke.orientation-ltr.pgm) | 同一拓扑 `left-to-right` |
-| [`product.org-chart.pgm`](single-layer/product.org-chart.pgm) | 组织架构（父居中、镜像对称） |
-| [`mech.layout-params.pgm`](single-layer/mech.layout-params.pgm) | `placer` / gap / routing_style 声明 |
-| [`mech.root-alignment.pgm`](single-layer/mech.root-alignment.pgm) | `root_alignment: leading` |
-| [`mech.orthogonal-at-root.pgm`](single-layer/mech.orthogonal-at-root.pgm) | `routing_style: orthogonal-at-root` |
-| [`stress.asymmetric-fanout.pgm`](single-layer/stress.asymmetric-fanout.pgm) | 不对称扇出 + 深链 |
+| [`smoke.root-branches.taut`](single-layer/smoke.root-branches.taut) | 单根三子 |
+| [`smoke.orientation-ltr.taut`](single-layer/smoke.orientation-ltr.taut) | 同一拓扑 `left-to-right` |
+| [`product.org-chart.taut`](single-layer/product.org-chart.taut) | 组织架构（父居中、镜像对称） |
+| [`mech.layout-params.taut`](single-layer/mech.layout-params.taut) | `placer` / gap / routing_style 声明 |
+| [`mech.root-alignment.taut`](single-layer/mech.root-alignment.taut) | `root_alignment: leading` |
+| [`mech.orthogonal-at-root.taut`](single-layer/mech.orthogonal-at-root.taut) | `routing_style: orthogonal-at-root` |
+| [`stress.asymmetric-fanout.taut`](single-layer/stress.asymmetric-fanout.taut) | 不对称扇出 + 深链 |
 
 ### `single-split-layered/`
 
@@ -38,60 +38,60 @@
 
 | 文件 | 主题 |
 |------|------|
-| [`product.tech-stack.pgm`](single-split-layered/product.tech-stack.pgm) | 分类树，根左右开 |
-| [`demo.knowledge-map.pgm`](single-split-layered/demo.knowledge-map.pgm) | 多层知识树 |
+| [`product.tech-stack.taut`](single-split-layered/product.tech-stack.taut) | 分类树，根左右开 |
+| [`demo.knowledge-map.taut`](single-split-layered/demo.knowledge-map.taut) | 多层知识树 |
 
 ### `left-right/`
 
 | 文件 | 主题 |
 |------|------|
-| [`smoke.file-tree.pgm`](left-right/smoke.file-tree.pgm) | `placer: left-right` 竖直总线 |
-| [`smoke.bus.pgm`](left-right/smoke.bus.pgm) | `placer: bus` 末子朝下 |
+| [`smoke.file-tree.taut`](left-right/smoke.file-tree.taut) | `placer: left-right` 竖直总线 |
+| [`smoke.bus.taut`](left-right/smoke.bus.taut) | `placer: bus` 末子朝下 |
 
 ### `double-layer/`
 
 | 文件 | 主题 |
 |------|------|
-| [`smoke.wide-fanout.pgm`](double-layer/smoke.wide-fanout.pgm) | 八子交错两行 |
+| [`smoke.wide-fanout.taut`](double-layer/smoke.wide-fanout.taut) | 八子交错两行 |
 
 ### `dendrogram/`
 
 | 文件 | 主题 |
 |------|------|
-| [`product.taxonomy.pgm`](dendrogram/product.taxonomy.pgm) | 深度不齐的分类树，叶底对齐 |
+| [`product.taxonomy.taut`](dendrogram/product.taxonomy.taut) | 深度不齐的分类树，叶底对齐 |
 
 ### `assistant/`
 
 | 文件 | 主题 |
 |------|------|
-| [`product.org-assistants.pgm`](assistant/product.org-assistants.pgm) | 组织图：助理在侧、主链在下 |
+| [`product.org-assistants.taut`](assistant/product.org-assistants.taut) | 组织图：助理在侧、主链在下 |
 
 ### `compact/`
 
 | 文件 | 主题 |
 |------|------|
-| [`smoke.wide-fanout.pgm`](compact/smoke.wide-fanout.pgm) | 八子；策略搜索接近正方形 |
+| [`smoke.wide-fanout.taut`](compact/smoke.wide-fanout.taut) | 八子；策略搜索接近正方形 |
 
 ### `aspect-ratio/`
 
 | 文件 | 主题 |
 |------|------|
-| [`smoke.wide-fanout.pgm`](aspect-ratio/smoke.wide-fanout.pgm) | 八子；按长宽比切行/列，根在左上角 |
+| [`smoke.wide-fanout.taut`](aspect-ratio/smoke.wide-fanout.taut) | 八子；按长宽比切行/列，根在左上角 |
 
 ### `radial/`
 
 | 文件 | 主题 |
 |------|------|
-| [`product.taxonomy.pgm`](radial/product.taxonomy.pgm) | 分类树；同深度同心圆 |
+| [`product.taxonomy.taut`](radial/product.taxonomy.taut) | 分类树；同深度同心圆 |
 
 ### `balloon/`
 
 | 文件 | 主题 |
 |------|------|
-| [`smoke.uneven-subtrees.pgm`](balloon/smoke.uneven-subtrees.pgm) | 不对称子树；大盘占更大圆心角 |
+| [`smoke.uneven-subtrees.taut`](balloon/smoke.uneven-subtrees.taut) | 不对称子树；大盘占更大圆心角 |
 
 ### `mixed/`
 
 | 文件 | 主题 |
 |------|------|
-| [`product.org-mixed-placers.pgm`](mixed/product.org-mixed-placers.pgm) | 组织图默认分层；`ops` 局部 `left-right` |
+| [`product.org-mixed-placers.taut`](mixed/product.org-mixed-placers.taut) | 组织图默认分层；`ops` 局部 `left-right` |

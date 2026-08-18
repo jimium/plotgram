@@ -3,21 +3,21 @@
 # 文件名角色 = product；本清单只挑选进硬门禁的子集。
 # 新布局内核毕业后，向同一文件追加 hierarchical/ 之外的 {layout}/ 行即可。
 
-hierarchical/flat/product.three-tier.pgm
-hierarchical/flat/product.typical-microservice-architecture.pgm
-hierarchical/flat/product.flat-rest-api.pgm
-hierarchical/group-weak/product.microservices.pgm
-hierarchical/group-weak/product.cdn-cache.pgm
-hierarchical/group-weak/product.cloud-native.pgm
-hierarchical/group-weak/product.ecommerce-platform.pgm
-hierarchical/group-weak/product.message-queue-pipeline.pgm
-hierarchical/group-weak/product.monitoring-stack.pgm
-hierarchical/group-weak/mech.narrow-corridor.pgm
-hierarchical/flat/product.linear-chain.pgm
-hierarchical/flat/product.user-auth.pgm
-hierarchical/flat/product.refund-process.pgm
-# hierarchical/group-strong-macro/product.swimlane-order-process.pgm（已转 strong-macro 基准，实现落地前不可渲染）
-hierarchical/flat/product.password-reset.pgm
-hierarchical/flat/product.leave-approval-process.pgm
-hierarchical/flat/product.self-loop-retry.pgm
-hierarchical/flat/product.symmetric-fanout.pgm
+hierarchical/flat/product.three-tier.taut
+hierarchical/flat/product.typical-microservice-architecture.taut
+hierarchical/flat/product.flat-rest-api.taut
+hierarchical/group-weak/product.microservices.taut
+hierarchical/group-weak/product.cdn-cache.taut
+hierarchical/group-weak/product.cloud-native.taut
+hierarchical/group-weak/product.ecommerce-platform.taut
+hierarchical/group-weak/product.message-queue-pipeline.taut
+hierarchical/group-weak/product.monitoring-stack.taut
+hierarchical/group-weak/mech.narrow-corridor.taut
+hierarchical/flat/product.linear-chain.taut
+hierarchical/flat/product.user-auth.taut
+hierarchical/flat/product.refund-process.taut
+# hierarchical/group-strong-macro/product.swimlane-order-process.taut（已转 strong-macro 基准，实现落地前不可渲染）
+hierarchical/flat/product.password-reset.taut
+hierarchical/flat/product.leave-approval-process.taut
+hierarchical/flat/product.self-loop-retry.taut
+hierarchical/flat/product.symmetric-fanout.taut

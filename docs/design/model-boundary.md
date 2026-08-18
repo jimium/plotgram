@@ -1,6 +1,6 @@
-# plotgram-model 边界
+# tautcore-model 边界
 
-> 状态：已落地 | 对应 crate：`crates/plotgram-model`
+> 状态：已落地 | 对应 crate：`crates/tautcore-model`
 
 ## 职责
 
@@ -22,7 +22,7 @@ model 是**纯数据层**：定义所有 crate 共享的类型，不含布局/�
 | `render` | `RenderMeta`, `RenderInput` | **render 入口** |
 | `profile` | `DiagramType`, `Profile` | **仅** DSL / parse / 编排（engine 禁止 import） |
 
-构建入口：[`plotgram-compile`](../../crates/plotgram-compile)（parse → measure → engine → render）。  
+构建入口：[`tautcore-compile`](../../crates/tautcore-compile)（parse → measure → engine → render）。  
 CLI 仅做参数与文件 I/O，调用 compile，不写构建逻辑。
 
 ## `Edge` 一等结构字段（写权）
@@ -40,7 +40,7 @@ CLI 仅做参数与文件 I/O，调用 compile，不写构建逻辑。
 
 当 `LayoutContract.layout.name == "sequence"`：
 
-- 消息时间序 = [`Graph::edges_in_declaration_order`](../../crates/plotgram-model/src/graph.rs)（顶层 `edges` 向量序，再按 `groups` 声明序深度优先）。
+- 消息时间序 = [`Graph::edges_in_declaration_order`](../../crates/tautcore-model/src/graph.rs)（顶层 `edges` 向量序，再按 `groups` 声明序深度优先）。
 - **无** `seq` 字段；重排时间 = 重排 DSL 中边的书写顺序。
 - 产品上消息写在顶层；组内消息不是一等时序能力。
 
@@ -93,14 +93,14 @@ CLI 仅做参数与文件 I/O，调用 compile，不写构建逻辑。
 
 ## Engine 入口（ADR-006）
 
-- [`LayoutContract`](../../crates/plotgram-model/src/contract.rs) = `layout` + `edge_routing?` + `graph` + **`node_sizes`**。
+- [`LayoutContract`](../../crates/tautcore-model/src/contract.rs) = `layout` + `edge_routing?` + `graph` + **`node_sizes`**。
 - `edge_routing: None` → Layout 内建写边；`Some` → `EdgeRouter` 写边（端口仍由 Layout 决议）。
-- Crate：`engine-api`（Trait）→ `plotgram-engine`（`run` + in-tree `layout/` / `route/`；长大再拆）。详见 [`adr/006-engine-io-and-crates.md`](adr/006-engine-io-and-crates.md)。
+- Crate：`engine-api`（Trait）→ `tautcore-engine`（`run` + in-tree `layout/` / `route/`；长大再拆）。详见 [`adr/006-engine-io-and-crates.md`](adr/006-engine-io-and-crates.md)。
 
 ## 管线位置
 
 ```
-.pgm
+.taut
   → parse（attrs 含 from_side / weight / critical（糖）/ role …；可选 @group 端点）
   → 展开 @group 糖（→ group_anchor nodes）
   → lift_all_node_structural_attrs / lift_all_edge_structural_attrs
@@ -109,7 +109,7 @@ CLI 仅做参数与文件 I/O，调用 compile，不写构建逻辑。
   → compile MeasureParams（主题中的度量字段；ADR-005）
   → 度量：preferred size → NodeSizes（+ ContentLayout）
   → LayoutContract { layout, edge_routing?, graph, node_sizes }
-  → plotgram_engine::run（Layout / 可选 EdgeRouter；group 包络）
+  → tautcore_engine::run（Layout / 可选 EdgeRouter；group 包络）
   → LayoutResult（EdgePlacement 含 PortRef；可选 decorations，见 ADR-009）
   → RenderInput { graph, layout, meta }
   → SVG（跳过 group_anchor 形体；画 decorations；内容块展开 ContentLayout）

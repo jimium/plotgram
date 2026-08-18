@@ -1,11 +1,11 @@
 # AGENTS.md
 
 本仓库所有 agent（AI 助手与人类协作者）必须遵守的**现行**约束。  
-当前阶段：**重建 plotgram**（新 crate：`plotgram-model` / `engine` / `render` / `cli`；旧实现在 `crates/v1/`，只读参考）。
+当前阶段：**重建 tautcore**（新 crate：`tautcore-model` / `engine` / `render` / `cli`；旧实现在 `crates/v1/`，只读参考）。
 
 ## 1. 设计尺子（布局 / 路由）
 
-plotgram 由 yFiles 经验孵化：轻量 DSL 画图引擎。设计布局与边路由时，**默认采用 yFiles 沉淀的理念与纪律**；**不**复刻全量复杂布局栈。
+tautcore 由 yFiles 经验孵化：轻量 DSL 画图引擎。设计布局与边路由时，**默认采用 yFiles 沉淀的理念与纪律**；**不**复刻全量复杂布局栈。
 
 硬约束（Hier / 正交主路径；其它图种取适用子集）：
 
@@ -22,7 +22,7 @@ plotgram 由 yFiles 经验孵化：轻量 DSL 画图引擎。设计布局与边�
 - **无向后兼容**：可自由重命名、删除、重构；直接删旧代码，不留 deprecated 转发层。
 - **确定性**：布局 / 路由迭代不得依赖 `HashMap` key 序；需稳定序时用显式排序或 `IndexMap` / `BTreeMap`。
 - **禁止图名特判**：引擎不按 diagram type 分支；图种差异只经 profile 展开进算法参数（见 [`ADR-001`](docs/design/adr/001-diagram-type-not-in-engine.md)）。
-- **验真**：日常 `cargo check` / `cargo test` / `cargo run -p plotgram-cli`（debug）。`--release` 仅用于性能测量。优先 `cargo run`，勿信陈旧 binary。
+- **验真**：日常 `cargo check` / `cargo test` / `cargo run -p tautcore-cli`（debug）。`--release` 仅用于性能测量。优先 `cargo run`，勿信陈旧 binary。
 - **WASM 计时**：会编到 WASM 的布局 / 引擎代码内禁止裸 `std::time::{Instant, SystemTime}`；统一走项目的 perf 抽象（勿钉死 v1 路径）。
 
 ## 3. 读什么

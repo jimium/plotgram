@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Showcase render orchestrator (showcase-redesign-2026-08.md §6).
-# Thin shell: cargo build + drive plotgram validate/render + call scripts/.
+# Thin shell: cargo build + drive tautcore validate/render + call scripts/.
 # Non-trivial logic (discover / incremental / manifest) lives in scripts/*.py.
 set -euo pipefail
 
@@ -17,7 +17,7 @@ usage() {
   cat <<EOF
 用法: render.sh [选项]
 
-增量渲染激活布局目录下的 .pgm -> _out/{path 去 .pgm}.svg（镜像 facet），并写 manifest。
+增量渲染激活布局目录下的 .taut -> _out/{path 去 .taut}.svg（镜像 facet），并写 manifest。
 
 渲染完成后通过 ./apps/serve.sh 提供的 HTTP 服务访问画廊。
 
@@ -39,7 +39,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-BIN="$TARGET_DIR/$PROFILE/plotgram"
+BIN="$TARGET_DIR/$PROFILE/tautcore"
 
 sha256_file() {
   if command -v shasum >/dev/null 2>&1; then
@@ -50,11 +50,11 @@ sha256_file() {
 }
 
 # 1. build
-echo "构建 plotgram-cli ($PROFILE)..."
+echo "构建 tautcore-cli ($PROFILE)..."
 if [[ "$PROFILE" == "release" ]]; then
-  (cd "$ROOT_DIR" && cargo build --release -p plotgram-cli)
+  (cd "$ROOT_DIR" && cargo build --release -p tautcore-cli)
 else
-  (cd "$ROOT_DIR" && cargo build -p plotgram-cli)
+  (cd "$ROOT_DIR" && cargo build -p tautcore-cli)
 fi
 [[ -x "$BIN" ]] || { echo "未找到二进制: $BIN" >&2; exit 1; }
 echo
@@ -83,7 +83,7 @@ python3 "$SCRIPTS/discover.py" "${DISCOVER_ARGS[@]}" > "$ALL_LIST"
 
 ALL_COUNT=$(grep -c '' "$ALL_LIST" || true)
 if [[ "$ALL_COUNT" -eq 0 ]]; then
-  echo "未发现 .pgm 样例" >&2
+  echo "未发现 .taut 样例" >&2
   exit 1
 fi
 
@@ -137,7 +137,7 @@ timed_capture() {
 render_one() {
   local path="$1"
   local pgm_abs="$SCRIPT_DIR/$path"
-  local svg_rel="_out/${path%.pgm}.svg"
+  local svg_rel="_out/${path%.taut}.svg"
   local svg_abs="$SCRIPT_DIR/$svg_rel"
 
   # validate
@@ -172,7 +172,7 @@ render_one() {
 
   # layout facts sidecar (ADR-007 explain). Best-effort: a failure never
   # fails the sample — write a placeholder so incremental stays consistent.
-  local facts_rel="_out/${path%.pgm}.facts.txt"
+  local facts_rel="_out/${path%.taut}.facts.txt"
   local facts_abs="$SCRIPT_DIR/$facts_rel"
   : > "$ERR_FILE"
   set +e

@@ -2,7 +2,7 @@
 
 > 状态：M1–M5 已落地；DemandBoard 抬 `layer_gap`；节点级 `subtree_placer` 有 `mixed/` 样例。`single-split` / `multi-layer` / `fixed` 保持 `Unsupported`
 > 引擎注册名：`tree`
-> 代码：`crates/plotgram-layout/src/layout/tree/`
+> 代码：`crates/tautcore-layout/src/layout/tree/`
 > **目标架构真源**：[architecture.md](architecture.md)
 
 ## 签名

@@ -131,7 +131,7 @@ export function ChatPanel({
               <h2 className="chat-empty-hero-title">开始一段对话</h2>
               <p className="chat-empty-hero-subtitle">
                 用自然语言描述你想要的图表<br />
-                Plotgram Agent 会自动生成、修改、迭代
+                Tautcore Agent 会自动生成、修改、迭代
               </p>
             </div>
 

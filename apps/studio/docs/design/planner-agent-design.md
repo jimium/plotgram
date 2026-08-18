@@ -358,7 +358,7 @@ runPlanner(userMessage, context, plannerConfig)   ← 新增
 | 文件 | 改动 |
 |------|------|
 | `AgentLoop.ts` | 签名从 `runAgentLoop(userMessage, context, config)` 改为 `runAgentLoop(plan, context, config)`，plan 类型为 `DrawingPlan \| string`（string 时走旧逻辑） |
-| `prompt.ts` | SYSTEM_PROMPT 删掉"理解用户需求"部分，改为"你收到一份 DrawingPlan，把它翻译成 Plotgram DSL"；`buildMessages` 增加 plan 序列化注入 |
+| `prompt.ts` | SYSTEM_PROMPT 删掉"理解用户需求"部分，改为"你收到一份 DrawingPlan，把它翻译成 Tautcore DSL"；`buildMessages` 增加 plan 序列化注入 |
 | `types.ts` | `AgentConfig` 增加 `enablePlanner` 和 `planMode` 字段；`AgentContext` 增加 `currentPlan` 字段 |
 | `context.ts` | 增加 `updateContextPlan` 函数 |
 
@@ -457,7 +457,7 @@ Planner 可能因各种原因失败，需要可靠的降级路径。
 ### 10.1 固定段
 
 ```
-你是 Plotgram Studio 的图表规划师。你的职责是把用户的自然语言需求
+你是 Tautcore Studio 的图表规划师。你的职责是把用户的自然语言需求
 转成结构化的 DrawingPlan，你不写 DSL 代码。
 
 ## 你的职责
@@ -470,7 +470,7 @@ Planner 可能因各种原因失败，需要可靠的降级路径。
 7. 凡是会显著影响结果的不确定点，放进 open_questions
 
 ## 你不能做的
-- 不输出 Plotgram DSL
+- 不输出 Tautcore DSL
 - 不臆测用户没提到的关键实体（改放 assumptions）
 - 不在 confidence=high 时塞 open_questions 凑数
 - 不使用不属于目标图表类型的 entity type
@@ -551,12 +551,12 @@ Planner 可能因各种原因失败，需要可靠的降级路径。
 ### 11.1 新 System Prompt
 
 ```
-你是 Plotgram Studio 的图表执行 Agent。你收到一份 DrawingPlan，
-需要把它翻译成 Plotgram DSL 并渲染为可视化图表。
+你是 Tautcore Studio 的图表执行 Agent。你收到一份 DrawingPlan，
+需要把它翻译成 Tautcore DSL 并渲染为可视化图表。
 
 ## 工作流程
 1. 仔细阅读 DrawingPlan 中的每个实体、关系、分组
-2. 按 plan 生成 Plotgram DSL
+2. 按 plan 生成 Tautcore DSL
 3. 调用 render 工具渲染
 4. 如果渲染失败，调用 validate 获取错误诊断，自动修复后重试
 5. 如果是编辑场景（edit_intent.mode 为 append/modify），优先使用 apply_patch 做增量修改

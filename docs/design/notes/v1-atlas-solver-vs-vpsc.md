@@ -2,7 +2,7 @@
 
 > 日期：2026-07-31  
 > 状态：设计态度（现行）  
-> 相关：[`plotgram-algo/PARTS.md`](../../../crates/plotgram-algo/PARTS.md) · [from-yfiles-reference](../layout/hierarchical/from-yfiles-reference.md) · v1 `layout/kernel/coordinate/`
+> 相关：[`tautcore-algo/PARTS.md`](../../../crates/tautcore-algo/PARTS.md) · [from-yfiles-reference](../layout/hierarchical/from-yfiles-reference.md) · v1 `layout/kernel/coordinate/`
 
 ---
 
@@ -25,7 +25,7 @@ v1 Atlas 求解器 ≈「分隔约束一维坐标核」的**自研投影法**；
 
 ## v1 实际是什么
 
-路径：`crates/v1/plotgram-core/src/layout/kernel/coordinate/`
+路径：`crates/v1/tautcore-core/src/layout/kernel/coordinate/`
 
 ```text
 硬约束：x[j] - x[i] ≥ d   （一维分隔）
@@ -40,7 +40,7 @@ Atlas 总纲曾写：逐轴都是「带分离约束的一维凸问题」，并�
 
 ## 与经典 VPSC 的对照
 
-| | **VPSC**（`plotgram-algo`） | **v1 PAVA + Dykstra + 投影梯度** |
+| | **VPSC**（`tautcore-algo`） | **v1 PAVA + Dykstra + 投影梯度** |
 |--|---------------------------|----------------------------------|
 | 问题 | $\min \sum w(x-x^{des})^2$ s.t. 任意一对 $x_j-x_i\ge g$ | 同型分隔约束 + 分层软目标 |
 | 硬约束图 | **任意**分离约束（一般约束图） | 层内多为**链上相邻**；跨层/bounds 另投影 |

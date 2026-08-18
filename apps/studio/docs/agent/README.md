@@ -1,6 +1,6 @@
 # Agent 子系统文档
 
-Plotgram Studio Agent 模块的架构与实现文档。
+Tautcore Studio Agent 模块的架构与实现文档。
 
 ## 文档索引
 

@@ -43,7 +43,7 @@ function fenceLanguage(info: string): string {
   return info.trim().split(/\s+/)[0]?.toLowerCase() ?? '';
 }
 
-export function extendPlotgramMarkdownIt(md: MarkdownIt, extensionPath: string): MarkdownIt {
+export function extendTautcoreMarkdownIt(md: MarkdownIt, extensionPath: string): MarkdownIt {
   const defaultFence =
     md.renderer.rules.fence ??
     ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options, env, self));
@@ -56,8 +56,8 @@ export function extendPlotgramMarkdownIt(md: MarkdownIt, extensionPath: string):
 
     if (!isNodeWasmAvailable(extensionPath)) {
       return (
-        '<pre class="plotgram-markdown-error">' +
-        'Plotgram WASM 未构建，请在 editors/vscode 执行 npm run build:wasm' +
+        '<pre class="tautcore-markdown-error">' +
+        'Tautcore WASM 未构建，请在 editors/vscode 执行 npm run build:wasm' +
         '</pre>\n'
       );
     }
@@ -65,14 +65,14 @@ export function extendPlotgramMarkdownIt(md: MarkdownIt, extensionPath: string):
     try {
       const result = renderSource(extensionPath, token.content);
       if (result.success && result.svg) {
-        return `<div class="plotgram-markdown-diagram">\n${result.svg}\n</div>\n`;
+        return `<div class="tautcore-markdown-diagram">\n${result.svg}\n</div>\n`;
       }
 
-      const message = escapeHtml(result.errors.join('\n') || 'Plotgram 渲染失败');
-      return `<pre class="plotgram-markdown-error">${message}</pre>\n`;
+      const message = escapeHtml(result.errors.join('\n') || 'Tautcore 渲染失败');
+      return `<pre class="tautcore-markdown-error">${message}</pre>\n`;
     } catch (error) {
       const message = escapeHtml(error instanceof Error ? error.message : String(error));
-      return `<pre class="plotgram-markdown-error">${message}</pre>\n`;
+      return `<pre class="tautcore-markdown-error">${message}</pre>\n`;
     }
   };
 

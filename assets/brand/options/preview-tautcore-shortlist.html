@@ -1,0 +1,1546 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tautcore Logo — Product Shortlist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,500;9..40,600;9..40,700&family=IBM+Plex+Mono:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F4F1EA;
+    --ink: #121212;
+    --muted: #6A645C;
+    --line: #E3DDD3;
+    --card: #FFFCFA;
+    --accent: #0F9F8A;
+    --accent-hot: #E4572E;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "DM Sans", system-ui, sans-serif;
+    padding: 48px 36px 100px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .hero { max-width: 900px; margin-bottom: 40px; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    margin-bottom: 12px;
+  }
+  .lede {
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--muted);
+    max-width: 680px;
+  }
+  .lede b { color: var(--ink); }
+  .filter {
+    margin-top: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chip {
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid var(--line);
+    color: var(--muted);
+  }
+  .chip.on {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #F4F1EA;
+  }
+  .rec {
+    margin-top: 28px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: #121212;
+    color: #F4F1EA;
+    font-size: 13px;
+    line-height: 1.6;
+    max-width: 760px;
+  }
+  .rec b { color: #7CFFB2; }
+  .option {
+    max-width: 1100px;
+    margin-top: 48px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    overflow: hidden;
+  }
+  .option-head {
+    padding: 22px 24px 18px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .name {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+  .why {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+    max-width: 520px;
+    margin-top: 6px;
+  }
+  .badge {
+    font-size: 11px;
+    font-weight: 650;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: #E8F7F3;
+    color: #0B6F60;
+    white-space: nowrap;
+  }
+  .badge.alt { background: #F3EFE7; color: #6A645C; }
+  .stages {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr;
+    gap: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  @media (max-width: 860px) {
+    .stages { grid-template-columns: 1fr; }
+  }
+  .stage {
+    min-height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border-right: 1px solid var(--line);
+  }
+  .stage:last-child { border-right: none; }
+  .stage.light { background: #FAF8F4; }
+  .stage.dark { background: #121212; }
+  .stage.app { background: linear-gradient(160deg, #1a1a1a, #0d2a26); }
+  .label {
+    position: absolute;
+    top: 12px;
+    left: 14px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: #9A9288;
+  }
+  .stage.dark .label, .stage.app .label { color: #6B7280; }
+  .sizes {
+    display: flex;
+    gap: 18px;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .size-wrap { text-align: center; }
+  .size-wrap span {
+    display: block;
+    margin-top: 8px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    color: #9A9288;
+  }
+  .wm-bar {
+    padding: 22px 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 860px) {
+    .wm-bar { grid-template-columns: 1fr; }
+  }
+  .wm {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    min-height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 20px;
+    background: #FFFCFA;
+  }
+  .wm.dark {
+    background: #121212;
+    border-color: #2A2A2A;
+  }
+  .wm svg { height: 36px; width: auto; max-width: 100%; }
+  .pick {
+    margin-top: 56px;
+    max-width: 760px;
+    padding: 20px 22px;
+    border-radius: 16px;
+    border: 1px solid var(--line);
+    background: #FFFCFA;
+  }
+  .pick h2 {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 18px;
+    margin-bottom: 8px;
+  }
+  .pick p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+  .pick code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    background: #F0EBE3;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--ink);
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="eyebrow">Shortlist · high recognition · product-first</div>
+  <h1>产品向精选 · 重做版</h1>
+  <p class="lede">
+    按你的偏好过滤：<b>一眼能认</b>、<b>像成熟产品</b>、小尺寸仍清晰。
+    刻意弱化了 CLI/图表/抽象实验方向。
+  </p>
+  <div class="filter">
+    <span class="chip on">高识别度</span>
+    <span class="chip on">产品感</span>
+    <span class="chip on">小尺寸可读</span>
+    <span class="chip">避开纯 CLI</span>
+    <span class="chip">避开数据图表感</span>
+  </div>
+  <div class="rec">
+    S1 已整向重做（绿点不再贴笔画）。S2 收成更抽象符号。
+    新优先序：<b>S2a2 族（含 21–25）</b> → <b>S2a / S2a1</b> → <b>S1a</b>。
+  </div>
+</div>
+
+<!-- S1a -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S1a · 重做</div>
+      <div class="name">实心 P · 字怀节点</div>
+      <p class="why">标准比例实心 P，青绿填在字怀（counter）里——节点是字母的一部分，不是外挂装饰。比例稳，小尺寸干净。</p>
+    </div>
+    <span class="badge">首选</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+        <!-- solid P: stem + bowl; counter punched then green fill -->
+        <path fill="#FAF8F4" d="M32 24h20c12.5 0 22 9 22 20.5S64.5 65 52 65H40v11c0 1.7-1.3 3-3 3h-2c-1.7 0-3-1.3-3-3V27c0-1.7 1.3-3 3-3zm8 8v25h12c7.5 0 13.5-5.5 13.5-12.5S59.5 32 52 32H40z"/>
+        <circle cx="49" cy="44.5" r="6.5" fill="#2DD4A8"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path fill="#121212" d="M32 24h20c12.5 0 22 9 22 20.5S64.5 65 52 65H40v11c0 1.7-1.3 3-3 3h-2c-1.7 0-3-1.3-3-3V27c0-1.7 1.3-3 3-3zm8 8v25h12c7.5 0 13.5-5.5 13.5-12.5S59.5 32 52 32H40z"/>
+            <circle cx="49" cy="44.5" r="6.5" fill="#0F9F8A"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path fill="#121212" d="M32 24h20c12.5 0 22 9 22 20.5S64.5 65 52 65H40v11c0 1.7-1.3 3-3 3h-2c-1.7 0-3-1.3-3-3V27c0-1.7 1.3-3 3-3zm8 8v25h12c7.5 0 13.5-5.5 13.5-12.5S59.5 32 52 32H40z"/>
+            <circle cx="49" cy="44.5" r="7" fill="#0F9F8A"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path fill="#121212" d="M32 24h20c12.5 0 22 9 22 20.5S64.5 65 52 65H40v11c0 1.7-1.3 3-3 3h-2c-1.7 0-3-1.3-3-3V27c0-1.7 1.3-3 3-3zm8 8v25h12c7.5 0 13.5-5.5 13.5-12.5S59.5 32 52 32H40z"/>
+            <circle cx="49" cy="44.5" r="8" fill="#0F9F8A"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B1F1C"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
+        <path fill="#FAF8F4" d="M34 28h17c10.5 0 18.5 7.5 18.5 17.5S61.5 63 51 63H41v9c0 1.4-1.1 2.5-2.5 2.5h-2c-1.4 0-2.5-1.1-2.5-2.5V30.5c0-1.4 1.1-2.5 2.5-2.5zm7 7v21h10c6.2 0 11-4.5 11-10.5S57.2 35 51 35H41z"/>
+        <circle cx="49" cy="45.5" r="5.5" fill="#2DD4A8"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#121212"/>
+        <path fill="#FAF8F4" d="M12 12h9c5.8 0 10 4 10 9.2S26.8 30.4 21 30.4H16v4.2c0 .8-.6 1.4-1.4 1.4h-1.2c-.8 0-1.4-.6-1.4-1.4V13.4c0-.8.6-1.4 1.4-1.4zm4 3.6v11.2h5c3.4 0 6-2.4 6-5.6s-2.6-5.6-6-5.6h-5z"/>
+        <circle cx="20.5" cy="21.2" r="2.8" fill="#2DD4A8"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">tautcore</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#FAF8F4"/>
+        <path fill="#121212" d="M12 12h9c5.8 0 10 4 10 9.2S26.8 30.4 21 30.4H16v4.2c0 .8-.6 1.4-1.4 1.4h-1.2c-.8 0-1.4-.6-1.4-1.4V13.4c0-.8.6-1.4 1.4-1.4zm4 3.6v11.2h5c3.4 0 6-2.4 6-5.6s-2.6-5.6-6-5.6h-5z"/>
+        <circle cx="20.5" cy="21.2" r="2.8" fill="#0F9F8A"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">tautcore</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S1b -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S1b · 重做</div>
+      <div class="name">竖笔 + 圆 · 抽象 P</div>
+      <p class="why">竖笔是墨色，碗口直接用青绿大圆构成。绿点不再「贴」在边上，而是碗口本身。极简、识别度高。</p>
+    </div>
+    <span class="badge">抽象</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+        <rect x="30" y="24" width="10" height="48" rx="5" fill="#FAF8F4"/>
+        <circle cx="56" cy="40" r="16" fill="#2DD4A8"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <rect x="30" y="24" width="10" height="48" rx="5" fill="#121212"/>
+            <circle cx="56" cy="40" r="16" fill="#0F9F8A"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <rect x="30" y="24" width="11" height="48" rx="5.5" fill="#121212"/>
+            <circle cx="56" cy="40" r="16" fill="#0F9F8A"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <rect x="28" y="22" width="14" height="52" rx="7" fill="#121212"/>
+            <circle cx="58" cy="40" r="18" fill="#0F9F8A"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B1F1C"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
+        <rect x="32" y="28" width="9" height="40" rx="4.5" fill="#FAF8F4"/>
+        <circle cx="55" cy="40" r="14" fill="#2DD4A8"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#121212"/>
+        <rect x="11" y="12" width="5" height="24" rx="2.5" fill="#FAF8F4"/>
+        <circle cx="24" cy="20" r="8" fill="#2DD4A8"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">tautcore</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#FAF8F4"/>
+        <rect x="11" y="12" width="5" height="24" rx="2.5" fill="#121212"/>
+        <circle cx="24" cy="20" r="8" fill="#0F9F8A"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">tautcore</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S1c -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S1c · 重做</div>
+      <div class="name">干净 P · 角标节点</div>
+      <p class="why">字母本身纯净、比例标准；青绿点作为角标（像 app badge），与字形分离。产品感强，不抢 P 的结构。</p>
+    </div>
+    <span class="badge alt">备选</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+        <path fill="#FAF8F4" d="M30 24h20c13 0 23 9.2 23 21S63 66 50 66H38v10c0 1.7-1.3 3-3 3h-2c-1.7 0-3-1.3-3-3V27c0-1.7 1.3-3 3-3zm8 8v26h12c8 0 14.5-5.8 14.5-13S58 32 50 32H38z"/>
+        <circle cx="72" cy="24" r="8" fill="#2DD4A8"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path fill="#121212" d="M30 24h20c13 0 23 9.2 23 21S63 66 50 66H38v10c0 1.7-1.3 3-3 3h-2c-1.7 0-3-1.3-3-3V27c0-1.7 1.3-3 3-3zm8 8v26h12c8 0 14.5-5.8 14.5-13S58 32 50 32H38z"/>
+            <circle cx="72" cy="24" r="8" fill="#0F9F8A"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path fill="#121212" d="M30 24h20c13 0 23 9.2 23 21S63 66 50 66H38v10c0 1.7-1.3 3-3 3h-2c-1.7 0-3-1.3-3-3V27c0-1.7 1.3-3 3-3zm8 8v26h12c8 0 14.5-5.8 14.5-13S58 32 50 32H38z"/>
+            <circle cx="72" cy="24" r="9" fill="#0F9F8A"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path fill="#121212" d="M30 24h20c13 0 23 9.2 23 21S63 66 50 66H38v10c0 1.7-1.3 3-3 3h-2c-1.7 0-3-1.3-3-3V27c0-1.7 1.3-3 3-3zm8 8v26h12c8 0 14.5-5.8 14.5-13S58 32 50 32H38z"/>
+            <circle cx="72" cy="24" r="10" fill="#0F9F8A"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B1F1C"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
+        <path fill="#FAF8F4" d="M32 28h17c11 0 19.5 7.8 19.5 18S60 64 49 64H39v8.5c0 1.4-1.1 2.5-2.5 2.5h-2c-1.4 0-2.5-1.1-2.5-2.5V30.5c0-1.4 1.1-2.5 2.5-2.5zm7 7v22h10c6.8 0 12-4.8 12-11s-5.2-11-12-11H39z"/>
+        <circle cx="70" cy="26" r="7" fill="#2DD4A8"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#121212"/>
+        <path fill="#FAF8F4" d="M11 12h9c5.8 0 10.2 4 10.2 9.2S25.8 30.4 20 30.4H15v4c0 .8-.6 1.4-1.4 1.4h-1.2c-.8 0-1.4-.6-1.4-1.4V13.4c0-.8.6-1.4 1.4-1.4zm4 3.6v11h5c3.5 0 6.2-2.4 6.2-5.5s-2.7-5.5-6.2-5.5h-5z"/>
+        <circle cx="33" cy="12" r="3.5" fill="#2DD4A8"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">tautcore</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#FAF8F4"/>
+        <path fill="#121212" d="M11 12h9c5.8 0 10.2 4 10.2 9.2S25.8 30.4 20 30.4H15v4c0 .8-.6 1.4-1.4 1.4h-1.2c-.8 0-1.4-.6-1.4-1.4V13.4c0-.8.6-1.4 1.4-1.4zm4 3.6v11h5c3.5 0 6.2-2.4 6.2-5.5s-2.7-5.5-6.2-5.5h-5z"/>
+        <circle cx="33" cy="12" r="3.5" fill="#0F9F8A"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">tautcore</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S2a -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S2a · 简化抽象</div>
+      <div class="name">三行 → 一节点</div>
+      <p class="why">三根横线 = 文本，右侧青绿圆 = 图。已去掉中间灰线，靠并置完成「文本→图」。</p>
+    </div>
+    <span class="badge">叙事</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+        <path d="M24 34h24M24 48h18M24 62h22" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="70" cy="48" r="11" fill="#2DD4A8"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M24 34h24M24 48h18M24 62h22" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="70" cy="48" r="11" fill="#0F9F8A"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M22 34h22M22 48h16M22 62h20" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="70" cy="48" r="12" fill="#0F9F8A"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M20 34h20M20 48h14M20 62h18" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+            <circle cx="70" cy="48" r="14" fill="#0F9F8A"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B1F1C"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
+        <path d="M26 34h20M26 46h14M26 58h18" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <circle cx="66" cy="46" r="10" fill="#2DD4A8"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#121212"/>
+        <path d="M9 16h10M9 24h7M9 32h9" stroke="#FAF8F4" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="30" cy="24" r="5" fill="#2DD4A8"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">tautcore</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#FAF8F4"/>
+        <path d="M9 16h10M9 24h7M9 32h9" stroke="#121212" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="30" cy="24" r="5" fill="#0F9F8A"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">tautcore</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S2a1 -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S2a1 · 新变体</div>
+      <div class="name">中间行即节点</div>
+      <p class="why">上、下两行仍是文本；中间那一行直接变成青绿圆。转化发生在字形内部，比并置更抽象。</p>
+    </div>
+    <span class="badge">抽象</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+        <path d="M26 32h44" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="48" cy="48" r="11" fill="#2DD4A8"/>
+        <path d="M26 64h44" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M26 32h44" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="48" cy="48" r="11" fill="#0F9F8A"/>
+            <path d="M26 64h44" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M24 30h48" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="48" cy="48" r="12" fill="#0F9F8A"/>
+            <path d="M24 66h48" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M22 28h52" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+            <circle cx="48" cy="48" r="14" fill="#0F9F8A"/>
+            <path d="M22 68h52" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B1F1C"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
+        <path d="M28 34h40" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <circle cx="48" cy="48" r="10" fill="#2DD4A8"/>
+        <path d="M28 62h40" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#121212"/>
+        <path d="M10 14h20" stroke="#FAF8F4" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="20" cy="24" r="5" fill="#2DD4A8"/>
+        <path d="M10 34h20" stroke="#FAF8F4" stroke-width="2.4" stroke-linecap="round"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">tautcore</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#FAF8F4"/>
+        <path d="M10 14h20" stroke="#121212" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="20" cy="24" r="5" fill="#0F9F8A"/>
+        <path d="M10 34h20" stroke="#121212" stroke-width="2.4" stroke-linecap="round"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">tautcore</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S2a2 -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S2a2 · 新变体</div>
+      <div class="name">渐短三行 · 汇入圆</div>
+      <p class="why">三行从长到短，视觉重心推向右侧青绿圆。无连接线，靠节奏暗示「文本收束成图」。</p>
+    </div>
+    <span class="badge">抽象</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+        <path d="M22 32h28M22 48h20M22 64h12" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="66" cy="48" r="14" fill="#2DD4A8"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M22 32h28M22 48h20M22 64h12" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="66" cy="48" r="14" fill="#0F9F8A"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M20 32h26M20 48h18M20 64h10" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="66" cy="48" r="15" fill="#0F9F8A"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M18 30h24M18 48h16M18 66h8" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+            <circle cx="68" cy="48" r="16" fill="#0F9F8A"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B1F1C"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
+        <path d="M26 34h22M26 48h16M26 62h10" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <circle cx="64" cy="48" r="12" fill="#2DD4A8"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#121212"/>
+        <path d="M8 15h12M8 24h9M8 33h5" stroke="#FAF8F4" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="29" cy="24" r="6" fill="#2DD4A8"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">tautcore</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#FAF8F4"/>
+        <path d="M8 15h12M8 24h9M8 33h5" stroke="#121212" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="29" cy="24" r="6" fill="#0F9F8A"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">tautcore</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S2a21 -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S2a21 · 巧思</div>
+      <div class="name">末行成圆</div>
+      <p class="why">上两行仍是文本；最短的「第三行」直接变成青绿圆。转化发生在句末——写到最后一行，就成了图。</p>
+    </div>
+    <span class="badge">巧思</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+        <path d="M24 30h40M24 46h28" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="36" cy="66" r="10" fill="#2DD4A8"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M24 30h40M24 46h28" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="36" cy="66" r="10" fill="#0F9F8A"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M22 28h44M22 46h28" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="36" cy="66" r="11" fill="#0F9F8A"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M20 26h48M20 46h28" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+            <circle cx="36" cy="66" r="13" fill="#0F9F8A"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B1F1C"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
+        <path d="M28 32h34M28 46h24" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <circle cx="38" cy="64" r="9" fill="#2DD4A8"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#121212"/>
+        <path d="M10 14h18M10 22h12" stroke="#FAF8F4" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="15" cy="32" r="4.5" fill="#2DD4A8"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">tautcore</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#FAF8F4"/>
+        <path d="M10 14h18M10 22h12" stroke="#121212" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="15" cy="32" r="4.5" fill="#0F9F8A"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">tautcore</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S2a22 -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S2a22 · 黄金比精修</div>
+      <div class="name">文本环绕 · 节点</div>
+      <p class="why">等距三行 + 黄金比缩短（28.8→17.8→11.0，φ≈1.618）；中线更短、环绕气口更清晰；底行与圆底对齐。字标 plot/gram 间距收紧。</p>
+    </div>
+    <span class="badge">精修</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+        <!-- φ 线长：48 / 29.67 / 18.33；底对齐圆 -->
+        <path d="M20 30h48" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+        <path d="M20 50h29.7" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+        <path d="M20 70h18.3" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="68.4" cy="61" r="11.5" fill="#2DD4A8"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M20 30h48" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
+            <path d="M20 50h29.7" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
+            <path d="M20 70h18.3" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="68.4" cy="61" r="11.5" fill="#0F9F8A"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M18 28h50" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
+            <path d="M18 50h31" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
+            <path d="M18 70h19" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="69" cy="60.5" r="12.5" fill="#0F9F8A"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M16 26h52" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+            <path d="M16 50h32" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+            <path d="M16 70h20" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+            <circle cx="70" cy="60" r="14" fill="#0F9F8A"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B1F1C"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
+        <path d="M24 30h40" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <path d="M24 48h24.7" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <path d="M24 66h15.3" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <circle cx="64" cy="57.25" r="10.5" fill="#2DD4A8"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 280 48" fill="none">
+        <rect x="0" y="0" width="36" height="36" rx="9" transform="translate(2,6)" fill="#121212"/>
+        <g transform="translate(2,6)">
+          <path d="M7.5 10.8h21.6" stroke="#FAF8F4" stroke-width="2.25" stroke-linecap="round"/>
+          <path d="M7.5 19.8h13.35" stroke="#FAF8F4" stroke-width="2.25" stroke-linecap="round"/>
+          <path d="M7.5 28.8h8.25" stroke="#FAF8F4" stroke-width="2.25" stroke-linecap="round"/>
+          <circle cx="27.15" cy="24.75" r="5.175" fill="#2DD4A8"/>
+        </g>
+        <text x="48" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">plot</text>
+        <text x="104" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#0F9F8A">gram</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 280 48" fill="none">
+        <rect x="0" y="0" width="36" height="36" rx="9" transform="translate(2,6)" fill="#FAF8F4"/>
+        <g transform="translate(2,6)">
+          <path d="M7.5 10.8h21.6" stroke="#121212" stroke-width="2.25" stroke-linecap="round"/>
+          <path d="M7.5 19.8h13.35" stroke="#121212" stroke-width="2.25" stroke-linecap="round"/>
+          <path d="M7.5 28.8h8.25" stroke="#121212" stroke-width="2.25" stroke-linecap="round"/>
+          <circle cx="27.15" cy="24.75" r="5.175" fill="#0F9F8A"/>
+        </g>
+        <text x="48" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">plot</text>
+        <text x="104" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#2DD4A8">gram</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S2a23 -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S2a23 · 巧思</div>
+      <div class="name">三线汇心</div>
+      <p class="why">三行右端对齐到同一竖线，再汇入圆。像漏斗：散落的文本被收束成一个节点。</p>
+    </div>
+    <span class="badge">巧思</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+        <path d="M20 30h32M28 48h24M36 66h16" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="68" cy="48" r="12" fill="#2DD4A8"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M20 30h32M28 48h24M36 66h16" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="68" cy="48" r="12" fill="#0F9F8A"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M18 28h32M26 48h24M34 66h16" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="68" cy="48" r="13" fill="#0F9F8A"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M16 26h32M24 48h24M32 66h16" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+            <circle cx="70" cy="48" r="14" fill="#0F9F8A"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B1F1C"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
+        <path d="M24 32h26M30 48h20M36 64h14" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <circle cx="64" cy="48" r="11" fill="#2DD4A8"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#121212"/>
+        <path d="M8 14h12M11 24h9M14 34h6" stroke="#FAF8F4" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="30" cy="24" r="5.5" fill="#2DD4A8"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">tautcore</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#FAF8F4"/>
+        <path d="M8 14h12M11 24h9M14 34h6" stroke="#121212" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="30" cy="24" r="5.5" fill="#0F9F8A"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">tautcore</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S2a24 -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S2a24 · 巧思</div>
+      <div class="name">阶梯落地</div>
+      <p class="why">右端阶梯下沉，最短行落在圆上——像 plot 折线的最后一跳，也像文本排版的缩进节奏。</p>
+    </div>
+    <span class="badge">巧思</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+        <path d="M20 28h36M20 44h28M20 60h18" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="66" cy="60" r="12" fill="#2DD4A8"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M20 28h36M20 44h28M20 60h18" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="66" cy="60" r="12" fill="#0F9F8A"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M18 26h34M18 44h26M18 60h16" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="66" cy="60" r="13" fill="#0F9F8A"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M16 24h32M16 44h24M16 60h14" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+            <circle cx="68" cy="60" r="14" fill="#0F9F8A"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B1F1C"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
+        <path d="M24 30h28M24 44h22M24 58h14" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <circle cx="62" cy="58" r="11" fill="#2DD4A8"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#121212"/>
+        <path d="M8 13h14M8 21h11M8 29h7" stroke="#FAF8F4" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="29" cy="29" r="5.5" fill="#2DD4A8"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">tautcore</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#FAF8F4"/>
+        <path d="M8 13h14M8 21h11M8 29h7" stroke="#121212" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="29" cy="29" r="5.5" fill="#0F9F8A"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">tautcore</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S2a25 -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S2a25 · 巧思</div>
+      <div class="name">圆内续行</div>
+      <p class="why">中间那行穿进青绿圆，圆内留一条同色负形缝。文本「写进」节点里——最贴 tautcore 的字面。</p>
+    </div>
+    <span class="badge">巧思</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+        <path d="M20 30h28M20 64h16" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="62" cy="48" r="16" fill="#2DD4A8"/>
+        <path d="M20 48h50" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+        <path d="M52 48h18" stroke="#0B1F1C" stroke-width="5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M20 30h28M20 64h16" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="62" cy="48" r="16" fill="#0F9F8A"/>
+            <path d="M20 48h50" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
+            <path d="M52 48h18" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M18 28h26M18 66h14" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="62" cy="48" r="17" fill="#0F9F8A"/>
+            <path d="M18 48h52" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
+            <path d="M50 48h20" stroke="#FAF8F4" stroke-width="6" stroke-linecap="round"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <path d="M16 26h24M16 68h12" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+            <circle cx="64" cy="48" r="18" fill="#0F9F8A"/>
+            <path d="M16 48h56" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+            <path d="M50 48h22" stroke="#FAF8F4" stroke-width="8" stroke-linecap="round"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B1F1C"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
+        <path d="M24 32h22M24 62h12" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <circle cx="58" cy="48" r="14" fill="#2DD4A8"/>
+        <path d="M24 48h42" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <path d="M48 48h16" stroke="#121212" stroke-width="4.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#121212"/>
+        <path d="M8 14h11M8 34h7" stroke="#FAF8F4" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="26" cy="24" r="7" fill="#2DD4A8"/>
+        <path d="M8 24h22" stroke="#FAF8F4" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M21 24h8" stroke="#121212" stroke-width="2.4" stroke-linecap="round"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">tautcore</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#FAF8F4"/>
+        <path d="M8 14h11M8 34h7" stroke="#121212" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="26" cy="24" r="7" fill="#0F9F8A"/>
+        <path d="M8 24h22" stroke="#121212" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M21 24h8" stroke="#FAF8F4" stroke-width="2.4" stroke-linecap="round"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">tautcore</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S2b -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S2b · 简化抽象</div>
+      <div class="name">条块 → 圆 · 正交</div>
+      <p class="why">左侧一条竖块（文本/文档的抽象），正交折线接到右侧圆节点。比 S2a 更「图」，仍无编辑器细节。</p>
+    </div>
+    <span class="badge alt">备选</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+        <rect x="26" y="28" width="14" height="40" rx="4" fill="#FAF8F4"/>
+        <path d="M40 48h14v14" fill="none" stroke="#6B7280" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="66" cy="62" r="10" fill="#2DD4A8"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <rect x="26" y="28" width="14" height="40" rx="4" fill="#121212"/>
+            <path d="M40 48h14v14" fill="none" stroke="#9CA3AF" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+            <circle cx="66" cy="62" r="10" fill="#0F9F8A"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <rect x="26" y="28" width="16" height="40" rx="4" fill="#121212"/>
+            <circle cx="66" cy="60" r="12" fill="#0F9F8A"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <rect x="24" y="26" width="18" height="44" rx="5" fill="#121212"/>
+            <circle cx="66" cy="60" r="14" fill="#0F9F8A"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B1F1C"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
+        <rect x="28" y="30" width="12" height="34" rx="3.5" fill="#FAF8F4"/>
+        <path d="M40 47h12v12" fill="none" stroke="#6B7280" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="64" cy="59" r="9" fill="#2DD4A8"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#121212"/>
+        <rect x="10" y="13" width="7" height="22" rx="2" fill="#FAF8F4"/>
+        <path d="M17 24h7v7" fill="none" stroke="#6B7280" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="30" cy="31" r="4.5" fill="#2DD4A8"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">tautcore</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#FAF8F4"/>
+        <rect x="10" y="13" width="7" height="22" rx="2" fill="#121212"/>
+        <path d="M17 24h7v7" fill="none" stroke="#9CA3AF" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="30" cy="31" r="4.5" fill="#0F9F8A"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">tautcore</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S3 -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S3 · 最高记忆点</div>
+      <div class="name">P 单字母章</div>
+      <p class="why">深绿底 + 大 P + 一枚亮点。识别成本最低，像 Linear / Notion 一类产品的字母标。含义稍弱，但品牌感最强。</p>
+    </div>
+    <span class="badge">记忆</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#0F3D34"/>
+        <text x="28" y="68" font-family="Space Grotesk, sans-serif" font-size="52" font-weight="700" fill="#E8F3EF">P</text>
+        <circle cx="68" cy="30" r="7" fill="#7CFFB2"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#0F3D34"/>
+            <text x="28" y="68" font-family="Space Grotesk, sans-serif" font-size="52" font-weight="700" fill="#E8F3EF">P</text>
+            <circle cx="68" cy="30" r="7" fill="#7CFFB2"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#0F3D34"/>
+            <text x="28" y="68" font-family="Space Grotesk, sans-serif" font-size="52" font-weight="700" fill="#E8F3EF">P</text>
+            <circle cx="68" cy="30" r="8" fill="#7CFFB2"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#0F3D34"/>
+            <text x="26" y="70" font-family="Space Grotesk, sans-serif" font-size="56" font-weight="700" fill="#E8F3EF">P</text>
+            <circle cx="70" cy="28" r="9" fill="#7CFFB2"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#071A16"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#0F3D34"/>
+        <text x="30" y="66" font-family="Space Grotesk, sans-serif" font-size="44" font-weight="700" fill="#E8F3EF">P</text>
+        <circle cx="64" cy="32" r="6" fill="#7CFFB2"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#0F3D34"/>
+        <text x="11" y="32" font-family="Space Grotesk, sans-serif" font-size="24" font-weight="700" fill="#E8F3EF">P</text>
+        <circle cx="30" cy="14" r="3.2" fill="#7CFFB2"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">tautcore</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#0F3D34"/>
+        <text x="11" y="32" font-family="Space Grotesk, sans-serif" font-size="24" font-weight="700" fill="#E8F3EF">P</text>
+        <circle cx="30" cy="14" r="3.2" fill="#7CFFB2"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">tautcore</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S4 -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S4 · 产品动作感</div>
+      <div class="name">P · 流出箭头</div>
+      <p class="why">线型 P 接出暖橙箭头与节点。比 S1 更「流程图」，比 S2 更简洁。适合强调「生成/输出」动作的产品。</p>
+    </div>
+    <span class="badge alt">备选</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4" stroke="#E3DDD3" stroke-width="2"/>
+        <path d="M28 26v44" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+        <path d="M28 26h18c13 0 21 8.5 21 20s-8 20-21 20H28" fill="none" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+        <path d="M58 46h10" stroke="#E4572E" stroke-width="4" stroke-linecap="round"/>
+        <path d="M65 41l7 5-7 5" fill="none" stroke="#E4572E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="74" y="54" width="12" height="12" rx="3" fill="#E4572E"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+            <path d="M30 28v40" stroke="#FAF8F4" stroke-width="8" stroke-linecap="round"/>
+            <path d="M30 28h16c12 0 19 8 19 18s-7 18-19 18H30" fill="none" stroke="#FAF8F4" stroke-width="8" stroke-linecap="round"/>
+            <rect x="68" y="54" width="12" height="12" rx="3" fill="#E4572E"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+            <path d="M30 28v40" stroke="#FAF8F4" stroke-width="10" stroke-linecap="round"/>
+            <path d="M30 28h16c12 0 19 8 19 18s-7 18-19 18H30" fill="none" stroke="#FAF8F4" stroke-width="10" stroke-linecap="round"/>
+            <rect x="66" y="52" width="14" height="14" rx="3" fill="#E4572E"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+            <path d="M30 28v40" stroke="#FAF8F4" stroke-width="12" stroke-linecap="round"/>
+            <path d="M30 28h16c12 0 19 8 19 18s-7 18-19 18H30" fill="none" stroke="#FAF8F4" stroke-width="12" stroke-linecap="round"/>
+            <circle cx="72" cy="58" r="10" fill="#E4572E"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#1A120E"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
+        <path d="M32 30v36" stroke="#FAF8F4" stroke-width="7" stroke-linecap="round"/>
+        <path d="M32 30h14c10 0 16 7 16 16s-6 16-16 16H32" fill="none" stroke="#FAF8F4" stroke-width="7" stroke-linecap="round"/>
+        <rect x="60" y="52" width="12" height="12" rx="3" fill="#E4572E"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 360 48" fill="none">
+        <path d="M8 10v28" stroke="#121212" stroke-width="4.5" stroke-linecap="round"/>
+        <path d="M8 10h10c7 0 11.5 4.5 11.5 10.5S25 31 18 31H8" fill="none" stroke="#121212" stroke-width="4.5" stroke-linecap="round"/>
+        <path d="M28 20.5h8" stroke="#E4572E" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M34 17l4 3.5-4 3.5" fill="none" stroke="#E4572E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="40" y="26" width="8" height="8" rx="2" fill="#E4572E"/>
+        <text x="62" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">tautcore</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 360 48" fill="none">
+        <path d="M8 10v28" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <path d="M8 10h10c7 0 11.5 4.5 11.5 10.5S25 31 18 31H8" fill="none" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <rect x="40" y="26" width="8" height="8" rx="2" fill="#E4572E"/>
+        <text x="62" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">tautcore</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S5 -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S5 · 字标产品感</div>
+      <div class="name">plot / gram 双色</div>
+      <p class="why">拆词着色 + 句点节点。落地页/文档头图很强；需搭配 S1 或 S3 做独立 icon。</p>
+    </div>
+    <span class="badge alt">字标</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">WORDMARK</div>
+      <svg width="220" height="64" viewBox="0 0 220 64" fill="none">
+        <text x="8" y="42" font-family="Space Grotesk, sans-serif" font-size="36" font-weight="700" letter-spacing="-0.05em" fill="#121212">plot</text>
+        <text x="88" y="42" font-family="Space Grotesk, sans-serif" font-size="36" font-weight="700" letter-spacing="-0.05em" fill="#0F9F8A">gram</text>
+        <circle cx="198" cy="34" r="5" fill="#0F9F8A"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">DARK</div>
+      <svg width="220" height="64" viewBox="0 0 220 64" fill="none">
+        <text x="8" y="42" font-family="Space Grotesk, sans-serif" font-size="36" font-weight="700" letter-spacing="-0.05em" fill="#FAF8F4">plot</text>
+        <text x="88" y="42" font-family="Space Grotesk, sans-serif" font-size="36" font-weight="700" letter-spacing="-0.05em" fill="#2DD4A8">gram</text>
+        <circle cx="198" cy="34" r="5" fill="#2DD4A8"/>
+      </svg>
+    </div>
+    <div class="stage app">
+      <div class="label">WITH ICON</div>
+      <svg width="200" height="48" viewBox="0 0 200 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#121212"/>
+        <path fill="#FAF8F4" d="M12 12h9c5.8 0 10 4 10 9.2S26.8 30.4 21 30.4H16v4.2c0 .8-.6 1.4-1.4 1.4h-1.2c-.8 0-1.4-.6-1.4-1.4V13.4c0-.8.6-1.4 1.4-1.4zm4 3.6v11.2h5c3.4 0 6-2.4 6-5.6s-2.6-5.6-6-5.6h-5z"/>
+        <circle cx="20.5" cy="21.2" r="2.8" fill="#2DD4A8"/>
+        <text x="50" y="33" font-family="Space Grotesk, sans-serif" font-size="24" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">plot</text>
+        <text x="102" y="33" font-family="Space Grotesk, sans-serif" font-size="24" font-weight="700" letter-spacing="-0.045em" fill="#2DD4A8">gram</text>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 300 48" fill="none">
+        <text x="8" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">plot</text>
+        <text x="72" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#0F9F8A">gram</text>
+        <circle cx="158" cy="26" r="4" fill="#0F9F8A"/>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 300 48" fill="none">
+        <text x="8" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">plot</text>
+        <text x="72" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#2DD4A8">gram</text>
+        <circle cx="158" cy="26" r="4" fill="#2DD4A8"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- S6 -->
+<section class="option">
+  <div class="option-head">
+    <div>
+      <div class="code">S6 · 布局 DNA 产品化</div>
+      <div class="name">黑底正交路由</div>
+      <p class="why">迷你架构图做印章。产品感来自「我们就是画这种图的」。识别度高，但不如字母标好念。</p>
+    </div>
+    <span class="badge alt">备选</span>
+  </div>
+  <div class="stages">
+    <div class="stage light">
+      <div class="label">ICON 96</div>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+        <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
+        <rect x="24" y="26" width="18" height="14" rx="3" fill="#FAF8F4"/>
+        <path d="M33 40v10h30" fill="none" stroke="#2DD4A8" stroke-width="4" stroke-linejoin="round"/>
+        <rect x="54" y="44" width="18" height="14" rx="3" fill="#2DD4A8"/>
+        <path d="M63 58v8H42" fill="none" stroke="#2DD4A8" stroke-width="4" stroke-linejoin="round"/>
+        <circle cx="36" cy="68" r="7" fill="#FAF8F4"/>
+      </svg>
+    </div>
+    <div class="stage dark">
+      <div class="label">SIZES</div>
+      <div class="sizes">
+        <div class="size-wrap">
+          <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <rect x="24" y="26" width="18" height="14" rx="3" fill="#121212"/>
+            <path d="M33 40v10h30" fill="none" stroke="#0F9F8A" stroke-width="4" stroke-linejoin="round"/>
+            <rect x="54" y="44" width="18" height="14" rx="3" fill="#0F9F8A"/>
+            <circle cx="36" cy="68" r="7" fill="#121212"/>
+          </svg>
+          <span>48</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <rect x="24" y="26" width="20" height="16" rx="3" fill="#121212"/>
+            <rect x="52" y="44" width="20" height="16" rx="3" fill="#0F9F8A"/>
+            <circle cx="36" cy="68" r="8" fill="#121212"/>
+          </svg>
+          <span>32</span>
+        </div>
+        <div class="size-wrap">
+          <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
+            <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
+            <rect x="22" y="24" width="22" height="18" rx="4" fill="#121212"/>
+            <rect x="52" y="42" width="22" height="18" rx="4" fill="#0F9F8A"/>
+            <circle cx="34" cy="70" r="10" fill="#121212"/>
+          </svg>
+          <span>16</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage app">
+      <div class="label">APP TILE</div>
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+        <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B1F1C"/>
+        <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
+        <rect x="28" y="28" width="14" height="11" rx="2.5" fill="#FAF8F4"/>
+        <path d="M35 39v8h24" fill="none" stroke="#2DD4A8" stroke-width="3.5" stroke-linejoin="round"/>
+        <rect x="52" y="42" width="14" height="11" rx="2.5" fill="#2DD4A8"/>
+        <circle cx="36" cy="62" r="6" fill="#FAF8F4"/>
+      </svg>
+    </div>
+  </div>
+  <div class="wm-bar">
+    <div class="wm">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#121212"/>
+        <rect x="9" y="12" width="8" height="6" rx="1.5" fill="#FAF8F4"/>
+        <path d="M13 18v5h12" fill="none" stroke="#2DD4A8" stroke-width="2" stroke-linejoin="round"/>
+        <rect x="21" y="20" width="8" height="6" rx="1.5" fill="#2DD4A8"/>
+        <circle cx="13" cy="32" r="3.2" fill="#FAF8F4"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">tautcore</text>
+      </svg>
+    </div>
+    <div class="wm dark">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#FAF8F4"/>
+        <rect x="9" y="12" width="8" height="6" rx="1.5" fill="#121212"/>
+        <rect x="21" y="20" width="8" height="6" rx="1.5" fill="#0F9F8A"/>
+        <circle cx="13" cy="32" r="3.2" fill="#121212"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">tautcore</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<div class="pick">
+  <h2>下一步</h2>
+  <p>
+    回复编号即可，例如 <code>S2a22</code>、<code>S2a25</code>、<code>S2a2</code>。
+    确认后输出正式 SVG 到 <code>assets/brand/</code>。
+  </p>
+</div>
+
+</body>
+</html>

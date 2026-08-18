@@ -52,12 +52,12 @@ export function TopBar({
           src={brandLogoUrl()}
           width="30"
           height="30"
-          alt="Plotgram"
+          alt="Tautcore"
           className="topbar-logo"
         />
         <div className="topbar-titles">
           <Text strong className="topbar-title">
-            Plotgram Agent
+            Tautcore Agent
           </Text>
           <Text className="topbar-subtitle">对话即画图 · AI 原生图表引擎</Text>
         </div>
@@ -95,7 +95,7 @@ export function TopBar({
       </div>
 
       <Space className="topbar-actions">
-        <Tooltip title="返回 Plotgram 主站">
+        <Tooltip title="返回 Tautcore 主站">
           <Button
             type="text"
             icon={<HomeOutlined />}
@@ -113,11 +113,11 @@ export function TopBar({
             文档
           </Button>
         </Tooltip>
-        <Tooltip title="Plotgram 仓库">
+        <Tooltip title="Tautcore 仓库">
           <Button
             type="text"
             icon={<GithubOutlined />}
-            onClick={() => window.open('https://github.com/plotgram/plotgram', '_blank', 'noopener')}
+            onClick={() => window.open('https://github.com/tautcore/tautcore', '_blank', 'noopener')}
           />
         </Tooltip>
       </Space>

@@ -1,8 +1,8 @@
 # 24 - Atlas Channel：端口挂接与候选端点增强需求
 
 > 日期：2026-07-26  
-> 状态：**可执行需求**（实现落点：`crates/plotgram-core/src/layout/atlas/channel/`）  
-> 上游：[`22-Atlas 总纲`](22-Atlas下一代布局与路由架构-总纲-2026-07.md) §5.1 I.5 / I.6；[`channel/README`](../../crates/plotgram-core/src/layout/atlas/channel/README.md)  
+> 状态：**可执行需求**（实现落点：`crates/tautcore-core/src/layout/atlas/channel/`）  
+> 上游：[`22-Atlas 总纲`](22-Atlas下一代布局与路由架构-总纲-2026-07.md) §5.1 I.5 / I.6；[`channel/README`](../../crates/tautcore-core/src/layout/atlas/channel/README.md)  
 > 读者：在 `channel` 内做增强的实现者
 
 ---

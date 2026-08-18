@@ -297,7 +297,7 @@ $\rho(v_i,v_{i+1}) = \frac{w_i}{2}+\frac{w_{i+1}}{2} + \max(\text{node gap}, \te
 
 ---
 
-## 7. 与 plotgram 的对照与建议
+## 7. 与 tautcore 的对照与建议
 
 1. **写权表**照第 0 节建立，编译期就把"谁能写 x"约束住（例如坐标字段只在对应 phase 的模块可变）。
 2. **P4 建议起步用 Brandes–Köpf**，把"端口/标签/组框"的额外需求先塞进层内间距 $\rho$；等约束多到打补丁时再整体换成 VPSC（路线 D），接口保持 `assign_x(order, spacing_provider) -> Coords` 不变。

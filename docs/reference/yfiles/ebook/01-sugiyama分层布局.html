@@ -574,8 +574,8 @@ restore_best()</code></pre>
 
         <p>规模经验值（单线程、release）：10k 节点 / 20k 边的分层图，纯 P1–P4 应在 ~1s 内；瓶颈通常是<strong>虚节点数</strong>和 P3 的轮数。优化顺序：先砍虚节点（P2 目标里加大权重 / 链聚合），再降 P3 轮数（早停：交叉数无改进连续 4 轮即停）。</p>
 
-        <!-- ============ §7 与 plotgram 对照 ============ -->
-        <h2 id="sec-8"><span class="h2-num">7</span>与 plotgram 的对照与建议</h2>
+        <!-- ============ §7 与 tautcore 对照 ============ -->
+        <h2 id="sec-8"><span class="h2-num">7</span>与 tautcore 的对照与建议</h2>
 
         <ol>
           <li><strong>写权表</strong>照第 0 节建立，编译期就把"谁能写 x"约束住（例如坐标字段只在对应 phase 的模块可变）。</li>
@@ -587,7 +587,7 @@ restore_best()</code></pre>
 
         <div class="callout good">
           <div class="ct-title"><span class="icon">✓</span>一句话收敛</div>
-          <p>Sugiyama 的价值不在某一相的算法多巧，而在<strong>五相之间严格的写权分工</strong>。把这个分工编译期固化，是 plotgram 区别于"在路由阶段加特判"的工程分水岭。</p>
+          <p>Sugiyama 的价值不在某一相的算法多巧，而在<strong>五相之间严格的写权分工</strong>。把这个分工编译期固化，是 tautcore 区别于"在路由阶段加特判"的工程分水岭。</p>
         </div>
 
       </div>

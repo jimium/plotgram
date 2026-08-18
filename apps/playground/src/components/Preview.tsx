@@ -266,7 +266,7 @@ export function Preview({
           />
         ) : (
           <div className="preview-message">
-            {ready ? '在左侧输入 Plotgram，将在这里实时渲染。' : 'WASM 加载中…'}
+            {ready ? '在左侧输入 Tautcore，将在这里实时渲染。' : 'WASM 加载中…'}
           </div>
         )}
 

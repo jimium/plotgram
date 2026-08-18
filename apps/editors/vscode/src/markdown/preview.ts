@@ -1,6 +1,6 @@
 /** Markdown 代码块语言标识（与 package.json / markdownItPlugin 保持一致）。 */
-export const MARKDOWN_CODE_BLOCK_LANGUAGE = 'plotgram' as const;
+export const MARKDOWN_CODE_BLOCK_LANGUAGE = 'tautcore' as const;
 
-export function isPlotgramCodeBlock(language: string | undefined): boolean {
+export function isTautcoreCodeBlock(language: string | undefined): boolean {
   return language === MARKDOWN_CODE_BLOCK_LANGUAGE;
 }

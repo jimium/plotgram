@@ -1,8 +1,8 @@
-# Plotgram Studio
+# Tautcore Studio
 
 **LLM 驱动的 Agent 绘图工作台**
 
-Plotgram Studio 是基于 [Plotgram](../) 构建的智能图表创作工具。用户用自然语言描述需求,LLM Agent 通过 Tool-Calling 操控 plotgram-wasm 生成与迭代图表,无需手写 DSL。
+Tautcore Studio 是基于 [Tautcore](../) 构建的智能图表创作工具。用户用自然语言描述需求,LLM Agent 通过 Tool-Calling 操控 tautcore-wasm 生成与迭代图表,无需手写 DSL。
 
 ## 与 Editor 的区别
 
@@ -24,7 +24,7 @@ Studio 不重复 Editor 的调校导出工作,专注 LLM 驱动与 Agent 绘图�
 - **自然语言驱动**:用户描述需求,Agent 生成图表
 - **多轮迭代**:基于上下文增量修改,支持"加个缓存""改个标签"等指令
 - **变更可视化**:每次修改展示 Diff 摘要,用户可接受或拒绝
-- **错误自修复**:Agent 利用 Plotgram 的结构化诊断自动修复 DSL 错误
+- **错误自修复**:Agent 利用 Tautcore 的结构化诊断自动修复 DSL 错误
 - **多 LLM 支持**:OpenAI / Anthropic / Ollama / 自定义 OpenAI 兼容服务
 - **本地运行**:WASM 渲染,API Key 仅存本地,不上传第三方
 
@@ -34,7 +34,7 @@ Studio 不重复 Editor 的调校导出工作,专注 LLM 驱动与 Agent 绘图�
 
 - Node.js 18+
 - npm 或 pnpm
-- Rust 1.75+(用于构建 plotgram-wasm,见根目录说明)
+- Rust 1.75+(用于构建 tautcore-wasm,见根目录说明)
 
 ### 安装
 
@@ -45,11 +45,11 @@ npm install
 
 ### 构建 WASM 产物
 
-Studio 依赖 plotgram-wasm,需先在仓库根目录构建:
+Studio 依赖 tautcore-wasm,需先在仓库根目录构建:
 
 ```bash
-cd ../crates/plotgram-wasm
-wasm-pack build --target web --out-dir ../../studio/plotgram-wasm
+cd ../crates/tautcore-wasm
+wasm-pack build --target web --out-dir ../../studio/tautcore-wasm
 ```
 
 ### 配置 LLM
@@ -90,7 +90,7 @@ npm run dev
 studio/
 ├── src/
 │   ├── agent/              # Agent 核心(重点)
-│   │   ├── types.ts        # 类型定义(与 plotgram-core 对齐)
+│   │   ├── types.ts        # 类型定义(与 tautcore-core 对齐)
 │   │   ├── prompt.ts       # System Prompt 模板
 │   │   ├── tools.ts        # Tool 定义与 WASM 桥接
 │   │   ├── context.ts      # 对话上下文管理
@@ -142,7 +142,7 @@ studio/
 - React 19 + TypeScript
 - Vite 8
 - Vitest(测试)
-- plotgram-wasm(图表渲染引擎)
+- tautcore-wasm(图表渲染引擎)
 - OpenAI 兼容 API(LLM)
 
 ## 许可证

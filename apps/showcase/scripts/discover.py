@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""List active layout .pgm samples under a showcase directory.
+"""List active layout .taut samples under a showcase directory.
 
 A "layout" is any top-level directory under showcase/ that does NOT start with
 '_' and is not in KNOWN_NON_SAMPLE_DIRS (scripts/, assets/). Each layout dir
-is scanned recursively for *.pgm (including optional facet subdirs such as
+is scanned recursively for *.taut (including optional facet subdirs such as
 hierarchical/flat/). _backup/ and _out/ are never scanned (they are
 '_'-prefixed).
 
@@ -38,7 +38,7 @@ def discover_layouts(showcase_dir: Path) -> list[Path]:
 
 
 def discover_samples(showcase_dir: Path, layout: str | None) -> list[str]:
-    """Return sorted posix-relative .pgm paths under active layout dirs."""
+    """Return sorted posix-relative .taut paths under active layout dirs."""
     layouts = discover_layouts(showcase_dir)
     if layout is not None:
         layouts = [d for d in layouts if d.name == layout]
@@ -46,7 +46,7 @@ def discover_samples(showcase_dir: Path, layout: str | None) -> list[str]:
             return []
     samples: list[str] = []
     for layout_dir in layouts:
-        for pgm in sorted(layout_dir.rglob("*.pgm")):
+        for pgm in sorted(layout_dir.rglob("*.taut")):
             if not pgm.is_file():
                 continue
             samples.append(pgm.relative_to(showcase_dir).as_posix())

@@ -60,7 +60,7 @@ export function HelpPanel({ open, onClose }: HelpPanelProps) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal help-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>Plotgram 语法速查</h2>
+          <h2>Tautcore 语法速查</h2>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭">
             <IconClose />
           </button>

@@ -4,13 +4,13 @@
 > 上游：[Circular Layout](https://docs.yfiles.com/yfiles-html/dguide/circular_layout/) · [CircularLayout](https://docs.yfiles.com/yfiles-html/api/CircularLayout.html) · [PartitionDescriptor](https://docs.yfiles.com/yfiles-html/api/PartitionDescriptor.html)
 > 算法证据：[05 §4](../../../reference/yfiles/05-树与径向布局.md) · [14](../../../reference/yfiles/14-图论与优化工具箱.md) · Six–Tollis 1999
 
-学理念与能力边界，**不**复刻 Stage 栈与全量 descriptor。本表回答：yFiles 有什么、plotgram 取哪几个、为什么。
+学理念与能力边界，**不**复刻 Stage 栈与全量 descriptor。本表回答：yFiles 有什么、tautcore 取哪几个、为什么。
 
 ---
 
 ## 1. 产品结构对照
 
-| yFiles | plotgram 目标 |
+| yFiles | tautcore 目标 |
 |--------|----------------|
 | `CircularLayout` 核 | `layout: circular` |
 | `partitioningPolicy` | `partitioning` |
@@ -27,13 +27,13 @@
 | `GenericLabeling` | Demand 预留；GENERIC 后置 |
 | 独立 `RadialLayout` / `RadialTreeLayout` 产品名 | 树状径向 = Tree `placer: radial` / `balloon`；**不**为本核再开注册名 |
 
-yFiles 默认 `partitioningPolicy = BCC_COMPACT`、`edgeRoutingPolicy = INTERIOR`、`partition style = CYCLE`。plotgram 默认对齐这三项。
+yFiles 默认 `partitioningPolicy = BCC_COMPACT`、`edgeRoutingPolicy = INTERIOR`、`partition style = CYCLE`。tautcore 默认对齐这三项。
 
 ---
 
 ## 2. `partitioningPolicy`
 
-| yFiles | 行为 | plotgram | 何时 |
+| yFiles | 行为 | tautcore | 何时 |
 |--------|------|----------|------|
 | **BCC_COMPACT** | 每 BCC 一区；跨块割点只派一区 | `bcc-compact` | **默认 · M1** |
 | **BCC_ISOLATED** | 割点各自成区 | `bcc-isolated` | **M2** |
@@ -44,7 +44,7 @@ yFiles 默认 `partitioningPolicy = BCC_COMPACT`、`edgeRoutingPolicy = INTERIOR
 
 ## 3. `PartitionDescriptor.style`
 
-| yFiles | 行为 | plotgram | 何时 |
+| yFiles | 行为 | tautcore | 何时 |
 |--------|------|----------|------|
 | **CYCLE** | 全体在圆周上 | `cycle` | **M0–M1** |
 | **DISK** | 连向它区的点在边界，其余可在盘内 | `disk` | 后置 Unsupported |
@@ -59,7 +59,7 @@ yFiles 默认 `partitioningPolicy = BCC_COMPACT`、`edgeRoutingPolicy = INTERIOR
 
 ## 4. 骨架（`backboneLayout`）
 
-| yFiles RadialTreeLayout 旋钮 | plotgram | 状态 |
+| yFiles RadialTreeLayout 旋钮 | tautcore | 状态 |
 |------------------------------|----------|------|
 | 分区圆当节点的径向树 | balloon 约束排分区圆心 | **M1** |
 | `placeChildrenOnCommonRadius` | 同名，默认 true | M1 读；false 后置 |
@@ -74,7 +74,7 @@ yFiles 默认 `partitioningPolicy = BCC_COMPACT`、`edgeRoutingPolicy = INTERIOR
 
 ## 5. 边
 
-| yFiles | plotgram | 状态 |
+| yFiles | tautcore | 状态 |
 |--------|----------|------|
 | `INTERIOR` 弦 | `routing_policy: interior` | **M0 默认** |
 | 同区外弧 | `exterior` | **M2** |
@@ -84,13 +84,13 @@ yFiles 默认 `partitioningPolicy = BCC_COMPACT`、`edgeRoutingPolicy = INTERIOR
 | bundling | — | 后置 |
 | 后接 EdgeRouter | `DeferToRouter` | 允许 |
 
-yFiles 原文：弦会穿节点与标签；需要时后接 router。plotgram 同样：**不**在 Circular 内核里做 OVG。
+yFiles 原文：弦会穿节点与标签；需要时后接 router。tautcore 同样：**不**在 Circular 内核里做 OVG。
 
 ---
 
 ## 6. 圈序
 
-| 来源 | plotgram |
+| 来源 | tautcore |
 |------|----------|
 | yFiles 单环交叉启发式（Single Cycle） | M1 谱序（Fiedler）；小图 BFS 回退 |
 | `fromSketchMode` 保圆周序 | 后置 |

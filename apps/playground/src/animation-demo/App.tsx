@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { loadWasm, renderSource, diffSources, formatSource, type PlotgramWasm, type ChangeSetJson, type ChangeJson } from '../lib/wasm';
+import { loadWasm, renderSource, diffSources, formatSource, type TautcoreWasm, type ChangeSetJson, type ChangeJson } from '../lib/wasm';
 import { SvgAnimator } from './SvgAnimator';
 import { SCENES, type AnimationScene } from './scenes';
 import { withBase } from '../lib/baseUrl';
@@ -19,7 +19,7 @@ interface FrameInfo {
   diffFromPrev?: ChangeSetJson;
 }
 
-function buildFrames(wasm: PlotgramWasm, scene: AnimationScene): FrameInfo[] {
+function buildFrames(wasm: TautcoreWasm, scene: AnimationScene): FrameInfo[] {
   const frames: FrameInfo[] = [];
   for (let i = 0; i < scene.dsls.length; i++) {
     const rawDsl = scene.dsls[i];
@@ -67,7 +67,7 @@ function changeColor(op: string): string {
 }
 
 export default function App() {
-  const [wasm, setWasm] = useState<PlotgramWasm | null>(null);
+  const [wasm, setWasm] = useState<TautcoreWasm | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sceneIdx, setSceneIdx] = useState(0);
   const [frameIdx, setFrameIdx] = useState(0);
@@ -370,7 +370,7 @@ export default function App() {
               <div className="dsl-panel">
                 <div className="panel-header">
                   <h3>DSL 源码</h3>
-                  <p className="panel-sub">当前帧对应的 Plotgram DSL</p>
+                  <p className="panel-sub">当前帧对应的 Tautcore DSL</p>
                 </div>
                 <pre className="dsl-code"><code>{currentFrame.dsl}</code></pre>
               </div>

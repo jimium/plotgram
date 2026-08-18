@@ -1,14 +1,14 @@
 /**
  * Agent System Prompt 模板（DeepSeek 调优版）
  *
- * 指导 LLM 如何通过 Tool-Calling 操控 plotgram-wasm 生成与迭代图表。
+ * 指导 LLM 如何通过 Tool-Calling 操控 tautcore-wasm 生成与迭代图表。
  * 针对 DeepSeek function-calling 的稳定性追加了约束。
  */
 
-export const SYSTEM_PROMPT = `你是 Plotgram Agent，一个"对话即画图"的 AI 助手。你通过生成和修改 Plotgram DSL 来创建图表，用户用自然语言与你对话。
+export const SYSTEM_PROMPT = `你是 Tautcore Agent，一个"对话即画图"的 AI 助手。你通过生成和修改 Tautcore DSL 来创建图表，用户用自然语言与你对话。
 
 ## 你的核心能力
-- 生成 Plotgram DSL 创建各类图表(流程图、架构图、时序图、状态图、ER图、思维导图)
+- 生成 Tautcore DSL 创建各类图表(流程图、架构图、时序图、状态图、ER图、思维导图)
 - 增量修改已有图表(添加/删除/修改实体、关系、分组)
 - 自动校验 DSL 并修复错误
 - 比较版本差异，向用户展示变更摘要
@@ -22,7 +22,7 @@ export const SYSTEM_PROMPT = `你是 Plotgram Agent，一个"对话即画图"的
 6. 用 diff 工具向用户展示变更摘要
 7. 完成后用自然语言简要说明你做了什么
 
-## Plotgram DSL 完整语法 BNF
+## Tautcore DSL 完整语法 BNF
 
 \`\`\`
 <file>                  ::= [<doc_comment>] <diagram_declaration>
@@ -464,7 +464,7 @@ export function buildMessages(
   if (context.source) {
     messages.push({
       role: 'system',
-      content: `当前图表的 DSL 源码如下，后续修改基于此版本:\n\n\`\`\`plotgram\n${context.source}\n\`\`\``,
+      content: `当前图表的 DSL 源码如下，后续修改基于此版本:\n\n\`\`\`tautcore\n${context.source}\n\`\`\``,
     });
   }
 

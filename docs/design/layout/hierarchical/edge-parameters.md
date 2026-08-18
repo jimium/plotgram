@@ -26,12 +26,12 @@ yFiles 的 8 个 Edges 参数，我们**按写权归位**后没有一个需要�
 | dummy 链正交 Ink（中点双折点 jog） | `ink/route.rs` | 回边、跨层边共用同一展开；无走廊概念 |
 | FAS 反转 + 回边走廊侧别（G3） | `compose/cycle.rs` / `ports.rs` | 回边「能画」，但走 rank 方向、折点无界 |
 | 自环 | `ink/selfloop.rs` | 已支持 |
-| `Edge.weight` 结构字段（`Option<f64>`；`critical: true` 糖 = `2.0`） | `plotgram-model/graph.rs` | 作者边权重（关键路径偏好） |
+| `Edge.weight` 结构字段（`Option<f64>`；`critical: true` 糖 = `2.0`） | `tautcore-model/graph.rs` | 作者边权重（关键路径偏好） |
 | 布局 `auto_edge_grouping` | `HierarchicalParams` | **自动**同源/同汇合流（§2.3）；无边级 `edge_group` |
 | `HierarchicalLayoutData.edge { min_span?, weight?, priority? }` | architecture.md §9.2 | weight 已落地（`Edge.weight` → `RealEdge.weight: f64`，P3/P4 消费）；min length 仍待 DemandBoard |
 | DemandBoard | architecture.md §3.3 | 目标协议、代码未立——层间距 demand 回写的唯一合法通道 |
 | Channel / track / rip-up | roadmap D₁ | 未实现——segment 约束、bus 干线、边优先级抢占都依赖它 |
-| diagram 级 `edge_routing:` 独立 EdgeRouter | `plotgram-router` | 五路由器齐备；与内建 `routing_style` **正交**（architecture.md §5.3） |
+| diagram 级 `edge_routing:` 独立 EdgeRouter | `tautcore-router` | 五路由器齐备；与内建 `routing_style` **正交**（architecture.md §5.3） |
 
 ---
 
@@ -218,7 +218,7 @@ orthogonal 几何零变化；`octilinear` 仍硬失败（明示后置）。
 - **Ink**：`[shared_port, (shared_x, bus_y), (target_x, bus_y), target]`。
 - **无效组合**：`auto_edge_grouping=true` × `routing_style=octilinear`；
   键 `cluster_pitch` / `edge_grouping` / `edge_group` 硬失败。
-- **验收落地**：`fan/auto_edge_grouping.pgm`、`flat/smoke.fan-out-four.pgm`；
+- **验收落地**：`fan/auto_edge_grouping.taut`、`flat/smoke.fan-out-four.taut`；
   集成测试断言同源簇成员 `samples()[0]` 相等。
 
 ### 第三批 · Demand 与 Channel 前置参数

@@ -1,4 +1,4 @@
-# Plotgram Archetype 规范
+# Tautcore Archetype 规范
 
 > 版本：1.0 | 状态：现行（规范已定；实现 `planned`）  
 > 定位：**节点 archetype 展开糖**的单一真源——目录格式（CSV）、展开纪律、编译进二进制的约定。  
@@ -44,7 +44,7 @@ shape: cylinder + variant: info  （icon 见 CSV；可为空）
 5. **引擎**：不读 `archetype`，不读展开前的包名
 
 ```text
-.pgm
+.taut
   → parse
   → archetype expand     ← 本规范；写 shape / variant / icon 缺省
   → profile expand       ← 布局默认、自环、可选图种默认 shape（若节点仍无 shape）
@@ -58,7 +58,7 @@ shape: cylinder + variant: info  （icon 见 CSV；可为空）
 
 属性键：`archetype`（atom）。写法与位置糖见 dsl-spec §5.1 / §5.5。
 
-```plotgram
+```tautcore
 node db { label: "用户库", archetype: database }
 node db "用户库" database
 node db "用户库" database mysql
@@ -99,7 +99,7 @@ node gw { label: "网关", archetype: gateway, icon: none }
 ### 5.1 文件位置
 
 ```text
-crates/plotgram-model/assets/archetypes.csv
+crates/tautcore-model/assets/archetypes.csv
 ```
 
 仓库内**有且仅有一份** CSV 真源；清单以该文件为准（本文不复制全表，避免第二份真源）。
@@ -141,7 +141,7 @@ id,shape,variant,icon,note
 
 ### 6.1 产物
 
-CSV → 静态表，链入二进制（推荐放 `plotgram-model`）：
+CSV → 静态表，链入二进制（推荐放 `tautcore-model`）：
 
 ```rust
 // 示意；实现可调整
@@ -167,7 +167,7 @@ pub fn archetype_by_id(id: &str) -> Option<&'static ArchetypeDef>;
 
 ### 6.3 与 icon 资源的关系
 
-Icon 字形仍由 `plotgram-render` 内嵌 SVG 提供；archetype 只存 **icon id 字符串**。CSV 校验不得引用不存在的 id。
+Icon 字形仍由 `tautcore-render` 内嵌 SVG 提供；archetype 只存 **icon id 字符串**。CSV 校验不得引用不存在的 id。
 
 ---
 
@@ -184,7 +184,7 @@ Icon 字形仍由 `plotgram-render` 内嵌 SVG 提供；archetype 只存 **icon 
 
 ## 8. 非目标
 
-- 用户 `.pgm` 内自定义 archetype 表（可日后另议；v1 仅内置 CSV）
+- 用户 `.taut` 内自定义 archetype 表（可日后另议；v1 仅内置 CSV）
 - 按 diagram_type 分多份 CSV
 - archetype 驱动布局算法或端口
 - 在 archetype 里写 fill/stroke 等颜料字面量

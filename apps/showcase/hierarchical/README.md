@@ -17,17 +17,17 @@
 
 | 文件 | 开关 / 主题 |
 |------|-------------|
-| [`smoke.auto-edge-grouping-on.pgm`](flat/smoke.auto-edge-grouping-on.pgm) | `auto_edge_grouping: true` |
-| [`smoke.auto-edge-grouping-off.pgm`](flat/smoke.auto-edge-grouping-off.pgm) | 对照 off |
-| [`smoke.critical.pgm`](flat/smoke.critical.pgm) | `critical` 边 |
-| [`smoke.self-loop.pgm`](flat/smoke.self-loop.pgm) | 真自环 `a → a` |
-| [`smoke.multi-rank-backedge.pgm`](flat/smoke.multi-rank-backedge.pgm) | 多 rank 回边 |
+| [`smoke.auto-edge-grouping-on.taut`](flat/smoke.auto-edge-grouping-on.taut) | `auto_edge_grouping: true` |
+| [`smoke.auto-edge-grouping-off.taut`](flat/smoke.auto-edge-grouping-off.taut) | 对照 off |
+| [`smoke.critical.taut`](flat/smoke.critical.taut) | `critical` 边 |
+| [`smoke.self-loop.taut`](flat/smoke.self-loop.taut) | 真自环 `a → a` |
+| [`smoke.multi-rank-backedge.taut`](flat/smoke.multi-rank-backedge.taut) | 多 rank 回边 |
 
 ### `fan/` 开关对照
 
 | 文件 | 开关 | 观感 |
 |------|------|------|
-| [`auto_edge_grouping.pgm`](fan/auto_edge_grouping.pgm) | `auto_edge_grouping: true` | 端总线 SharedPort→Trunk→Bus→Stub |
-| [`critical.pgm`](fan/critical.pgm) | `critical` 边 | 关键路径权重 |
+| [`auto_edge_grouping.taut`](fan/auto_edge_grouping.taut) | `auto_edge_grouping: true` | 端总线 SharedPort→Trunk→Bus→Stub |
+| [`critical.taut`](fan/critical.taut) | `critical` 边 | 关键路径权重 |
 
-> 曾误引入的 `bus_routing` / `demo.bus_routing*.pgm` 已删除：对应的是 yFiles Layout Styles **demo** 面板名，不是 Hier API。
+> 曾误引入的 `bus_routing` / `demo.bus_routing*.taut` 已删除：对应的是 yFiles Layout Styles **demo** 面板名，不是 Hier API。

@@ -2,7 +2,7 @@
 
 > 状态：MVP 已落地
 > 注册名：`polyline`
-> 代码：`crates/plotgram-router/src/polyline.rs`
+> 代码：`crates/tautcore-router/src/polyline.rs`
 > 约束：[写权纪律](../../layout/write-authority.md) · [routing README](../README.md) · [ADR-006](../../adr/006-engine-io-and-crates.md)
 
 任意角折线避障路由：节点与端口冻结后，在障碍间隙中求可见性最短折线。独立于布局核，可手写 `RouteScene` 夹具开发。

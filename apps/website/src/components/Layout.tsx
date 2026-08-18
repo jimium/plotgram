@@ -26,7 +26,7 @@ export default function Layout() {
         <div className="container nav-inner">
           <Link to="/" className="nav-brand">
             <BrandIcon />
-            <span className="nav-brand-name">Plotgram</span>
+            <span className="nav-brand-name">Tautcore</span>
           </Link>
           <div className="nav-links">
             {NAV_ITEMS.map((item) => (
@@ -62,7 +62,7 @@ export default function Layout() {
         <div className="container footer-inner">
           <div className="footer-brand">
             <BrandIcon size={22} />
-            <span>Plotgram</span>
+            <span>Tautcore</span>
           </div>
           <div className="footer-links">
             <a href="/editor/" target="_blank" rel="noopener noreferrer">Editor</a>

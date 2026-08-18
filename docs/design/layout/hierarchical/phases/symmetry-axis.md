@@ -1,8 +1,8 @@
 # Hierarchical · 次轴对称（目标函数）
 
 > 父页：[architecture](../architecture.md) §5 · 视觉裁定：[expectations §6.1](../expectations.md)  
-> 上游：BK ideal（[`metric/bk.rs`](../../../../crates/plotgram-layout/src/layout/hierarchical/metric/bk.rs)）  
-> 下游：无 — 本写者即次轴终局（[`metric/cross_axis.rs`](../../../../crates/plotgram-layout/src/layout/hierarchical/metric/cross_axis.rs) → [`symmetry_objective.rs`](../../../../crates/plotgram-layout/src/layout/hierarchical/metric/symmetry_objective.rs)）  
+> 上游：BK ideal（[`metric/bk.rs`](../../../../crates/tautcore-layout/src/layout/hierarchical/metric/bk.rs)）  
+> 下游：无 — 本写者即次轴终局（[`metric/cross_axis.rs`](../../../../crates/tautcore-layout/src/layout/hierarchical/metric/cross_axis.rs) → [`symmetry_objective.rs`](../../../../crates/tautcore-layout/src/layout/hierarchical/metric/symmetry_objective.rs)）  
 > 状态：**P4 已落地**（声明表删除；组边界细则仍后续）
 
 ## 1. 要解决什么
@@ -81,7 +81,7 @@ boost / φ / ψ（twin 与 chain_end 仍优先）:
 边权基：`real–real=1` / `real–virt=2` / `virt–virt=8`（作者 `weight` 乘基；`critical: true` 糖 = `2.0`）。  
 `center_h`：**扇出**为孩子的 mass 加权重心（质量全相等则回退中位，保 D3）；**纯扇入**仍是父母等权中位。1:1 茎上的扇出 hub 不进 `λ_sym`。
 
-**邻接真源**：`RealGraph` **正向** real 端点（长边一跳；**reversed 不计扇**）。辅助谓词仍在 [`metric/symmetry.rs`](../../../../crates/plotgram-layout/src/layout/hierarchical/metric/symmetry.rs)（`forward_real_adjacency` / `descendant_mass` / `twin_plan_pairs` / `fan_pitch` / `slot_multipliers`）。
+**邻接真源**：`RealGraph` **正向** real 端点（长边一跳；**reversed 不计扇**）。辅助谓词仍在 [`metric/symmetry.rs`](../../../../crates/tautcore-layout/src/layout/hierarchical/metric/symmetry.rs)（`forward_real_adjacency` / `descendant_mass` / `twin_plan_pairs` / `fan_pitch` / `slot_multipliers`）。
 
 ## 4. 终局 snap（展开，非新自由度）
 

@@ -26,39 +26,39 @@
 
 ```
 path	groups	edges	distorted	distorted_eids	class	note
-showcase/architecture/product.three-tier.pgm	0	4	0		no_groups	no groups → repair N/A
-showcase/architecture/product.typical-microservice-architecture.pgm	0	16	0		no_groups	no groups → repair N/A
-showcase/architecture/product.flat-rest-api.pgm	0	7	0		no_groups	no groups → repair N/A
-showcase/architecture/product.microservices.pgm	2	8	0		clean	groups present, no dogleg
-showcase/architecture/product.cdn-cache.pgm	2	9	0		clean	groups present, no dogleg
-showcase/architecture/product.cloud-native.pgm	6	14	0		clean	groups present, no dogleg
-showcase/architecture/product.ecommerce-platform.pgm	5	19	0		clean	groups present, no dogleg
-showcase/architecture/product.message-queue-pipeline.pgm	4	7	0		clean	groups present, no dogleg
-showcase/architecture/product.monitoring-stack.pgm	3	6	0		clean	groups present, no dogleg
-showcase/architecture/product.narrow-corridor.pgm	3	5	0		clean	groups present, no dogleg
-showcase/flowchart/product.linear-chain.pgm	0	2	0		no_groups	no groups → repair N/A
-showcase/flowchart/product.user-auth.pgm	0	8	0		no_groups	no groups → repair N/A
-showcase/flowchart/product.refund-process.pgm	0	11	0		no_groups	no groups → repair N/A
-showcase/flowchart/product.swimlane-order-process.pgm	4	7	0		clean	groups present, no dogleg
-showcase/flowchart/product.password-reset.pgm	0	11	0		no_groups	no groups → repair N/A
-showcase/flowchart/product.leave-approval-process.pgm	0	11	0		no_groups	no groups → repair N/A
-showcase/flowchart/product.self-loop-retry.pgm	0	8	0		no_groups	no groups → repair N/A
-showcase/flowchart/product.symmetric-fanout.pgm	0	7	0		no_groups	no groups → repair N/A
+showcase/architecture/product.three-tier.taut	0	4	0		no_groups	no groups → repair N/A
+showcase/architecture/product.typical-microservice-architecture.taut	0	16	0		no_groups	no groups → repair N/A
+showcase/architecture/product.flat-rest-api.taut	0	7	0		no_groups	no groups → repair N/A
+showcase/architecture/product.microservices.taut	2	8	0		clean	groups present, no dogleg
+showcase/architecture/product.cdn-cache.taut	2	9	0		clean	groups present, no dogleg
+showcase/architecture/product.cloud-native.taut	6	14	0		clean	groups present, no dogleg
+showcase/architecture/product.ecommerce-platform.taut	5	19	0		clean	groups present, no dogleg
+showcase/architecture/product.message-queue-pipeline.taut	4	7	0		clean	groups present, no dogleg
+showcase/architecture/product.monitoring-stack.taut	3	6	0		clean	groups present, no dogleg
+showcase/architecture/product.narrow-corridor.taut	3	5	0		clean	groups present, no dogleg
+showcase/flowchart/product.linear-chain.taut	0	2	0		no_groups	no groups → repair N/A
+showcase/flowchart/product.user-auth.taut	0	8	0		no_groups	no groups → repair N/A
+showcase/flowchart/product.refund-process.taut	0	11	0		no_groups	no groups → repair N/A
+showcase/flowchart/product.swimlane-order-process.taut	4	7	0		clean	groups present, no dogleg
+showcase/flowchart/product.password-reset.taut	0	11	0		no_groups	no groups → repair N/A
+showcase/flowchart/product.leave-approval-process.taut	0	11	0		no_groups	no groups → repair N/A
+showcase/flowchart/product.self-loop-retry.taut	0	8	0		no_groups	no groups → repair N/A
+showcase/flowchart/product.symmetric-fanout.taut	0	7	0		no_groups	no groups → repair N/A
 ```
 
 ### stress Hier（删前快照）
 
 ```
-showcase/architecture/stress.layout-stress-nested.pgm	5	13	0		clean
-showcase/architecture/stress.layout-stress-flat-mesh.pgm	0	20	0		no_groups
-showcase/flowchart/stress.layout-stress-dag.pgm	0	18	0		no_groups
-showcase/flowchart/stress.layout-stress-yfiles-pipeline.pgm	0	31	0		no_groups
+showcase/architecture/stress.layout-stress-nested.taut	5	13	0		clean
+showcase/architecture/stress.layout-stress-flat-mesh.taut	0	20	0		no_groups
+showcase/flowchart/stress.layout-stress-dag.taut	0	18	0		no_groups
+showcase/flowchart/stress.layout-stress-yfiles-pipeline.taut	0	31	0		no_groups
 ```
 
 ## 复现
 
 ```bash
-cargo run -p plotgram-eval --bin atlas_repair_baseline -- benchmarks/sets/product-regression-set.txt
-cargo run -p plotgram-eval --bin atlas_repair_baseline -- benchmarks/sets/stress-probe-set.txt
+cargo run -p tautcore-eval --bin atlas_repair_baseline -- benchmarks/sets/product-regression-set.txt
+cargo run -p tautcore-eval --bin atlas_repair_baseline -- benchmarks/sets/stress-probe-set.txt
 # 删后 hints.atlas_plan_distorted_edges 恒空；探针仍可用于回归观测
 ```

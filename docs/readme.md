@@ -1,4 +1,4 @@
-# Plotgram 文档中心
+# Tautcore 文档中心
 
 项目级文档索引。
 
@@ -27,37 +27,37 @@ docs/
 
 | Crate | 路径 | 职责 |
 |-------|------|------|
-| **plotgram-model** | `crates/plotgram-model` | 纯数据：Graph / Contract / Result / Port / Profile |
-| **plotgram-content** | `crates/plotgram-content` | 框内瘦 MD：parse → measure → SVG 片段 |
-| **plotgram-parse** | `crates/plotgram-parse` | `.pgm` → Graph + profile 展开（骨架） |
-| **plotgram-compile** | `crates/plotgram-compile` | 构建：parse → measure → engine → render |
-| **plotgram-engine-api** | `crates/plotgram-engine-api` | `LayoutAlgorithm` / `EdgeRouter` Trait（无算法） |
-| **plotgram-algo** | `crates/plotgram-algo` | 共享 GD 零件（VPSC / FAS / …）；见 [PARTS.md](../crates/plotgram-algo/PARTS.md) |
-| **plotgram-engine** | `crates/plotgram-engine` | `run` + 注册表；内含 layout/route **模块**（消费 algo） |
-| **plotgram-render** | `crates/plotgram-render` | SVG / ASCII 出图 + theme |
-| **plotgram-cli** | `crates/plotgram-cli` | 薄 CLI：参数与文件 I/O |
+| **tautcore-model** | `crates/tautcore-model` | 纯数据：Graph / Contract / Result / Port / Profile |
+| **tautcore-content** | `crates/tautcore-content` | 框内瘦 MD：parse → measure → SVG 片段 |
+| **tautcore-parse** | `crates/tautcore-parse` | `.taut` → Graph + profile 展开（骨架） |
+| **tautcore-compile** | `crates/tautcore-compile` | 构建：parse → measure → engine → render |
+| **tautcore-engine-api** | `crates/tautcore-engine-api` | `LayoutAlgorithm` / `EdgeRouter` Trait（无算法） |
+| **tautcore-algo** | `crates/tautcore-algo` | 共享 GD 零件（VPSC / FAS / …）；见 [PARTS.md](../crates/tautcore-algo/PARTS.md) |
+| **tautcore-engine** | `crates/tautcore-engine` | `run` + 注册表；内含 layout/route **模块**（消费 algo） |
+| **tautcore-render** | `crates/tautcore-render` | SVG / ASCII 出图 + theme |
+| **tautcore-cli** | `crates/tautcore-cli` | 薄 CLI：参数与文件 I/O |
 
-### `plotgram-engine` 内模块（可后拆 crate）
+### `tautcore-engine` 内模块（可后拆 crate）
 
 | 模块 | 将来可抽为 | 职责 |
 |------|------------|------|
-| `layout/hierarchical` | `plotgram-layout-hierarchical` | Hier + 内建正交 Ink |
-| `route/core` | `plotgram-route-core` | 正交无策略原语 |
-| `route/orthogonal` | `plotgram-route-orthogonal` | 独立 EdgeRouter |
+| `layout/hierarchical` | `tautcore-layout-hierarchical` | Hier + 内建正交 Ink |
+| `route/core` | `tautcore-route-core` | 正交无策略原语 |
+| `route/orthogonal` | `tautcore-route-orthogonal` | 独立 EdgeRouter |
 
 ### 依赖关系
 
 ```mermaid
 flowchart BT
-  model[plotgram-model]
-  api[plotgram-engine-api]
-  algo[plotgram-algo]
-  content[plotgram-content]
-  parse[plotgram-parse]
-  engine[plotgram-engine]
-  render[plotgram-render]
-  compile[plotgram-compile]
-  cli[plotgram-cli]
+  model[tautcore-model]
+  api[tautcore-engine-api]
+  algo[tautcore-algo]
+  content[tautcore-content]
+  parse[tautcore-parse]
+  engine[tautcore-engine]
+  render[tautcore-render]
+  compile[tautcore-compile]
+  cli[tautcore-cli]
 
   api --> model
   content --> model
@@ -90,7 +90,7 @@ render         → model
 管线方向（数据流，与上图依赖相反）：
 
 ```text
-.pgm → parse → compile(measure/content) → engine::run → render → SVG
+.taut → parse → compile(measure/content) → engine::run → render → SVG
          ↑                                      ↑
        model                              engine-api Traits
 ```
@@ -107,7 +107,7 @@ render         → model
 | [layout/write-authority.md](design/layout/write-authority.md) | 布局写权纪律 — 单写者、落笔零新决策、判断句 |
 | [layout/hierarchical/from-yfiles-reference.md](design/layout/hierarchical/from-yfiles-reference.md) | yFiles 参考文库启发 — Hier 构造与 v1 Atlas 迁移 |
 | [notes/](design/notes/README.md) | 设计笔记 — 短纪要（如 v1 求解器 vs VPSC） |
-| [model-boundary.md](design/model-boundary.md) | plotgram-model 边界 — Graph / 端口 / 边组 / 时序边序 |
+| [model-boundary.md](design/model-boundary.md) | tautcore-model 边界 — Graph / 端口 / 边组 / 时序边序 |
 | [adr/001…](design/adr/001-diagram-type-not-in-engine.md) | profile / 图种不进引擎；DSL 用 `profile:` 属性 |
 | [adr/002…](design/adr/002-no-config-block-freeform-options.md) | 废除 config 块 |
 | [adr/003…](design/adr/003-edge-structural-fields.md) | Edge 结构一等字段与时序边序 |
@@ -155,7 +155,7 @@ render         → model
 
 | 编号 | 主题 | 对应源码 | 页面 |
 |------|------|----------|------|
-| 001 | EdgeRouter trait 与 RouteScene 生态 | `crates/plotgram-engine-api/src/traits.rs` L54-62 | [edge-router-trait.html](explainers/001-edge-router-trait.html) |
+| 001 | EdgeRouter trait 与 RouteScene 生态 | `crates/tautcore-engine-api/src/traits.rs` L54-62 | [edge-router-trait.html](explainers/001-edge-router-trait.html) |
 
 ---
 
@@ -179,7 +179,7 @@ render         → model
 | [yFiles-layouts-and-routing.md](reference/yFiles-layouts-and-routing.md) | yFiles 布局算法与路由风格（[HTML 版](reference/yFiles-layouts-and-routing.html)） |
 | **[yfiles/](reference/yfiles/00-索引与阅读指南.md)** | **算法级参考文库（22 篇）**：分层/正交/路由/力导向/树/标签/约束/分组/架构/行业/度量/论文书目/路线图/零件库/落笔层/性能/动画/超图/序列图/参数映射/[术语表](reference/yfiles/21-术语表.md) |
 | [graphviz-algorithms-research.md](reference/graphviz-algorithms-research.md) | Graphviz 核心算法研究与 Rust 实现路线 |
-| [cytoscape-js-research.md](reference/cytoscape-js-research.md) | Cytoscape.js 能力研究与 Plotgram 取舍 |
+| [cytoscape-js-research.md](reference/cytoscape-js-research.md) | Cytoscape.js 能力研究与 Tautcore 取舍 |
 
 ---
 
@@ -198,7 +198,7 @@ render         → model
 
 | 位置 | 范围 |
 |------|------|
-| [studio/docs/](../studio/docs/README.md) | Plotgram Studio 前端 |
+| [studio/docs/](../studio/docs/README.md) | Tautcore Studio 前端 |
 | [showcase/README.md](../showcase/README.md) | 示例图集 |
 | [playground/README.md](../playground/README.md) | Playground 编辑器 |
 

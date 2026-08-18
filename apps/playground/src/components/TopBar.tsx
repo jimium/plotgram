@@ -160,7 +160,7 @@ export function TopBar({
     <header className="topbar">
       <div className="topbar-left">
         <div className="brand">
-          <img className="brand-logo" src={withBase(theme === 'dark' ? 'logo-dark.svg' : 'logo.svg')} alt="Plotgram" />
+          <img className="brand-logo" src={withBase(theme === 'dark' ? 'logo-dark.svg' : 'logo.svg')} alt="Tautcore" />
           <span className="brand-subtitle">Editor</span>
         </div>
 
@@ -182,7 +182,7 @@ export function TopBar({
               </button>
               <button type="button" onClick={() => runFileAction(onOpenFile)}>
                 <IconFolderOpen size={14} />
-                <span>打开 .pgm…</span>
+                <span>打开 .taut…</span>
               </button>
               <button type="button" onClick={() => runFileAction(onSaveFile)}>
                 <IconSave size={14} />
@@ -219,7 +219,7 @@ export function TopBar({
       </div>
 
       <div className="topbar-right">
-        <a href="/" className="btn btn-ghost" title="返回 Plotgram 主站">
+        <a href="/" className="btn btn-ghost" title="返回 Tautcore 主站">
           <span>主站</span>
         </a>
 

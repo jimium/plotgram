@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** Agent 中转 API 端点，默认走 Vite proxy 到本地 plotgram-server */
+  /** Agent 中转 API 端点，默认走 Vite proxy 到本地 tautcore-server */
   readonly VITE_AGENT_API?: string;
   /** 部署子路径，如 /agent/ */
   readonly VITE_BASE_PATH?: string;

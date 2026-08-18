@@ -1,4 +1,4 @@
-# Plotgram 内容块 MD 子集规范
+# Tautcore 内容块 MD 子集规范
 
 > 版本：0.1-draft  
 > 状态：现行（随 [ADR-005](../design/adr/005-content-measure-params.md) accepted）  

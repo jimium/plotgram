@@ -26,12 +26,12 @@ import {
   type AppearanceOptions,
 } from '@lib/themes';
 import { downloadSvg, downloadPng, openInDrawio, copyText } from '@lib/exportImage';
-import type { PlotgramWasm } from '@lib/wasm';
+import type { TautcoreWasm } from '@lib/wasm';
 
 interface PreviewCanvasProps {
   svg: string;
   source: string;
-  wasm: PlotgramWasm | null;
+  wasm: TautcoreWasm | null;
   ready: boolean;
   isAgentRunning: boolean;
   onRerenderTheme: (optionsJson: string) => void;

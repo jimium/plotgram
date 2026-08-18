@@ -9,18 +9,18 @@ const sidebar = DOCS_SIDEBAR.map((section) => ({
   })),
 }));
 
-const curlCode = `curl -X POST https://api.plotgram.com/v1/render \\
+const curlCode = `curl -X POST https://api.tautcore.com/v1/render \\
   -H "Content-Type: application/json" \\
   -d '{
     "source": "diagram flowchart { title: \\"示例\\" entity[a] start \\"开始\\" entity[b] end \\"结束\\" a -> b }",
     "options": { "theme": "clean-light" }
   }'`;
 
-const wasmCode = `import init, { render } from './plotgram_wasm.js';
+const wasmCode = `import init, { render } from './tautcore_wasm.js';
 await init();
 const svg = render(source, { theme: 'clean-light' });`;
 
-const systemPromptCode = `你是一个图表生成助手。你必须使用 Plotgram 语法输出图表代码。
+const systemPromptCode = `你是一个图表生成助手。你必须使用 Tautcore 语法输出图表代码。
 
 ## 语法规则（严格遵守）
 1. 始终以 diagram 开头声明图表类型：diagram flowchart { ... }
@@ -34,8 +34,8 @@ const systemPromptCode = `你是一个图表生成助手。你必须使用 Plotg
 6. 用语义角色命名实体类型：start, end, process, decision, database, service, gateway, user, browser, cache, server, client, api, auth
 
 ## 输出要求
-- 只输出 Plotgram 代码，不要输出解释文字
-- 代码放在 \`\`\`plotgram 代码块中
+- 只输出 Tautcore 代码，不要输出解释文字
+- 代码放在 \`\`\`tautcore 代码块中
 - 不要添加任何 Markdown 格式外的内容`;
 
 const errorJsonCode = `{
@@ -109,14 +109,14 @@ export default function AgentGuide() {
   return (
     <DocPage
       title="🤖 AI Agent 集成指南"
-      description="把 Plotgram 嵌入你的 LLM 应用 / AI Agent，让 AI 自动生成、修改、修复图表。"
+      description="把 Tautcore 嵌入你的 LLM 应用 / AI Agent，让 AI 自动生成、修改、修复图表。"
       sidebar={sidebar}
     >
       <div className="callout info">
         <div className="callout-icon">ℹ️</div>
         <div className="callout-body">
           <strong>AI 原生设计</strong>
-          <p>Plotgram 的核心设计目标就是 AI 原生。从语法设计（极简规则、无语义歧义）到错误模型（结构化JSON含修复建议）再到操作范式（AST Diff &amp; Patch），每一处都为 Agent 工作流优化。</p>
+          <p>Tautcore 的核心设计目标就是 AI 原生。从语法设计（极简规则、无语义歧义）到错误模型（结构化JSON含修复建议）再到操作范式（AST Diff &amp; Patch），每一处都为 Agent 工作流优化。</p>
         </div>
       </div>
 
@@ -134,7 +134,7 @@ export default function AgentGuide() {
           <tr>
             <th>对比维度</th>
             <th>Mermaid</th>
-            <th>Plotgram</th>
+            <th>Tautcore</th>
           </tr>
         </thead>
         <tbody>
@@ -167,7 +167,7 @@ export default function AgentGuide() {
       </table>
 
       <h2>快速集成：三行代码调用 API</h2>
-      <p>Plotgram 提供 HTTP API 和 WASM 两种集成方式，你可以根据部署场景选择：HTTP API 适合服务端渲染，WASM 适合浏览器端零延迟渲染。</p>
+      <p>Tautcore 提供 HTTP API 和 WASM 两种集成方式，你可以根据部署场景选择：HTTP API 适合服务端渲染，WASM 适合浏览器端零延迟渲染。</p>
 
       <h3>HTTP API 渲染（curl 示例）</h3>
       <CodeBlock code={curlCode} language="bash" title="curl" />
@@ -214,7 +214,7 @@ export default function AgentGuide() {
       </div>
 
       <h2>结构化错误处理与自修复</h2>
-      <p>Plotgram 的 validate API 返回结构化的 JSON 错误对象，包含错误位置、上下文和修复建议，让 Agent 可以精确地进行自我修复，而不需要重新生成全部内容。</p>
+      <p>Tautcore 的 validate API 返回结构化的 JSON 错误对象，包含错误位置、上下文和修复建议，让 Agent 可以精确地进行自我修复，而不需要重新生成全部内容。</p>
       <p>每个错误对象包含以下字段：</p>
       <ul>
         <li><code>code</code>：错误码，便于程序判断错误类型</li>
@@ -232,7 +232,7 @@ export default function AgentGuide() {
           <div className="step-number">1</div>
           <div className="step-body">
             <h3>首次生成</h3>
-            <p>构造 System Prompt + 用户自然语言描述，调用 LLM 生成 Plotgram 源码。</p>
+            <p>构造 System Prompt + 用户自然语言描述，调用 LLM 生成 Tautcore 源码。</p>
           </div>
         </div>
         <div className="step">
@@ -261,7 +261,7 @@ export default function AgentGuide() {
       </div>
 
       <h2>AST Diff &amp; Patch：增量修改</h2>
-      <p>当用户需要对已有图表进行小修改时（如改标签、加节点、换箭头），重新生成整张图既浪费 token 又容易引入新错误。Plotgram 提供 Patch API，支持原子化的增量修改。</p>
+      <p>当用户需要对已有图表进行小修改时（如改标签、加节点、换箭头），重新生成整张图既浪费 token 又容易引入新错误。Tautcore 提供 Patch API，支持原子化的增量修改。</p>
       <p>例如用户说："把数据库改成 PostgreSQL 语义，并加上 Redis 缓存层"，Agent 不需要重新生成整个图表，只需要发送一组 Patch 操作：</p>
 
       <CodeBlock code={patchJsonCode} language="json" title="patch-request.json" />
@@ -279,7 +279,7 @@ export default function AgentGuide() {
       <ol>
         <li>接收用户自然语言描述</li>
         <li>构造 System Prompt + 用户描述 + Few-shot 示例</li>
-        <li>调用 LLM 生成 Plotgram 源码</li>
+        <li>调用 LLM 生成 Tautcore 源码</li>
         <li>调用 validate API 检查语法</li>
         <li>如有错误，将错误信息（含 suggestion）加入上下文重试（最多2次）</li>
         <li>调用 render API 生成 SVG</li>
@@ -291,7 +291,7 @@ export default function AgentGuide() {
         <a href="/docs/getting-started/" className="quick-link-card">
           <div className="ql-icon">🚀</div>
           <h4>快速上手</h4>
-          <p>5 分钟学会 Plotgram 基础语法</p>
+          <p>5 分钟学会 Tautcore 基础语法</p>
           <span className="ql-arrow">→</span>
         </a>
         <a href="/docs/how-it-works/" className="quick-link-card">

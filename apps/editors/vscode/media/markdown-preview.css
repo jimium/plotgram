@@ -1,14 +1,14 @@
-.plotgram-markdown-diagram {
+.tautcore-markdown-diagram {
   margin: 12px 0;
   overflow-x: auto;
 }
 
-.plotgram-markdown-diagram svg {
+.tautcore-markdown-diagram svg {
   max-width: 100%;
   height: auto;
 }
 
-.plotgram-markdown-error {
+.tautcore-markdown-error {
   color: var(--vscode-editorError-foreground, #f48771);
   white-space: pre-wrap;
   margin: 0;

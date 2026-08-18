@@ -1,0 +1,11 @@
+[package]
+name = "tautcore-engine-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Tautcore layout/routing plugin traits (no algorithms)"
+
+[dependencies]
+tautcore-model = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

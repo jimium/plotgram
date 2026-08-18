@@ -305,7 +305,7 @@ fn cost(c: &amp;Candidate, idx: &amp;SpatialIndex) -&gt; f64 {
         <p><strong>yFiles 的实际做法接近 B + A</strong>：布局算法接受 <code>LabelLayoutData</code>（含 preferred placement），内部为标签预留空间，最后可再跑 <code>GenericLabeling</code> 精修未固定的标签。</p>
 
         <div class="callout good">
-          <div class="ct-title"><span class="icon">✓</span>plotgram 建议：直接做 B</div>
+          <div class="ct-title"><span class="icon">✓</span>tautcore 建议：直接做 B</div>
           <ol>
             <li>测量相（measure）计算所有标签尺寸（含字体度量、换行）；</li>
             <li>分层布局：边标签 → label dummy 节点；节点外部标签 → 计入节点的“有效包围盒”；</li>

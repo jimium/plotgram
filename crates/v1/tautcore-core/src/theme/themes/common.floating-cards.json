@@ -1,0 +1,68 @@
+{
+  "version": "0.2",
+  "id": "common.floating-cards",
+  "name": "Floating Cards",
+  "meta": {
+    "author": "Tautcore",
+    "description": "浮岛白卡：压暗画布，白卡 group 浮起。适合 playground / 全屏查看器；嵌入灰白文档时会显灰盘子",
+    "tags": [
+      "light",
+      "clean",
+      "floating-cards",
+      "fullscreen",
+      "modern"
+    ]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#E2E2E6",
+      "neutral_fill": "#FFFFFF",
+      "neutral_stroke": "#C9C9C9",
+      "edge_stroke": "#A8A8B0",
+      "group_fill": "#FFFFFF",
+      "group_stroke": "#C4C4CB",
+      "border_strong": "#C4C4CB"
+    }
+  },
+  "defaults": {
+    "group": {
+      "fill": "{colors.group_fill}",
+      "stroke": "{colors.group_stroke}",
+      "stroke_width": 1.25,
+      "stroke_dasharray": "none"
+    }
+  },
+  "diagrams": {
+    "flowchart": {
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "#FFFFFF", "stroke": "#C4C4CB", "stroke_width": 1.25, "border_radius": 10.0, "stroke_dasharray": "none" },
+            { "fill": "#F7F7F8", "stroke": "#D4D4D8", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#EFEFF1", "stroke": "#D8D8DE", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#E8E8EC", "stroke": "#D8D8DE", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" }
+          ]
+        }
+      }
+    },
+    "architecture": {
+      "group": {
+        "fill": "{colors.group_fill}",
+        "stroke": "{colors.group_stroke}",
+        "stroke_width": 1.25,
+        "stroke_dasharray": "none"
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "#FFFFFF", "stroke": "#C4C4CB", "stroke_width": 1.25, "border_radius": 10.0, "stroke_dasharray": "none" },
+            { "fill": "#F7F7F8", "stroke": "#D4D4D8", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#EFEFF1", "stroke": "#D8D8DE", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#E8E8EC", "stroke": "#D8D8DE", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" }
+          ]
+        }
+      }
+    }
+  }
+}

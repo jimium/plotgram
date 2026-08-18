@@ -418,7 +418,7 @@ detect_cycles: 无弦环 → 排成正多边形</code></pre>
         </ul>
 
         <!-- ============ §8 ============ -->
-        <h2 id="sec-9"><span class="h2-num">8</span>plotgram 落地建议</h2>
+        <h2 id="sec-9"><span class="h2-num">8</span>tautcore 落地建议</h2>
 
         <ol>
           <li><strong>只实现一条 organic 主线</strong>：<code>PivotMDS 初始化 → SGD stress（sparse pairs）→ PRISM 消重叠 → 装箱</code>。全链确定性可控、无退火调参、代码量可控。</li>
@@ -430,7 +430,7 @@ detect_cycles: 无弦环 → 排成正多边形</code></pre>
 
         <div class="callout good">
           <div class="ct-title"><span class="icon">✓</span>一句话收敛</div>
-          <p>plotgram 的 organic 主线 = <strong>PivotMDS → SGD stress → PRISM → 装箱</strong>，全程确定性、无退火、可测试。交互式场景另起 ForceAtlas2 + BH + local speed 模拟器，与静态布局共用坐标模型。</p>
+          <p>tautcore 的 organic 主线 = <strong>PivotMDS → SGD stress → PRISM → 装箱</strong>，全程确定性、无退火、可测试。交互式场景另起 ForceAtlas2 + BH + local speed 模拟器，与静态布局共用坐标模型。</p>
         </div>
 
       </div>

@@ -107,7 +107,7 @@ run_step() {
 
 # ─── 主流程 ─────────────────────────────────────────────
 main() {
-  log "=== 全量发布 Plotgram ==="
+  log "=== 全量发布 Tautcore ==="
   log "  步骤: ${STEPS[*]}"
   log "  站点: $DEPLOY_HOST ($REMOTE_DIR)"
   log "  CDN:  $ASSET_HOST ($ASSET_REMOTE_DIR)"

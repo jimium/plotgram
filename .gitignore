@@ -20,23 +20,26 @@ Thumbs.db
 !**/src/bin/**
 
 # WASM build artifacts
-/crates/plotgram-wasm/pkg/
-/crates/plotgram-wasm/dist/
-/playground/plotgram-wasm/
+/crates/tautcore-wasm/pkg/
+/crates/tautcore-wasm/dist/
+/apps/playground/tautcore-wasm/
+/apps/website/tautcore-wasm/
+/apps/agent-demo/tautcore-wasm/
+/apps/studio/tautcore-wasm/
 
 # Website build artifacts
-/website/node_modules/
-/website/dist/
+/apps/website/node_modules/
+/apps/website/dist/
 
 # Playground dependencies
-/playground/node_modules/
+/apps/playground/node_modules/
 
 # VS Code extension
-/editors/vscode/node_modules/
-/editors/vscode/out/
-/editors/vscode/*.vsix
-/editors/vscode/media/wasm/
-/editors/vscode/media/node/
+/apps/editors/vscode/node_modules/
+/apps/editors/vscode/out/
+/apps/editors/vscode/*.vsix
+/apps/editors/vscode/media/wasm/
+/apps/editors/vscode/media/node/
 
 # Environment
 .env

@@ -1,0 +1,41 @@
+---
+source: crates/tautcore-layout/src/layout/hierarchical/strong_macro/mod.rs
+expression: frames
+---
+[
+  {
+    "h": 32.0,
+    "id": "web",
+    "w": 80.0,
+    "x": 0.0,
+    "y": 0.0
+  },
+  {
+    "h": 32.0,
+    "id": "lb",
+    "w": 80.0,
+    "x": 0.0,
+    "y": 72.0
+  },
+  {
+    "h": 32.0,
+    "id": "api",
+    "w": 80.0,
+    "x": 0.0,
+    "y": 184.0
+  },
+  {
+    "h": 32.0,
+    "id": "biz",
+    "w": 80.0,
+    "x": 0.0,
+    "y": 256.0
+  },
+  {
+    "h": 32.0,
+    "id": "db",
+    "w": 80.0,
+    "x": 0.0,
+    "y": 368.0
+  }
+]

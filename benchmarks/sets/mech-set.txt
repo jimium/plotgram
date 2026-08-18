@@ -3,8 +3,8 @@
 # 可与 product-gate 交集：机制用断言，美观用 product 指标，报告分栏。
 # 在 compare.sh 中：默认不参与质量门禁（仅正确性 + 机制断言）。
 
-# hierarchical/group-strong-macro/mech.constrain-cross-group.pgm（已转 strong-macro 基准，实现落地前不可渲染）
-hierarchical/flat/mech.constrain-flat-chain.pgm
-hierarchical/flat/mech.constrain-sink.pgm
-hierarchical/flat/product.user-auth.pgm
-hierarchical/flat/product.typical-microservice-architecture.pgm
+# hierarchical/group-strong-macro/mech.constrain-cross-group.taut（已转 strong-macro 基准，实现落地前不可渲染）
+hierarchical/flat/mech.constrain-flat-chain.taut
+hierarchical/flat/mech.constrain-sink.taut
+hierarchical/flat/product.user-auth.taut
+hierarchical/flat/product.typical-microservice-architecture.taut

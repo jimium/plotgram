@@ -1,6 +1,6 @@
 # API 文档
 
-本文档描述 Plotgram Studio 的核心 API,包括 Agent 模块、WASM 桥接层、LLM 客户端。
+本文档描述 Tautcore Studio 的核心 API,包括 Agent 模块、WASM 桥接层、LLM 客户端。
 
 ## 1. Agent 模块
 
@@ -192,7 +192,7 @@ const executors = createToolExecutors(async () => wasmModule);
 
 ## 3. Change 类型
 
-与 plotgram-core 的 `diff/types.rs` 对齐。
+与 tautcore-core 的 `diff/types.rs` 对齐。
 
 ```typescript
 interface Change {

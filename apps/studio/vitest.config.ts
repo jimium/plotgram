@@ -12,9 +12,9 @@ export default defineConfig({
       '@hooks': path.resolve(__dirname, 'src/hooks'),
       '@lib': path.resolve(__dirname, 'src/lib'),
       // 测试时用 mock 替代真实 WASM 产物
-      '../plotgram-wasm/plotgram_wasm.js': path.resolve(
+      '../tautcore-wasm/tautcore_wasm.js': path.resolve(
         __dirname,
-        'tests/mocks/plotgram-wasm.ts',
+        'tests/mocks/tautcore-wasm.ts',
       ),
     },
   },

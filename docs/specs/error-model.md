@@ -1,10 +1,10 @@
-# Plotgram 错误模型与反馈机制
+# Tautcore 错误模型与反馈机制
 
 > 版本：0.1.0 | 状态：已实现（P0–P3）
 
-本文档定义 Plotgram 的结构化错误体系。错误反馈是 Plotgram 区别于传统图表工具的核心能力之一——当 AI Agent 生成错误时，Plotgram 不只返回"出错了"，而是返回**哪里错了、为什么错了、怎么修**。
+本文档定义 Tautcore 的结构化错误体系。错误反馈是 Tautcore 区别于传统图表工具的核心能力之一——当 AI Agent 生成错误时，Tautcore 不只返回"出错了"，而是返回**哪里错了、为什么错了、怎么修**。
 
-实现位于 [`crates/plotgram-core/src/error.rs`](../../crates/plotgram-core/src/error.rs)，供 Agent / CLI / LSP 消费方参考。
+实现位于 [`crates/tautcore-core/src/error.rs`](../../crates/tautcore-core/src/error.rs)，供 Agent / CLI / LSP 消费方参考。
 
 ---
 
@@ -12,19 +12,19 @@
 
 ### 1.1 错误是一等公民
 
-传统图表工具的错误是文本字符串（甚至是空白页）。Plotgram 的错误是**结构化对象**，可以被程序解析、理解和处理。
+传统图表工具的错误是文本字符串（甚至是空白页）。Tautcore 的错误是**结构化对象**，可以被程序解析、理解和处理。
 
 ```
 传统工具: 源文本 → 渲染失败 → "Error" / 空白页
-Plotgram:   源文本 → 解析失败 → 结构化错误（JSON）→ Agent 理解 → 修复 → 重试
+Tautcore:   源文本 → 解析失败 → 结构化错误（JSON）→ Agent 理解 → 修复 → 重试
 ```
 
 ### 1.2 错误驱动的自我修正闭环
 
 ```
-AI Agent 生成 Plotgram
+AI Agent 生成 Tautcore
     ↓
-Plotgram 解析/验证
+Tautcore 解析/验证
     ↓ (失败)
 返回结构化错误列表
     ↓
@@ -192,7 +192,7 @@ pub struct DiagnosticError {
         "expected": ["->", "-->", "<->"]
     },
     "suggestion": {
-        "text": "Plotgram 只支持三种箭头：-> (主动), --> (被动), <-> (双向)。请使用 -> 替代 =>",
+        "text": "Tautcore 只支持三种箭头：-> (主动), --> (被动), <-> (双向)。请使用 -> 替代 =>",
         "fix": {
             "action": "replace_text",
             "payload": { "old": "=>", "new": "->" }
@@ -562,7 +562,7 @@ E011 的 `Suggestion.text` 会自动通过 **Levenshtein 距离**计算最相似
 - 上下文行：自动从 `context` JSON 提取 `available_entities`、`valid_values`、`referenced_entity` 等字段
 - 建议行：`建议: <suggestion.text>`
 
-`plotgram validate` 和 `plotgram render` 在 text 模式下会显示源码片段，带 `^` 指示错误位置：
+`tautcore validate` 和 `tautcore render` 在 text 模式下会显示源码片段，带 `^` 指示错误位置：
 
 ```
 ✗ E013 [line 36:5] 实体 'n9' 存在不允许的自环关系（仅 type: decision 允许自环）
@@ -575,7 +575,7 @@ E011 的 `Suggestion.text` 会自动通过 **Levenshtein 距离**计算最相似
 
 ### 4.4 CLI `--format json`
 
-`plotgram validate --format json` 输出结构化 JSON：
+`tautcore validate --format json` 输出结构化 JSON：
 
 ```json
 {
@@ -696,15 +696,15 @@ pub struct ValidationResult {
 
 ## 7. LSP 兼容映射
 
-Plotgram 错误模型与 Language Server Protocol 的 Diagnostic 规范兼容：
+Tautcore 错误模型与 Language Server Protocol 的 Diagnostic 规范兼容：
 
-| PlotgramError 字段 | LSP Diagnostic 字段 | 映射方式 |
+| TautcoreError 字段 | LSP Diagnostic 字段 | 映射方式 |
 |------------------|---------------------|----------|
 | `location` | `range` | `start.line - 1`, `start.column - 1`（LSP 从 0 开始） |
 | `severity` | `severity` | `"error"` → `1`, `"warning"` → `2` |
 | `code` | `code` | 直接映射（string） |
 | `message` | `message` | 直接映射 |
-| — | `source` | 固定为 `"plotgram"` |
+| — | `source` | 固定为 `"tautcore"` |
 
 `DiagnosticError::to_lsp()` 生成 LSP Diagnostic 协议兼容的 JSON：
 
@@ -716,7 +716,7 @@ Plotgram 错误模型与 Language Server Protocol 的 Diagnostic 规范兼容：
   },
   "severity": 1,
   "code": "E003",
-  "source": "plotgram",
+  "source": "tautcore",
   "message": "关系引用了不存在的实体 'payment_db'"
 }
 ```
@@ -727,12 +727,12 @@ Plotgram 错误模型与 Language Server Protocol 的 Diagnostic 规范兼容：
 
 ## 8. Rust 内部错误传播
 
-### 8.1 PlotgramError
+### 8.1 TautcoreError
 
-Rust 层面的 `Result<T, PlotgramError>` 传播链：
+Rust 层面的 `Result<T, TautcoreError>` 传播链：
 
 ```rust
-pub enum PlotgramError {
+pub enum TautcoreError {
     Parse(Vec<DiagnosticError>),
     Prepare(Vec<DiagnosticError>),
     Render(Vec<DiagnosticError>),
@@ -802,18 +802,18 @@ pub enum PlotgramError {
 
 | 文件 | 说明 |
 |------|------|
-| `crates/plotgram-core/src/error.rs` | ErrorCode 枚举、DiagnosticError、PlotgramError、Display、LSP |
-| `crates/plotgram-core/src/diff/types.rs` | `PatchResult.errors` → `Vec<DiagnosticError>` |
-| `crates/plotgram-core/src/diff/patch.rs` | 返回 `Result<(), DiagnosticError>`，使用 P001–P004 |
-| `crates/plotgram-core/src/dsl/parser/mod.rs` | `parse()` 始终走 fallback |
-| `crates/plotgram-core/src/pipeline/mod.rs` | 渲染错误保留原始错误码 |
-| `crates/plotgram-core/src/pipeline/prepare.rs` | `PipelineOutput` 新增 total_errors/truncated/sort |
-| `crates/plotgram-core/src/validation/mod.rs` | 验证入口与错误收集 |
-| `crates/plotgram-core/src/validation/common.rs` | self_loop 区分豁免(W003)/非豁免(E013) |
-| `crates/plotgram-core/src/validation/attrs.rs` | 使用 StylePropError 区分 E004/E016 |
-| `crates/plotgram-core/src/prepare/styles.rs` | 样式声明与选择器验证 |
-| `crates/plotgram-core/src/icons/validate.rs` | W008/W009 图标语义与名称验证 |
-| `crates/plotgram-core/src/types/style_attrs.rs` | StylePropError 枚举 |
-| `crates/plotgram-core/src/render/scene.rs` | layout 错误 → E101 |
-| `crates/plotgram-core/src/render/encode/*.rs` | 渲染错误 → E102 |
-| `crates/plotgram-cli/src/main.rs` | `--format json`、源码片段、`into_diagnostics` |
+| `crates/tautcore-core/src/error.rs` | ErrorCode 枚举、DiagnosticError、TautcoreError、Display、LSP |
+| `crates/tautcore-core/src/diff/types.rs` | `PatchResult.errors` → `Vec<DiagnosticError>` |
+| `crates/tautcore-core/src/diff/patch.rs` | 返回 `Result<(), DiagnosticError>`，使用 P001–P004 |
+| `crates/tautcore-core/src/dsl/parser/mod.rs` | `parse()` 始终走 fallback |
+| `crates/tautcore-core/src/pipeline/mod.rs` | 渲染错误保留原始错误码 |
+| `crates/tautcore-core/src/pipeline/prepare.rs` | `PipelineOutput` 新增 total_errors/truncated/sort |
+| `crates/tautcore-core/src/validation/mod.rs` | 验证入口与错误收集 |
+| `crates/tautcore-core/src/validation/common.rs` | self_loop 区分豁免(W003)/非豁免(E013) |
+| `crates/tautcore-core/src/validation/attrs.rs` | 使用 StylePropError 区分 E004/E016 |
+| `crates/tautcore-core/src/prepare/styles.rs` | 样式声明与选择器验证 |
+| `crates/tautcore-core/src/icons/validate.rs` | W008/W009 图标语义与名称验证 |
+| `crates/tautcore-core/src/types/style_attrs.rs` | StylePropError 枚举 |
+| `crates/tautcore-core/src/render/scene.rs` | layout 错误 → E101 |
+| `crates/tautcore-core/src/render/encode/*.rs` | 渲染错误 → E102 |
+| `crates/tautcore-cli/src/main.rs` | `--format json`、源码片段、`into_diagnostics` |

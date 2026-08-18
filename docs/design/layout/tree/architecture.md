@@ -3,7 +3,7 @@
 > 状态：**现行目标架构 v1**（驱动重建；非当前能力声明）
 > 日期：2026-08-15
 > 引擎注册名：`tree`
-> 代码落点：`crates/plotgram-layout/src/layout/tree/`（与 Hier / Sequence 同 crate；见 [ADR-006](../../adr/006-engine-io-and-crates.md)）
+> 代码落点：`crates/tautcore-layout/src/layout/tree/`（与 Hier / Sequence 同 crate；见 [ADR-006](../../adr/006-engine-io-and-crates.md)）
 > 约束入口：[写权纪律](../write-authority.md) · [AGENTS.md](../../../../AGENTS.md) §1
 > 证据：[05 树与径向](../../../reference/yfiles/05-树与径向布局.md) · [yFiles TreeLayout 产品条](../../../reference/yFiles-layouts-and-routing.md) · 上游 [Tree Layouts](https://docs.yfiles.com/yfiles-html/dguide/tree_layouts/) · [TreeLayout API](https://docs.yfiles.com/yfiles-html/api/TreeLayout.html) · [ISubtreePlacer](https://docs.yfiles.com/yfiles-html/api/ISubtreePlacer.html)
 > 对照：[vs-reference.md](vs-reference.md)（yFiles placer 全表 → 取舍）
@@ -63,7 +63,7 @@ T6 的执行点：`DeferToRouter` 时本核仍写节点框与端口决议，树�
 
 ### 2.1 递归框架，不是单次分层
 
-yFiles `TreeLayout` 的算法核极薄：从叶到根，对每个局部根调用其 `ISubtreePlacer.placeSubtree`。真正的产品多样性全部在 placer。plotgram 对齐这一分层，而不是把「居中分层 / 总线 / 径向」写成三套互不相通的 `if`。
+yFiles `TreeLayout` 的算法核极薄：从叶到根，对每个局部根调用其 `ISubtreePlacer.placeSubtree`。真正的产品多样性全部在 placer。tautcore 对齐这一分层，而不是把「居中分层 / 总线 / 径向」写成三套互不相通的 `if`。
 
 ```text
                     ┌─ OrientationStage（核心只实现 TB；已有 wrap）
@@ -104,7 +104,7 @@ LayoutOutput
 ### 2.3 模块边界（目标）
 
 ```text
-plotgram-layout/layout/tree/
+tautcore-layout/layout/tree/
   params.rs          # TreeParams · PlacerId · bind
   compose/           # 根选择 · 生成林 · 子序 · placer 指派 · connector 方向
   plan.rs            # TreePlan
@@ -115,7 +115,7 @@ plotgram-layout/layout/tree/
   demand.rs          # 标签 / margin → 形状下界
   verify.rs
 
-plotgram-algo/       # Buchheim first/second walk 可下沉为可单测零件
+tautcore-algo/       # Buchheim first/second walk 可下沉为可单测零件
                      # OrientationStage 已有，继续复用
 ```
 
@@ -196,9 +196,9 @@ fn place(id: NodeId, plan: &TreePlan) -> SubtreeShape {
 
 ### 4.1 为何不是「整图一个 routing_style」
 
-yFiles 文档原话：树的路由风格 largely 由 subtree placer 决定。同一棵树可以根用 `single-layer`、某部门用 `left-right`、助理用 `assistant`。plotgram 允许：
+yFiles 文档原话：树的路由风格 largely 由 subtree placer 决定。同一棵树可以根用 `single-layer`、某部门用 `left-right`、助理用 `assistant`。tautcore 允许：
 
-```plotgram
+```tautcore
 layout: tree { placer: single-layer }     // defaultSubtreePlacer
 node assistants_boss { subtree_placer: left-right }
 ```
@@ -307,7 +307,7 @@ M0 bind 已接受 `single-layer`（及别名 `layered` / `default` / `centered`�
 | `mindmap` | `tree` | `placer: single-split-layered`（M2 起）。整图 `orientation` 保持 TB：左右开由 placer **内部**旋转完成，不要再套一层 LTR |
 | （无 / 其它）+ 显式 `layout: tree` | 作者写的 | 默认 `single-layer` + TB → 组织图 / 目录树 |
 
-组织架构图**不是**新 profile。作者写 `layout: tree`（或将来若加 `profile: orgchart` 也只许展开参数）。禁止 `if mindmap` 出现在 `plotgram-layout`。
+组织架构图**不是**新 profile。作者写 `layout: tree`（或将来若加 `profile: orgchart` 也只许展开参数）。禁止 `if mindmap` 出现在 `tautcore-layout`。
 
 M2 落地前：`profile: mindmap` 只保证 `layout: tree`（今日行为）；showcase 的 mindmap 样例会先以分层树出现，这是过渡，不是目标观感。
 

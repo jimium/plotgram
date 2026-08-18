@@ -33,5 +33,5 @@ NNN-主题.md        （可选）对应的纯文本摘要
 
 | 编号 | 主题 | 对应源码 | 页面 |
 |------|------|----------|------|
-| 001 | EdgeRouter trait 与 RouteScene 生态 | `crates/plotgram-engine-api/src/traits.rs` L54-62 | [edge-router-trait.html](001-edge-router-trait.html) |
-| 002 | Hierarchical 布局模块：三相架构与执行流程 | `crates/plotgram-layout/src/layout/hierarchical/` | [hierarchical-layout.html](002-hierarchical-layout.html) |
+| 001 | EdgeRouter trait 与 RouteScene 生态 | `crates/tautcore-engine-api/src/traits.rs` L54-62 | [edge-router-trait.html](001-edge-router-trait.html) |
+| 002 | Hierarchical 布局模块：三相架构与执行流程 | `crates/tautcore-layout/src/layout/hierarchical/` | [hierarchical-layout.html](002-hierarchical-layout.html) |

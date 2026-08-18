@@ -9,7 +9,7 @@
 
 ## 1. 从 v1 Atlas 拆掉的壳
 
-v1 源码仍在 `crates/v1/plotgram-core/src/layout/atlas/`（只读）。可借鉴的形状（奇偶坐标、构建期切割、构造 + 独立 verifier）已进现行 Channel；下面三条**不要搬回来**。
+v1 源码仍在 `crates/v1/tautcore-core/src/layout/atlas/`（只读）。可借鉴的形状（奇偶坐标、构建期切割、构造 + 独立 verifier）已进现行 Channel；下面三条**不要搬回来**。
 
 | 勿做 | 为何 |
 |------|------|

@@ -3,7 +3,7 @@
  */
 import CodeMirror from '@uiw/react-codemirror';
 import { EditorView } from '@codemirror/view';
-import { plotgramLanguage } from '@lib/plotgramLanguage';
+import { tautcoreLanguage } from '@lib/tautcoreLanguage';
 import { Empty } from 'antd';
 
 interface DslViewerProps {
@@ -25,7 +25,7 @@ export function DslViewer({ source }: DslViewerProps) {
   return (
     <CodeMirror
       value={source}
-      extensions={[plotgramLanguage, EditorView.lineWrapping]}
+      extensions={[tautcoreLanguage, EditorView.lineWrapping]}
       theme="dark"
       editable={false}
       basicSetup={{

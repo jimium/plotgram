@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 启动 plotgram-agent-api（后台运行）
+# 启动 tautcore-agent-api（后台运行）
 #
 # 用法: ./start.sh
 #
@@ -10,9 +10,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-BINARY="$SCRIPT_DIR/plotgram-server"
+BINARY="$SCRIPT_DIR/tautcore-server"
 ENV_FILE="$SCRIPT_DIR/.env"
-PID_FILE="$SCRIPT_DIR/plotgram-server.pid"
+PID_FILE="$SCRIPT_DIR/tautcore-server.pid"
 LOG_FILE="$SCRIPT_DIR/server.log"
 
 # ─── 前置检查 ────────────────────────────────────────────
@@ -29,7 +29,7 @@ fi
 if [[ -f "$PID_FILE" ]]; then
     OLD_PID=$(cat "$PID_FILE" 2>/dev/null || true)
     if [[ -n "$OLD_PID" ]] && kill -0 "$OLD_PID" 2>/dev/null; then
-        echo "▸ plotgram-server 已在运行 (PID=$OLD_PID)，跳过启动"
+        echo "▸ tautcore-server 已在运行 (PID=$OLD_PID)，跳过启动"
         exit 0
     fi
     # PID 文件残留但进程已退出，清理
@@ -48,12 +48,12 @@ else
 fi
 
 # 强制绑定到 127.0.0.1，由 nginx 反向代理对外
-export PLOTGRAM_SERVER_ADDR="${PLOTGRAM_SERVER_ADDR:-127.0.0.1:6080}"
+export TAUTCORE_SERVER_ADDR="${TAUTCORE_SERVER_ADDR:-127.0.0.1:6080}"
 
 # ─── 后台启动 ────────────────────────────────────────────
-echo "▸ 启动 plotgram-server..."
+echo "▸ 启动 tautcore-server..."
 echo "  二进制: $BINARY"
-echo "  监听:   $PLOTGRAM_SERVER_ADDR"
+echo "  监听:   $TAUTCORE_SERVER_ADDR"
 echo "  日志:   $LOG_FILE"
 
 nohup "$BINARY" >>"$LOG_FILE" 2>&1 &

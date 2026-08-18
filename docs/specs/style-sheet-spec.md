@@ -1,4 +1,4 @@
-# Plotgram Theme（StyleSheet）规范
+# Tautcore Theme（StyleSheet）规范
 
 > 版本：2.4 | 状态：现行（规范已定；实现仍漂移，见 §6.4）
 >
@@ -14,7 +14,7 @@
 
 DSL 语法与语义属性登记见 [dsl-spec.md](dsl-spec.md)（§5–§7 / §14）；archetype 见 [archetype-spec.md](archetype-spec.md)。DSL 只引用 §5 词表，不另立键名清单。
 
-实现入口：`crates/plotgram-render/src/theme/`（编译）、`resolve.rs`（cascade）。
+实现入口：`crates/tautcore-render/src/theme/`（编译）、`resolve.rs`（cascade）。
 
 ---
 
@@ -228,7 +228,7 @@ compiled_variants[v] = defaults.node ⊕ variants[v]   // 颜料字段；禁止 
 ### 6.4 实现漂移（相对本规范）
 
 
-| 规范（§6）                          | 当前 `plotgram-render`       |
+| 规范（§6）                          | 当前 `tautcore-render`       |
 | ------------------------------- | -------------------------- |
 | `variant` + `compiled_variants` | 仍 `kind` + `kind_styles`   |
 | edge / group `variant` cascade  | 仅 `defaults.*` + `style.*` |
@@ -262,7 +262,7 @@ default | primary | secondary | muted | info
 
 ## 8. 内置主题 id
 
-嵌入于 `plotgram-render`（信息索引，非封闭承诺）：
+嵌入于 `tautcore-render`（信息索引，非封闭承诺）：
 
 
 | id                                            | 说明                |

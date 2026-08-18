@@ -1,7 +1,7 @@
 # 布局/路由算法简化重构（第二轮）Spec
 
 > 日期：2026-07-20
-> 范围：`crates/plotgram-core/src/layout/` 全模块（架构图 + 流程图布局 / 正交边路由）
+> 范围：`crates/tautcore-core/src/layout/` 全模块（架构图 + 流程图布局 / 正交边路由）
 > 前置工作：第一轮已落地 Phase 1 死代码清理（~1,144 行）+ Phase 2 §3.2.1 C/D 去重（~15 行），S4 删除实验失败回滚
 > 约束：遵守 AGENTS.md §1–§7；允许性能基线略有下降（用户明确许可），但 product-gate 正确性不退化
 
@@ -22,9 +22,9 @@
 ## What Changes
 
 - **新增**：本轮简化方案的现状分析、简化策略、预期结果三章节（本 spec §1–§3）
-- **新增**：临时备份机制（`/tmp/plotgram-simplify-r2-backup/` 按阶段分子目录，存原始文件副本 + `git diff` patch）
-- **新增**：执行笔记文件（`/tmp/plotgram-simplify-r2-backup/NOTES.md`，每步追加：改了什么、门禁结果、是否回滚）
-- **修改**：`crates/plotgram-core/src/layout/` 下若干文件（具体清单见 §2 简化策略矩阵）
+- **新增**：临时备份机制（`/tmp/tautcore-simplify-r2-backup/` 按阶段分子目录，存原始文件副本 + `git diff` patch）
+- **新增**：执行笔记文件（`/tmp/tautcore-simplify-r2-backup/NOTES.md`，每步追加：改了什么、门禁结果、是否回滚）
+- **修改**：`crates/tautcore-core/src/layout/` 下若干文件（具体清单见 §2 简化策略矩阵）
 - **修改**：`docs/布局路由算法简化重构方案-2026-07.md` 末尾追加"第二轮执行结论"
 - **修改**：`docs/总结经验/简化重构经验-哪些不可精简-2026-07.md` 追加新一轮 keep-list 收敛
 - **不修改**：keep-list 13 项（详见 §1.4）—— 经第一轮门禁实测全部承重，本轮不动
@@ -38,17 +38,17 @@
 ## Impact
 
 - **Affected code**:
-  - `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs`（§3.2.2，1240 行）
-  - `crates/plotgram-core/src/layout/pipeline.rs`（§3.2.4，467 行）
-  - `crates/plotgram-core/src/layout/node/architecture_v2/pipeline.rs`（§3.2.5，228 行）
-  - `crates/plotgram-core/src/layout/demand/{grid.rs,pierce.rs,features.rs}`（§3.3.2）
-  - `crates/plotgram-core/src/layout/edge/route_annotation.rs`（§3.3.3，765 行）
-  - `crates/plotgram-core/src/layout/refine/spline_fallback.rs`（§3.3.4，1002 行）
+  - `crates/tautcore-core/src/layout/edge/edge_routing_orthogonal/scoring.rs`（§3.2.2，1240 行）
+  - `crates/tautcore-core/src/layout/pipeline.rs`（§3.2.4，467 行）
+  - `crates/tautcore-core/src/layout/node/architecture_v2/pipeline.rs`（§3.2.5，228 行）
+  - `crates/tautcore-core/src/layout/demand/{grid.rs,pierce.rs,features.rs}`（§3.3.2）
+  - `crates/tautcore-core/src/layout/edge/route_annotation.rs`（§3.3.3，765 行）
+  - `crates/tautcore-core/src/layout/refine/spline_fallback.rs`（§3.3.4，1002 行）
   - 顶层 env var 清理涉及：`space_budget.rs` / `group_frame/spec.rs` / `phases/port_slot.rs` / `phases/refine.rs`
 - **Affected specs**: 无对外 spec（核心算法非 spec 化）
 - **Affected docs**: `docs/布局路由算法简化重构方案-2026-07.md`、`docs/总结经验/简化重构经验-哪些不可精简-2026-07.md`
 - **Benchmarks**: 每阶段产出新 baseline（`benchmarks/baselines/YYYY-MM-DD-HHMMSS-<phase>.{json,md}`）+ `compare.sh` 对比上一阶段
-- **WASM**: `plotgram-core` 编译到 WASM，全程 `cargo check -p plotgram-wasm --target wasm32-unknown-unknown`；禁 `std::time::{Instant,SystemTime}`
+- **WASM**: `tautcore-core` 编译到 WASM，全程 `cargo check -p tautcore-wasm --target wasm32-unknown-unknown`；禁 `std::time::{Instant,SystemTime}`
 
 ---
 
@@ -58,7 +58,7 @@
 
 | 阶段 | 内容 | 状态 | 净减行数 |
 |------|------|------|----------|
-| Phase 1（死代码清理） | 6 项安全清理：`corridor_stick.rs` / `channel_occupancy.rs` / `demand/dump.rs` 精简 / `PLOTGRAM_PORT_PRESSURE_PREFER` / `PLOTGRAM_CHECK_D_IDEMPOTENT` / `edge_stages.rs` 写权审计表 | ✅ 已完成，门禁 PASS | ~1,144 |
+| Phase 1（死代码清理） | 6 项安全清理：`corridor_stick.rs` / `channel_occupancy.rs` / `demand/dump.rs` 精简 / `TAUTCORE_PORT_PRESSURE_PREFER` / `TAUTCORE_CHECK_D_IDEMPOTENT` / `edge_stages.rs` 写权审计表 | ✅ 已完成，门禁 PASS | ~1,144 |
 | Phase 2 §3.2.1（C/D 去重） | run.rs C 末 `dock_sep` 删除（实验 A PASS）+ phase_lane C 期 `min_gap` 删除（实验 C PASS）+ `gap_fixed` 死代码清除 | ✅ 已完成，门禁 PASS | ~15 |
 | Phase 3 §3.2.3（S4 删除） | 删 S4/S4.x/B.2 监控走廊特化 + 失活 trunk/feedback helper/`force_outer_escape`/`protected_trunk`/`outer_ring` | ⛔ FAIL 回滚，`typical-microservice-architecture` tight_sev 1048→3044（~3×） | 0 |
 | Phase 2 §3.2.2 / §3.2.4 / §3.2.5 | Scoring / D-pipeline / Architecture 后处理精简 | ⏭️ 未实施 | 0 |
@@ -80,23 +80,23 @@
 
 ### 1.3 残留环境变量（13 处，原方案 23 处）
 
-`crates/plotgram-core/src/layout/` 内 `std::env::var` 命中 13 处：
+`crates/tautcore-core/src/layout/` 内 `std::env::var` 命中 13 处：
 
 | # | 文件:行 | 环境变量 | 默认 | 用途 | 处置 |
 |---|--------|---------|------|------|------|
-| 1 | `edge/edge_routing_orthogonal/run.rs:15` | `PLOTGRAM_EDGE_ORDER_SCORE` | 开启 | 边难度排序 | 保留 |
-| 2 | `edge/edge_routing_orthogonal/channel_load.rs:31` | `PLOTGRAM_CORRIDOR_SOFT` | 开启 | 走廊软惩罚 | 保留 |
-| 3 | `space_budget.rs:170` | `PLOTGRAM_PRESSURE_BUDGET` | 开启 | 压力预算 | 保留 |
-| 4 | `space_budget.rs:354` | `PLOTGRAM_DEBUG_EDGE_PRESSURE` | 关闭 | 调试日志 | **Tier A 统一为 `perf_log!`** |
-| 5 | `space_budget.rs:415` | `PLOTGRAM_EDGE_PRESSURE_BUDGET` | 开启 | 边级压力预算 | 保留 |
-| 6 | `refine/mod.rs:77` | `PLOTGRAM_SKIP_REFINE` | 不跳过 | 调试：跳过 refine | 保留 |
-| 7 | `phases/refine.rs:181` | `PLOTGRAM_DEBUG_EDGE_ORDER` | 关闭 | 调试日志 | **Tier A 统一为 `perf_log!`** |
-| 8 | `phases/port_slot.rs:664` | `PLOTGRAM_PORT_PRESSURE_SIDE` | 开启 | 端口压力侧选 | 保留 |
-| 9 | `phases/port_slot.rs:671` | `PLOTGRAM_PORT_PRESSURE_RELIEVE` | 开启 | 端口压力释放 | 保留 |
-| 10 | `phases/port_slot.rs:679` | `PLOTGRAM_PORT_PRESSURE_SLOT` | 开启 | 端口压力 slot | 保留 |
-| 11 | `phases/port_slot.rs:806` | `PLOTGRAM_DEBUG_PORT_PRESSURE` | 关闭 | 调试日志 | **Tier A 统一为 `perf_log!`** |
-| 12 | `group_frame/spec.rs:427` | `PLOTGRAM_ARCH_PACK` | 未设 | 实验性排列 | **Tier A 删除（确认无生产 setter）** |
-| 13 | `group_frame/spec.rs:444` | `PLOTGRAM_FLOW_ASPECT` | 未设 | 实验性宽高比 | **Tier A 删除（确认无生产 setter）** |
+| 1 | `edge/edge_routing_orthogonal/run.rs:15` | `TAUTCORE_EDGE_ORDER_SCORE` | 开启 | 边难度排序 | 保留 |
+| 2 | `edge/edge_routing_orthogonal/channel_load.rs:31` | `TAUTCORE_CORRIDOR_SOFT` | 开启 | 走廊软惩罚 | 保留 |
+| 3 | `space_budget.rs:170` | `TAUTCORE_PRESSURE_BUDGET` | 开启 | 压力预算 | 保留 |
+| 4 | `space_budget.rs:354` | `TAUTCORE_DEBUG_EDGE_PRESSURE` | 关闭 | 调试日志 | **Tier A 统一为 `perf_log!`** |
+| 5 | `space_budget.rs:415` | `TAUTCORE_EDGE_PRESSURE_BUDGET` | 开启 | 边级压力预算 | 保留 |
+| 6 | `refine/mod.rs:77` | `TAUTCORE_SKIP_REFINE` | 不跳过 | 调试：跳过 refine | 保留 |
+| 7 | `phases/refine.rs:181` | `TAUTCORE_DEBUG_EDGE_ORDER` | 关闭 | 调试日志 | **Tier A 统一为 `perf_log!`** |
+| 8 | `phases/port_slot.rs:664` | `TAUTCORE_PORT_PRESSURE_SIDE` | 开启 | 端口压力侧选 | 保留 |
+| 9 | `phases/port_slot.rs:671` | `TAUTCORE_PORT_PRESSURE_RELIEVE` | 开启 | 端口压力释放 | 保留 |
+| 10 | `phases/port_slot.rs:679` | `TAUTCORE_PORT_PRESSURE_SLOT` | 开启 | 端口压力 slot | 保留 |
+| 11 | `phases/port_slot.rs:806` | `TAUTCORE_DEBUG_PORT_PRESSURE` | 关闭 | 调试日志 | **Tier A 统一为 `perf_log!`** |
+| 12 | `group_frame/spec.rs:427` | `TAUTCORE_ARCH_PACK` | 未设 | 实验性排列 | **Tier A 删除（确认无生产 setter）** |
+| 13 | `group_frame/spec.rs:444` | `TAUTCORE_FLOW_ASPECT` | 未设 | 实验性宽高比 | **Tier A 删除（确认无生产 setter）** |
 
 ### 1.4 keep-list（不可触碰，13 项，全部活跃在码）
 
@@ -139,7 +139,7 @@
 ```
 Tier A（零风险清理，预计 ~150 行）
   ├── 统一 DEBUG 日志为 perf_log!（3 处 var_os）
-  └── 删 PLOTGRAM_ARCH_PACK / PLOTGRAM_FLOW_ASPECT 实验开关
+  └── 删 TAUTCORE_ARCH_PACK / TAUTCORE_FLOW_ASPECT 实验开关
 
 Tier B（低风险合并，预计 ~100 行 + 减阶段）
   ├── D 阶段 min_gap + dock_sep 合并调用入口（不删 pass，合并 bookkeeping）
@@ -160,12 +160,12 @@ Tier D（高风险架构级，预计 ~600 行，帕累托评判）
 
 ##### A.1 统一 DEBUG 日志为 `perf_log!`
 
-- **位置**：`space_budget.rs:354`（`PLOTGRAM_DEBUG_EDGE_PRESSURE`）、`phases/refine.rs:181`（`PLOTGRAM_DEBUG_EDGE_ORDER`）、`phases/port_slot.rs:806`（`PLOTGRAM_DEBUG_PORT_PRESSURE`）
+- **位置**：`space_budget.rs:354`（`TAUTCORE_DEBUG_EDGE_PRESSURE`）、`phases/refine.rs:181`（`TAUTCORE_DEBUG_EDGE_ORDER`）、`phases/port_slot.rs:806`（`TAUTCORE_DEBUG_PORT_PRESSURE`）
 - **改动**：3 处 `var_os(...).is_some()` 守卫的 `eprintln!` / `println!` 块改用 `perf_log!` 宏（WASM-safe，AGENTS.md §6），并删除对应 `var_os` 读取
 - **预期**：~30 行；行为不变（perf_log! 在 release 默认 no-op，与原 var_os 默认关闭等价）
 - **风险**：极低；perf_log! 已是仓库统一计时/日志通道
 
-##### A.2 删除实验性 env var `PLOTGRAM_ARCH_PACK` / `PLOTGRAM_FLOW_ASPECT`
+##### A.2 删除实验性 env var `TAUTCORE_ARCH_PACK` / `TAUTCORE_FLOW_ASPECT`
 
 - **位置**：`group_frame/spec.rs:427` + `:444`
 - **前置验证**：先 Grep 全仓库 + 部署脚本 + playground 配置，确认无生产环境设置这两个变量
@@ -173,10 +173,10 @@ Tier D（高风险架构级，预计 ~600 行，帕累托评判）
 - **预期**：~50 行
 - **风险**：低；前提是无生产 setter（前置验证兜底）
 
-##### A.3 移除 `PLOTGRAM_PRESSURE_BUDGET=0` 分支
+##### A.3 移除 `TAUTCORE_PRESSURE_BUDGET=0` 分支
 
 - **位置**：`space_budget.rs:170` 附近
-- **改动**：`PLOTGRAM_PRESSURE_BUDGET` 默认开启，`=0` 关闭分支为调试用；移除该分支，统一走默认开启路径
+- **改动**：`TAUTCORE_PRESSURE_BUDGET` 默认开启，`=0` 关闭分支为调试用；移除该分支，统一走默认开启路径
 - **预期**：~50 行
 - **风险**：低；前提是确认 `=0` 分支未被任何测试/CI 显式触发
 
@@ -269,14 +269,14 @@ Tier D（高风险架构级，预计 ~600 行，帕累托评判）
 
 ### 2.4 回滚机制（吸取第一轮 `git restore` 误伤教训）
 
-- **临时备份目录**：`/tmp/plotgram-simplify-r2-backup/`
+- **临时备份目录**：`/tmp/tautcore-simplify-r2-backup/`
   - 每阶段子目录：`tier-a/` / `tier-b/` / `tier-c/` / `tier-d/`
   - 每步备份：`<tier>/<step-id>/originals/<file-path-slash>`（原文件副本）+ `<tier>/<step-id>/patch.diff`（`git diff` 输出）
 - **回滚策略**：
   - **纯本次改动文件**（`git diff --numstat` 与本次删除量吻合 → HEAD == before）：`git checkout HEAD -- file` 精确还原
   - **混合文件**（含更早阶段改动）：手动只逆向本次那部分，保留更早成果；或从 `<tier>/<step-id>/originals/` 恢复
   - 回滚后必须 `compare.sh` vs before，**零漂移**才算干净
-- **执行笔记**：`/tmp/plotgram-simplify-r2-backup/NOTES.md`，每步追加：
+- **执行笔记**：`/tmp/tautcore-simplify-r2-backup/NOTES.md`，每步追加：
   ```
   ## <step-id> <timestamp>
   - 改动: <file:line> <what>
@@ -320,7 +320,7 @@ Tier D（高风险架构级，预计 ~600 行，帕累托评判）
 | product-gate 质量（exact_sev/tight_sev/node_fp） | 持平或可解释微调 | 硬 | `compare.sh` product 硬 FAIL；若需抬基线须 `raise product:` |
 | stress 质量轨 | Tier D 允许 WARN | WARN | `raise stress (expected):` |
 | Scoring 权重变化 | 路径选择可能微调 | 需目视 5 个 architecture 样本 | C.1 完成后跑 architecture 子集 |
-| WASM 编译 | 无影响 | 硬 | `cargo check -p plotgram-wasm` |
+| WASM 编译 | 无影响 | 硬 | `cargo check -p tautcore-wasm` |
 | 大图性能（median_ms） | Tier B 可能有 ±5% | ≤10% 退化 | `bench-phases` 对比 |
 
 ### 3.4 维护性收益
@@ -341,12 +341,12 @@ Tier D（高风险架构级，预计 ~600 行，帕累托评判）
 
 1. 采 before 基线：`./benchmarks/snapshot.sh --tag <tier>-<step>-before`
 2. 应用改动
-3. 编译验证：`cargo build -p plotgram-core`
-4. WASM 验证：`cargo check -p plotgram-wasm --target wasm32-unknown-unknown`
-5. 单测验证：`cargo test -p plotgram-core --lib`（仅看新增失败，既有 19 项忽略）
+3. 编译验证：`cargo build -p tautcore-core`
+4. WASM 验证：`cargo check -p tautcore-wasm --target wasm32-unknown-unknown`
+5. 单测验证：`cargo test -p tautcore-core --lib`（仅看新增失败，既有 19 项忽略）
 6. 采 after 基线：`./benchmarks/snapshot.sh --tag <tier>-<step>-after`
 7. 门禁比对：`./benchmarks/compare.sh <before>.json <after>.json`
-8. 记笔记到 `/tmp/plotgram-simplify-r2-backup/NOTES.md`
+8. 记笔记到 `/tmp/tautcore-simplify-r2-backup/NOTES.md`
 9. 门禁 FAIL 时从 `<tier>/<step>/originals/` 精确回滚，回滚后再 compare 须零漂移
 
 #### Scenario: Tier A 步骤门禁通过
@@ -358,16 +358,16 @@ Tier D（高风险架构级，预计 ~600 行，帕累托评判）
 #### Scenario: Tier C 步骤门禁失败
 - **WHEN** C.2（demand grid.rs/pierce.rs 移除）后 compare 显示 `stress.layout-stress-dag` node_fp 变化
 - **THEN** 该 Step 标记为 FAIL
-- **AND** 从 `/tmp/plotgram-simplify-r2-backup/tier-c/c-2/originals/` 恢复 `demand/grid.rs` + `demand/pierce.rs` + `demand/mod.rs`
+- **AND** 从 `/tmp/tautcore-simplify-r2-backup/tier-c/c-2/originals/` 恢复 `demand/grid.rs` + `demand/pierce.rs` + `demand/mod.rs`
 - **AND** 恢复后 `compare.sh` vs before 须零漂移
 - **AND** 笔记记录 FAIL 原因 + 回滚范围 + keep-list 收敛建议
 
 ### Requirement: 临时备份与笔记机制
 
-本轮简化 SHALL 在 `/tmp/plotgram-simplify-r2-backup/` 建立分层备份目录：
+本轮简化 SHALL 在 `/tmp/tautcore-simplify-r2-backup/` 建立分层备份目录：
 
 ```
-/tmp/plotgram-simplify-r2-backup/
+/tmp/tautcore-simplify-r2-backup/
 ├── NOTES.md                    # 执行笔记（每步追加）
 ├── tier-a/
 │   ├── a-1-debug-log/
@@ -382,7 +382,7 @@ Tier D（高风险架构级，预计 ~600 行，帕累托评判）
 
 #### Scenario: 备份目录建立
 - **WHEN** 进入 Tier A 第一个 Step 前
-- **THEN** `/tmp/plotgram-simplify-r2-backup/` 及 `tier-a/a-1-debug-log/originals/` 子目录存在
+- **THEN** `/tmp/tautcore-simplify-r2-backup/` 及 `tier-a/a-1-debug-log/originals/` 子目录存在
 - **AND** 涉及修改的每个文件已复制到 `originals/` 下（路径用 `_` 替代 `/`）
 - **AND** `NOTES.md` 文件存在并写入首个 Step 的 header
 
@@ -397,11 +397,11 @@ Tier D（高风险架构级，预计 ~600 行，帕累托评判）
 
 ### Requirement: WASM 兼容性
 
-本轮简化 SHALL NOT 在 `crates/plotgram-core/src/` 内引入裸 `std::time::{Instant, SystemTime}` 或 `std::thread::spawn`。所有计时与日志 SHALL 走 `crate::layout::perf::Instant` 与 `perf_log!` 宏。
+本轮简化 SHALL NOT 在 `crates/tautcore-core/src/` 内引入裸 `std::time::{Instant, SystemTime}` 或 `std::thread::spawn`。所有计时与日志 SHALL 走 `crate::layout::perf::Instant` 与 `perf_log!` 宏。
 
 #### Scenario: DEBUG 日志统一引入 std::time
 - **WHEN** A.1 将 `eprintln!` 改为 `perf_log!` 时误引入 `std::time::Instant` 计算 delta
-- **THEN** `cargo check -p plotgram-wasm --target wasm32-unknown-unknown` SHALL 失败
+- **THEN** `cargo check -p tautcore-wasm --target wasm32-unknown-unknown` SHALL 失败
 - **AND** 该 Step 标记为 FAIL，须改用 `crate::layout::perf::Instant`
 
 ### Requirement: 确定性迭代

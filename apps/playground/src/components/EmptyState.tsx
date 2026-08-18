@@ -13,7 +13,7 @@ export function EmptyState({ onLoadSource, showcaseHref = '/showcase/' }: EmptyS
   const handlePasteConfirm = () => {
     const text = pasteText.trim();
     if (!text) return;
-    onLoadSource(text, '未命名.pgm');
+    onLoadSource(text, '未命名.taut');
     setPasteOpen(false);
     setPasteText('');
   };
@@ -23,7 +23,7 @@ export function EmptyState({ onLoadSource, showcaseHref = '/showcase/' }: EmptyS
     if (!file) return;
     try {
       const text = await file.text();
-      onLoadSource(text, file.name.endsWith('.pgm') ? file.name : `${file.name}.pgm`);
+      onLoadSource(text, file.name.endsWith('.taut') ? file.name : `${file.name}.taut`);
     } catch {
       // caller may toast
     }
@@ -33,7 +33,7 @@ export function EmptyState({ onLoadSource, showcaseHref = '/showcase/' }: EmptyS
   return (
     <div className="empty-state">
       <div className="empty-state-card">
-        <h2 className="empty-state-title">Plotgram Editor</h2>
+        <h2 className="empty-state-title">Tautcore Editor</h2>
         <p className="empty-state-lead">从 Showcase 选一张图开始调校，或载入你自己的 DSL。</p>
 
         <div className="empty-state-actions">
@@ -44,12 +44,12 @@ export function EmptyState({ onLoadSource, showcaseHref = '/showcase/' }: EmptyS
             粘贴 DSL
           </button>
           <button type="button" className="btn btn-soft empty-state-btn" onClick={() => fileInputRef.current?.click()}>
-            上传 .pgm
+            上传 .taut
           </button>
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pgm,.plotgram,text/plain"
+            accept=".taut,.tautcore,text/plain"
             className="empty-state-file-input"
             onChange={handleFileChange}
           />

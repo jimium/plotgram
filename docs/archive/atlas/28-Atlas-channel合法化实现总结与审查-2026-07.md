@@ -1,6 +1,6 @@
 # 28 · Atlas channel 合法化实现总结与审查（2026-07-26）
 
-> 实现对象：[`crates/plotgram-core/src/layout/atlas/channel/`](../../crates/plotgram-core/src/layout/atlas/channel/)（substrate / graph / search / derive / bundle）+ 探针门面 [`atlas/probe.rs`](../../crates/plotgram-core/src/layout/atlas/probe.rs) + [`atlas_probe`](../../crates/plotgram-eval/src/bin/atlas_probe.rs)
+> 实现对象：[`crates/tautcore-core/src/layout/atlas/channel/`](../../crates/tautcore-core/src/layout/atlas/channel/)（substrate / graph / search / derive / bundle）+ 探针门面 [`atlas/probe.rs`](../../crates/tautcore-core/src/layout/atlas/probe.rs) + [`atlas_probe`](../../crates/tautcore-eval/src/bin/atlas_probe.rs)
 > 依据需求：[`27-Atlas-channel模块审查与改造需求`](27-Atlas-channel模块审查与改造需求-2026-07.md) 的 **L1–L8** 合法化改造
 > 验收判据：27 号文 §7 **A1–A10**
 > 重采数据：已回写 [`25-Atlas-相I可行率探针报告`](25-Atlas-相I可行率探针报告-2026-07.md) §8（本文 §4 为摘要）
@@ -45,7 +45,7 @@
 - **端口宿主解析**：取包含节点体奇坐标的段；贴组边节点因「边界线不被切」恒得根段，B7 退化组自动成立。
 - **确定性**：`cut_line` 的 scope 归属按「深度降序 + GroupId 升序」平局；邻居按 `(to, via_key)` 排序；gate 占用 `BTreeSet` 去重——全链路无 HashMap 序依赖（AGENTS.md §2）。
 
-### 1.2 探针期补充定案（重采中暴露，27 号文未预见，已回写 [`channel/README.md`](../../crates/plotgram-core/src/layout/atlas/channel/README.md)）
+### 1.2 探针期补充定案（重采中暴露，27 号文未预见，已回写 [`channel/README.md`](../../crates/tautcore-core/src/layout/atlas/channel/README.md)）
 
 1. **组矩形嵌套树前提显式化**：切割模型要求任两组矩形「分离或有祖先关系」且矩内无非后代节点。derive 构建期拒绝（`OverlappingGroups` / `ForeignNodeInGroupRect`）。LayeredKernel flat 网格不做组感知布局，两种病态都会出现：探针门面（`probe.rs::sanitize`）确定性丢弃病态组，**含被丢空容器组的级联清理**（自叶向根不动点；修复 `demo.k8s-platform-stack` 整图 `EmptyGroup` 误判——4 个子组被丢后父容器成空组导致 30 边全灭）。生产接线（Legacy Adapter）镜像真实分区布局，不经此路径。三种病态各有单测钉死。
 2. **探针端点口径 = 四侧候选**（24 号文 R5 `derive_node_ports` + R3 `route_candidates`）：B7 退化轴的组内边正解是**边界缝侧端口**，钉死单一侧对会人为制造同 gate 双穿（假 A3，曾残余 4 处）；四侧候选下三集 A1/A2/A3 恒 0。口径二为拿到获胜端口对做占用提交，手动展开候选循环并复刻平局规则（升序遍历 + 严格 `<`）。
@@ -65,7 +65,7 @@
 | A9 | B1–B8 边界用例单测 | 全部钉死 | `tests.rs` 逐条覆盖（含 B7 宿主=边界缝根段、B8 构建期拒绝） | ✅ |
 | A10 | L8 副作用边界 | 组横跨全列时外部边仍可行且不含组内段 | 单测钉死（走外框 Converged） | ✅ |
 
-`cargo test -p plotgram-core`：**956 passed · 0 failed**（debug，AGENTS.md §9）。
+`cargo test -p tautcore-core`：**956 passed · 0 failed**（debug，AGENTS.md §9）。
 
 ## 3. 关键设计取舍
 
@@ -116,7 +116,7 @@ CodeReview 子代理对 substrate / graph / search / derive / bundle / probe / a
 - 奇偶坐标编码与 L1 定义严格对齐；`covers_gap` / `covers_slot` 构造性保证 B8 开闭规则，无边界 off-by-one。
 - G-inv-1/2/3 均为构建期检查，非法基底根本建不出来。
 - L6 检查器几何判定严密：scope 链正确排除祖先组，不误报合法的组内走线。
-- `cut_line` 的 scope 平局规则（深度降序 + GroupId 升序）、邻居 `(to, via_key)` 排序、`route_candidates` 升序×升序 + 严格 `<`——全部确定性，无 HashMap 序依赖；`crates/plotgram-core` 内无 `std::time` 裸用（AGENTS.md §2/§6）。
+- `cut_line` 的 scope 平局规则（深度降序 + GroupId 升序）、邻居 `(to, via_key)` 排序、`route_candidates` 升序×升序 + 严格 `<`——全部确定性，无 HashMap 序依赖；`crates/tautcore-core` 内无 `std::time` 裸用（AGENTS.md §2/§6）。
 - `Occupancy`：gate 用 `BTreeSet` 按边去重（同边同 gate 恒占 1 单位），commit/release 严格可逆；端口计数 `saturating_sub` 防下溢。
 - `bundle.rs` 反向后缀 trie 与新段模型兼容，未受改造影响。
 - 测试覆盖良好：B1–B8 逐条、G-inv、L6/L8、A10、确定性双跑、probe 三种病态消解。
@@ -151,11 +151,11 @@ CodeReview 子代理对 substrate / graph / search / derive / bundle / probe / a
 验证命令（均可复现）：
 
 ```bash
-cargo test -p plotgram-core                                                    # 958 passed
-cargo run -p plotgram-eval --bin atlas_probe                                   # product：A1/A2/A3=0，265/265
-cargo run -p plotgram-eval --bin atlas_probe -- --set benchmarks/sets/stress-probe-set.txt   # 180/180（8 条自环排除）
-cargo run -p plotgram-eval --bin atlas_probe -- --set benchmarks/sets/demo-observe-set.txt   # 699/699
-cargo run --release -p plotgram-eval --bin atlas_perf                          # A7：本体三集合计 ≈3.6 ms
+cargo test -p tautcore-core                                                    # 958 passed
+cargo run -p tautcore-eval --bin atlas_probe                                   # product：A1/A2/A3=0，265/265
+cargo run -p tautcore-eval --bin atlas_probe -- --set benchmarks/sets/stress-probe-set.txt   # 180/180（8 条自环排除）
+cargo run -p tautcore-eval --bin atlas_probe -- --set benchmarks/sets/demo-observe-set.txt   # 699/699
+cargo run --release -p tautcore-eval --bin atlas_perf                          # A7：本体三集合计 ≈3.6 ms
 ```
 
 确定性验证：三集探针各双跑，报告逐字节 diff 一致（A8）。

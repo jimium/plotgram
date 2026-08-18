@@ -241,14 +241,14 @@ pub struct HierarchicLayoutData {
 
 | 本篇概念 | 建议归属 |
 |---|---|
-| Domain Model（DSL AST、图种、主题） | `plotgram-model` + `plotgram-parse` |
-| **Layout Graph（纯几何）** | `plotgram-engine-api`（类型）+ `plotgram-engine`（算法） |
-| LayoutData（约束、权重） | `plotgram-engine-api` |
-| Stage 链 / 装饰器 | `plotgram-compile` |
-| Profile → 参数展开 | `plotgram-compile`（读 model，产出 engine 参数） |
-| 文本测量 / content sizing | `plotgram-content`（measure 相，见 06 篇 §5） |
-| VPSC / 公共求解器 | `plotgram-engine::solver` |
-| 渲染 | `plotgram-render` |
+| Domain Model（DSL AST、图种、主题） | `tautcore-model` + `tautcore-parse` |
+| **Layout Graph（纯几何）** | `tautcore-engine-api`（类型）+ `tautcore-engine`（算法） |
+| LayoutData（约束、权重） | `tautcore-engine-api` |
+| Stage 链 / 装饰器 | `tautcore-compile` |
+| Profile → 参数展开 | `tautcore-compile`（读 model，产出 engine 参数） |
+| 文本测量 / content sizing | `tautcore-content`（measure 相，见 06 篇 §5） |
+| VPSC / 公共求解器 | `tautcore-engine::solver` |
+| 渲染 | `tautcore-render` |
 
 三条最值钱的架构动作（按优先级）：
 1. **Writer 类型化写权**（§1.2 方案 B）—— 把纪律变成编译期检查。

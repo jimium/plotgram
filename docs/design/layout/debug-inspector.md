@@ -127,9 +127,9 @@ trait LayoutDebugTraceProvider {
 
 | 能力 | 落点 | 说明 |
 |------|------|------|
-| 信封类型 `LayoutDebugTrace` | 目标：`plotgram-engine-api` 或 `plotgram-model`（稳定后）；首期可 layout 内 + JSON | 跨核共享 |
-| 各核投影 | `plotgram-layout/src/layout/{name}/debug.rs` | 靠近内部 IR |
-| CLI | `plotgram-cli` | 与 layout.name 无关的入口 |
+| 信封类型 `LayoutDebugTrace` | 目标：`tautcore-engine-api` 或 `tautcore-model`（稳定后）；首期可 layout 内 + JSON | 跨核共享 |
+| 各核投影 | `tautcore-layout/src/layout/{name}/debug.rs` | 靠近内部 IR |
+| CLI | `tautcore-cli` | 与 layout.name 无关的入口 |
 | DebugPainter 注册表 | 独立模组：`kind → paint_fn` | 禁止打进默认 `render_svg` |
 | Inspector | 静态页一处 | 读 `extension.kind` 装载面板 |
 
@@ -263,7 +263,7 @@ LayoutDiagnostics   → 警告 / 放宽 / 不可行（跨核目标）
 LayoutDebugTrace    → 决策结构可视化
 ```
 
-注意：`LayoutDiagnostics` 已随 hier 阶段 C 落地（`plotgram-model::diagnostics`，经 `LayoutOutput` / `LayoutResult` 透出，见 hier roadmap §4）；Trace 不依赖它、不携带它。两者并列产出，不合并成单一根对象；UI 可分栏。
+注意：`LayoutDiagnostics` 已随 hier 阶段 C 落地（`tautcore-model::diagnostics`，经 `LayoutOutput` / `LayoutResult` 透出，见 hier roadmap §4）；Trace 不依赖它、不携带它。两者并列产出，不合并成单一根对象；UI 可分栏。
 
 ---
 
@@ -316,8 +316,8 @@ URL hash 保存：`layout`（冗余校验）、层开关、选中 id。
 ## 7. CLI
 
 ```bash
-plotgram debug-layout <file.pgm> -o out.trace.json
-plotgram render <file.pgm> -o out.svg --emit-trace out.trace.json
+tautcore debug-layout <file.taut> -o out.trace.json
+tautcore render <file.taut> -o out.svg --emit-trace out.trace.json
 ```
 
 - 入口**不**按图种分支；调用当前 contract 的 layout 核的 provider。  
@@ -373,7 +373,7 @@ plotgram render <file.pgm> -o out.svg --emit-trace out.trace.json
 
 1. Overlay 由 Rust 还是前端按 Trace 绘制？→ 首期前端或单一 overlay SVG；插件化后可混用。  
 2. Router 独立调试是否共用信封？→ 可另设 `RouterDebugTrace` 或 `extension.kind` 外的并列文件；**不**塞进 layout extension 假装是布局决策。  
-3. 信封类型何时上提 `plotgram-model` / engine-api？→ T4：第二个核消费之后（不改现有 layout trait）。
+3. 信封类型何时上提 `tautcore-model` / engine-api？→ T4：第二个核消费之后（不改现有 layout trait）。
 
 ---
 

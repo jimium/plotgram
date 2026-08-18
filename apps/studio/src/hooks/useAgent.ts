@@ -23,13 +23,13 @@ import {
 } from '@agent/index';
 import { createLLMClient } from '@lib/llm';
 import type { LLMConfig } from '@lib/llm';
-import type { PlotgramWasm } from '@lib/wasm';
+import type { TautcoreWasm } from '@lib/wasm';
 
 /** LLM 请求超时时间(毫秒) */
 const LLM_TIMEOUT_MS = 60_000;
 
 interface UseAgentOptions {
-  wasm: PlotgramWasm | null;
+  wasm: TautcoreWasm | null;
   ready: boolean;
   llmConfig: LLMConfig;
 }

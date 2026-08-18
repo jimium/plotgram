@@ -1,5 +1,5 @@
 /**
- * Plotgram Agent Demo 应用根组件
+ * Tautcore Agent Demo 应用根组件
  *
  * 三栏布局：左侧预览（SVG + DSL）| 中间对话 | 右侧执行轨迹
  */

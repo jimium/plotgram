@@ -13,8 +13,8 @@ gate_skip_unless_enabled "check-group-writes.sh"
 THRESHOLD="${GROUP_WRITE_THRESHOLD:-1}"
 # Atlas：flowchart Cross materialize 写权 0；architecture StrongMacro materialize ≤1。
 # 样本取 architecture，阈值 1 = materialize-only（canvas 平移不计）。
-SAMPLE="${GROUP_WRITE_SAMPLE:-apps/showcase/architecture/product.cloud-native.pgm}"
-# flowchart 路径另验：GROUP_WRITE_SAMPLE=apps/showcase/flowchart/product.user-auth.pgm GROUP_WRITE_THRESHOLD=0
+SAMPLE="${GROUP_WRITE_SAMPLE:-apps/showcase/architecture/product.cloud-native.taut}"
+# flowchart 路径另验：GROUP_WRITE_SAMPLE=apps/showcase/flowchart/product.user-auth.taut GROUP_WRITE_THRESHOLD=0
 
 if [[ ! -f "$SAMPLE" ]]; then
   echo "FAIL: sample not found: $SAMPLE"
@@ -22,7 +22,7 @@ if [[ ! -f "$SAMPLE" ]]; then
 fi
 
 out="$(
-  PLOTGRAM_PERF=1 cargo run -q -p plotgram-cli -- render "$SAMPLE" -o /tmp/plotgram-group-writes-check.svg 2>&1
+  TAUTCORE_PERF=1 cargo run -q -p tautcore-cli -- render "$SAMPLE" -o /tmp/tautcore-group-writes-check.svg 2>&1
 )" || {
   echo "$out" | tail -40
   echo "FAIL: render failed for $SAMPLE"

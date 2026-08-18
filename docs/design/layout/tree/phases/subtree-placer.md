@@ -26,7 +26,7 @@ Ink
   读 TreeRoute 骨架 → EdgePath
 ```
 
-yFiles 保证：调用 `placeSubtree` 时所有后代 shape 已算完。plotgram 同样：**禁止** placer 回头改已返回的孙 shape 拓扑（只允许整体平移 shape，这是合并的一部分）。
+yFiles 保证：调用 `placeSubtree` 时所有后代 shape 已算完。tautcore 同样：**禁止** placer 回头改已返回的孙 shape 拓扑（只允许整体平移 shape，这是合并的一部分）。
 
 ---
 
@@ -105,7 +105,7 @@ Ink 不得把 `Straight` 升成总线，也不得把 `VerticalBus` 收成三段�
 4. 同构子树同形（与位置无关）—— **包围盒分层做不到**，必须 Buchheim。
 5. 尽量窄：轮廓合并，不是整块 AABB 并排。
 
-`distance(w, v) = w.width/2 + v.width/2 + node_gap`。实现必须含 thread / default_ancestor / `execute_shifts`。零件可放 `plotgram-algo`，本核 placer 调用。
+`distance(w, v) = w.width/2 + v.width/2 + node_gap`。实现必须含 thread / default_ancestor / `execute_shifts`。零件可放 `tautcore-algo`，本核 placer 调用。
 
 ---
 

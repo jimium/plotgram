@@ -23,7 +23,7 @@ V1 的 `config { }` 块将布局/路由等引擎参数收纳在一个额外嵌�
 
 ## 示例
 
-```plotgram
+```tautcore
 diagram {
     profile: flowchart
     title: "用户登录"

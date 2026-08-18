@@ -11,8 +11,8 @@ const sidebar = DOCS_SIDEBAR.map((section) => ({
 export default function HowItWorks() {
   return (
     <DocPage
-      title="🔧 技术揭秘：Plotgram 渲染管线"
-      description="深入了解 Plotgram 的布局引擎、边路由算法和质量保障体系。"
+      title="🔧 技术揭秘：Tautcore 渲染管线"
+      description="深入了解 Tautcore 的布局引擎、边路由算法和质量保障体系。"
       sidebar={sidebar}
     >
       <div className="metric-row">
@@ -31,7 +31,7 @@ export default function HowItWorks() {
       </div>
 
       <h2>整体架构</h2>
-      <p>Plotgram 采用 Rust 编写核心引擎，通过 WASM 编译在浏览器中运行，CLI/HTTP API/WASM 三端共享同一套核心代码。整体渲染管线分为 4 个阶段。</p>
+      <p>Tautcore 采用 Rust 编写核心引擎，通过 WASM 编译在浏览器中运行，CLI/HTTP API/WASM 三端共享同一套核心代码。整体渲染管线分为 4 个阶段。</p>
       <div className="doc-feature-grid">
         <div className="doc-feature-card">
           <div className="icon">📝</div>
@@ -56,7 +56,7 @@ export default function HowItWorks() {
       </div>
 
       <h2>布局算法体系</h2>
-      <p>Plotgram 不是单一布局算法，而是根据图表类型自动选择最优布局策略的算法集合。</p>
+      <p>Tautcore 不是单一布局算法，而是根据图表类型自动选择最优布局策略的算法集合。</p>
 
       <div className="algo-card">
         <h3>Sugiyama-v2 增强分层布局 <span className="badge core">核心算法</span></h3>
@@ -94,7 +94,7 @@ export default function HowItWorks() {
       </div>
 
       <h2>确定性渲染</h2>
-      <p>为了避免图形抖动和测试不稳定，Plotgram 在所有分组和排序操作中严格使用显式排序键（BTreeMap/按ID排序），绝不依赖HashMap的迭代顺序。这确保：</p>
+      <p>为了避免图形抖动和测试不稳定，Tautcore 在所有分组和排序操作中严格使用显式排序键（BTreeMap/按ID排序），绝不依赖HashMap的迭代顺序。这确保：</p>
       <ul>
         <li>同一输入多次渲染产生完全一致的输出</li>
         <li>Snapshot测试可靠</li>
@@ -174,19 +174,19 @@ export default function HowItWorks() {
         <a href="/docs/agent-guide/" className="quick-link-card">
           <div className="ql-icon">🤖</div>
           <h4>AI Agent 集成</h4>
-          <p>将 Plotgram 嵌入 LLM 应用和 AI Agent</p>
+          <p>将 Tautcore 嵌入 LLM 应用和 AI Agent</p>
           <span className="ql-arrow">→</span>
         </a>
         <a href="/docs/getting-started/" className="quick-link-card">
           <div className="ql-icon">🚀</div>
           <h4>快速上手</h4>
-          <p>5 分钟学会用 Plotgram 画图</p>
+          <p>5 分钟学会用 Tautcore 画图</p>
           <span className="ql-arrow">→</span>
         </a>
         <a href="/playground/" className="quick-link-card" target="_blank" rel="noopener noreferrer">
           <div className="ql-icon">🎮</div>
           <h4>立即试用 Playground</h4>
-          <p>在线体验 Plotgram 图表渲染</p>
+          <p>在线体验 Tautcore 图表渲染</p>
           <span className="ql-arrow">→</span>
         </a>
       </div>

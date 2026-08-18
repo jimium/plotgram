@@ -1,7 +1,7 @@
 # 节点内容块：MD 子集用户手册
 
 > 面向：写图的用户 / 接入内容块的开发者
-> 实现：`crates/plotgram-content`（parse → measure → emit，ADR-005）
+> 实现：`crates/tautcore-content`（parse → measure → emit，ADR-005）
 > 规范真源：[content-md-spec.md](../specs/content-md-spec.md)（语法契约以规范为准，本文是使用说明 + 示例）
 
 节点除了单行 `label`，还可以携带一段**内容块**：一段瘦身版 Markdown 文本，渲染成节点内部的多行富文本（标题、分隔线、列表、代码片段等）。
@@ -153,5 +153,5 @@ python3 scripts/content_gallery.py    # 渲染 9 个典型样例 + 真字体对�
 |------|------|
 | 语法契约（真源） | [specs/content-md-spec.md](../specs/content-md-spec.md) |
 | 度量 / 三段管线设计 | [ADR-005](../design/adr/005-content-measure-params.md) |
-| 实现 | `crates/plotgram-content/`（`parse.rs` / `measure.rs` / `emit.rs`） |
-| 样例与画廊 | `crates/plotgram-content/examples/render_samples.rs`、`scripts/content_gallery.py` |
+| 实现 | `crates/tautcore-content/`（`parse.rs` / `measure.rs` / `emit.rs`） |
+| 样例与画廊 | `crates/tautcore-content/examples/render_samples.rs`、`scripts/content_gallery.py` |

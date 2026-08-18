@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# 构建并发布 Plotgram Editor（代码目录 apps/playground/）到 plotgram.cn/editor/
+# 构建并发布 Tautcore Editor（代码目录 apps/playground/）到 plotgram.cn/editor/
 #
 # 产物：
-#   - 主站:  /var/www/plotgram.cn/editor/  （HTML、favicon、logo，不含 assets/、plotgram-wasm/）
+#   - 主站:  /var/www/plotgram.cn/editor/  （HTML、favicon、logo，不含 assets/、tautcore-wasm/）
 #   - CDN:   /editor/assets/                （打包 js / css）
 #
 # 兼容：nginx 将 /playground/ 301 重定向到 /editor/
 #
-# 前置条件：apps/playground/plotgram-wasm/ 必须存在（由 deploy-wasm.sh 构建）。
+# 前置条件：apps/playground/tautcore-wasm/ 必须存在（由 deploy-wasm.sh 构建）。
 #
 # 用法:
 #   ./apps/deploy/deploy-playground.sh              # 构建 + 同步
@@ -27,7 +27,7 @@ usage() {
 
 构建 Editor（apps/playground/）并同步到 plotgram.cn/editor/ 与 CDN。
 
-前置：需先运行 ./apps/deploy/deploy-wasm.sh 生成 apps/playground/plotgram-wasm/。
+前置：需先运行 ./apps/deploy/deploy-wasm.sh 生成 apps/playground/tautcore-wasm/。
 
 选项:
   --skip-build    跳过 vite build，用已有 dist 同步
@@ -56,8 +56,8 @@ CDN_EDITOR_REMOTE="$ASSET_HOST:$ASSET_REMOTE_DIR/editor/"
 
 # ─── 构建 ───────────────────────────────────────────────
 build() {
-  if [[ ! -f "$PLAYGROUND_DIR/plotgram-wasm/plotgram_wasm_bg.wasm" ]]; then
-    die "缺少 apps/playground/plotgram-wasm/，请先运行 ./apps/deploy/deploy-wasm.sh"
+  if [[ ! -f "$PLAYGROUND_DIR/tautcore-wasm/tautcore_wasm_bg.wasm" ]]; then
+    die "缺少 apps/playground/tautcore-wasm/，请先运行 ./apps/deploy/deploy-wasm.sh"
   fi
 
   log "构建 Editor (base=${EDITOR_BASE}, cdn=${EDITOR_CDN_BASE})"
@@ -77,7 +77,7 @@ stage_artifacts() {
   mkdir -p "$STAGING_DIR/editor" "$STAGING_DIR/cdn-editor"
 
   rsync -a --delete \
-    --exclude='plotgram-wasm/' \
+    --exclude='tautcore-wasm/' \
     --exclude='assets/' \
     "$PLAYGROUND_DIR/dist/" "$STAGING_DIR/editor/"
 
@@ -105,7 +105,7 @@ upload() {
 
 # ─── 主流程 ─────────────────────────────────────────────
 main() {
-  log "=== 发布 Plotgram Editor ==="
+  log "=== 发布 Tautcore Editor ==="
   log "  访问地址: https://www.plotgram.cn/editor/"
 
   setup_ssh_multiplexing "$DEPLOY_HOST" "$ASSET_HOST"

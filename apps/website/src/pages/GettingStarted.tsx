@@ -10,7 +10,7 @@ const sidebar = DOCS_SIDEBAR.map((section) => ({
 }));
 
 const helloFlowchart = `diagram flowchart {
-    title: "Hello Plotgram"
+    title: "Hello Tautcore"
     config { direction: left-to-right }
 
     entity[start] start "开始"
@@ -87,11 +87,11 @@ export default function GettingStarted() {
   return (
     <DocPage
       title="5 分钟快速上手"
-      description="从零开始，5 分钟内用 Plotgram 画出你的第一张图。"
+      description="从零开始，5 分钟内用 Tautcore 画出你的第一张图。"
       sidebar={sidebar}
     >
       <h2>三种使用方式</h2>
-      <p>Plotgram 提供多种接入方式，根据你的场景选择最合适的一种开始体验。</p>
+      <p>Tautcore 提供多种接入方式，根据你的场景选择最合适的一种开始体验。</p>
       <div className="quick-links">
         <a href="/playground/" className="quick-link-card" target="_blank" rel="noopener noreferrer">
           <div className="ql-icon">🌐</div>
@@ -99,7 +99,7 @@ export default function GettingStarted() {
           <p>零安装，打开即用，实时预览</p>
           <span className="ql-arrow">→</span>
         </a>
-        <a href="https://github.com/plotgram/plotgram" target="_blank" rel="noopener noreferrer" className="quick-link-card">
+        <a href="https://github.com/tautcore/tautcore" target="_blank" rel="noopener noreferrer" className="quick-link-card">
           <div className="ql-icon">💻</div>
           <h4>CLI 命令行</h4>
           <p>本地渲染 SVG/PNG，支持批量处理和 CI 集成</p>
@@ -115,14 +115,14 @@ export default function GettingStarted() {
 
       <h2>第一步：Hello World 流程图</h2>
       <p>
-        打开 <a href="/playground/" target="_blank" rel="noopener noreferrer">Playground</a>，在左侧编辑器中输入以下代码，右侧会实时渲染出你的第一张 Plotgram 图：
+        打开 <a href="/playground/" target="_blank" rel="noopener noreferrer">Playground</a>，在左侧编辑器中输入以下代码，右侧会实时渲染出你的第一张 Tautcore 图：
       </p>
-      <CodeBlock code={helloFlowchart} title="hello.pgm" />
+      <CodeBlock code={helloFlowchart} title="hello.taut" />
 
       <h3>逐行解读</h3>
       <ul>
-        <li><code>diagram flowchart {'{'}</code> — 声明这是一张流程图，Plotgram 会自动选择最优布局算法</li>
-        <li><code>title: "Hello Plotgram"</code> — 图表标题，直接写在 diagram body 中（不在 config 块内）</li>
+        <li><code>diagram flowchart {'{'}</code> — 声明这是一张流程图，Tautcore 会自动选择最优布局算法</li>
+        <li><code>title: "Hello Tautcore"</code> — 图表标题，直接写在 diagram body 中（不在 config 块内）</li>
         <li><code>config {'{'} direction: left-to-right {'}'}</code> — 配置块，设置布局方向为从左到右（默认是 top-to-bottom）</li>
         <li><code>entity[start] start "开始"</code> — 声明一个类型为 <code>start</code> 的实体，id 为 <code>start</code>，显示标签为"开始"</li>
         <li><code>start -{'>'} step</code> — 用实线箭头连接两个实体，表示主动的流程推进</li>
@@ -130,9 +130,9 @@ export default function GettingStarted() {
 
       <h2>第二步：语义类型 + 响应箭头</h2>
       <p>
-        给实体指定语义类型（写在方括号中），Plotgram 会自动选择合适的图标和形状。使用 <code>--{'>'}</code> 虚线箭头表示"响应/返回"方向：
+        给实体指定语义类型（写在方括号中），Tautcore 会自动选择合适的图标和形状。使用 <code>--{'>'}</code> 虚线箭头表示"响应/返回"方向：
       </p>
-      <CodeBlock code={semanticFlowchart} title="user-auth.pgm" />
+      <CodeBlock code={semanticFlowchart} title="user-auth.taut" />
       <div className="callout tip">
         <div className="callout-icon">💡</div>
         <div className="callout-body">
@@ -144,20 +144,20 @@ export default function GettingStarted() {
       </div>
 
       <h2>第三步：尝试其他图表类型</h2>
-      <p>Plotgram 支持 6 种图表类型，每种都有专属的默认布局和实体类型。切换 <code>diagram</code> 后面的关键字即可。</p>
+      <p>Tautcore 支持 6 种图表类型，每种都有专属的默认布局和实体类型。切换 <code>diagram</code> 后面的关键字即可。</p>
 
       <h3>时序图（Sequence）</h3>
       <p>适合描述 API 调用、消息传递等交互时序。时序图不需要设置 direction，参与者按声明顺序排列。</p>
-      <CodeBlock code={helloSequence} title="api-sequence.pgm" />
+      <CodeBlock code={helloSequence} title="api-sequence.taut" />
       <p>时序图支持的实体类型：<code>participant</code>（默认参与者）、<code>actor</code>（人形角色）、<code>boundary</code>（边界/入口）、<code>control</code>（控制器）、<code>database</code>（数据库）。</p>
 
       <h3>架构图（Architecture）</h3>
       <p>适合描述微服务架构、系统分层、组件拓扑。架构图<strong>不支持</strong> <code>direction</code> 属性，默认采用水平分层布局。</p>
-      <CodeBlock code={helloArchitecture} title="three-tier.pgm" />
+      <CodeBlock code={helloArchitecture} title="three-tier.taut" />
       <p>架构图支持的实体类型：<code>frontend</code>、<code>backend</code>、<code>service</code>、<code>database</code>、<code>gateway</code>、<code>cache</code>、<code>queue</code>、<code>storage</code>、<code>external</code>。</p>
 
       <h2>核心语法：只有 5 个概念</h2>
-      <p>Plotgram 遵循"最少概念"原则——掌握以下 5 个核心元素，就能描述绝大多数技术图表。</p>
+      <p>Tautcore 遵循"最少概念"原则——掌握以下 5 个核心元素，就能描述绝大多数技术图表。</p>
       <table>
         <thead>
           <tr>
@@ -196,7 +196,7 @@ export default function GettingStarted() {
       </table>
 
       <h2>三种箭头，固定语义</h2>
-      <p>Plotgram 刻意只保留 3 种箭头，让 AI 和人类都能准确表达数据流含义，没有歧义。这是 LLM 一次写对的关键设计之一。</p>
+      <p>Tautcore 刻意只保留 3 种箭头，让 AI 和人类都能准确表达数据流含义，没有歧义。这是 LLM 一次写对的关键设计之一。</p>
       <div className="doc-feature-grid">
         <div className="doc-feature-card">
           <div className="icon">→</div>
@@ -216,7 +216,7 @@ export default function GettingStarted() {
       </div>
 
       <h2>流程图实体类型速查</h2>
-      <p>流程图是最常用的图表类型。通过 <code>entity[&lt;type&gt;]</code> 为实体指定语义角色，Plotgram 自动匹配对应的形状和图标。</p>
+      <p>流程图是最常用的图表类型。通过 <code>entity[&lt;type&gt;]</code> 为实体指定语义角色，Tautcore 自动匹配对应的形状和图标。</p>
       <table>
         <thead>
           <tr>
@@ -271,7 +271,7 @@ export default function GettingStarted() {
         <a href="/playground/" className="quick-link-card" target="_blank" rel="noopener noreferrer">
           <div className="ql-icon">🚀</div>
           <h4>打开 Playground 动手尝试</h4>
-          <p>在浏览器中实时编写 Plotgram 代码</p>
+          <p>在浏览器中实时编写 Tautcore 代码</p>
           <span className="ql-arrow">→</span>
         </a>
         <a href="/showcase/" className="quick-link-card" target="_blank" rel="noopener noreferrer">
@@ -283,7 +283,7 @@ export default function GettingStarted() {
         <a href="/docs/agent-guide/" className="quick-link-card">
           <div className="ql-icon">🤖</div>
           <h4>Agent 集成指南</h4>
-          <p>了解如何将 Plotgram 集成到 AI Agent 工作流中</p>
+          <p>了解如何将 Tautcore 集成到 AI Agent 工作流中</p>
           <span className="ql-arrow">→</span>
         </a>
       </div>

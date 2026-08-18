@@ -1,9 +1,9 @@
 {
-  "name": "plotgram-studio",
+  "name": "tautcore-studio",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Plotgram Studio - LLM 驱动的 Agent 绘图工作台",
+  "description": "Tautcore Studio - LLM 驱动的 Agent 绘图工作台",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

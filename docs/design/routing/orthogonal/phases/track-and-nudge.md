@@ -2,7 +2,7 @@
 
 > 状态：**已落地**（L3 = `interval_color`；L4 = `vpsc`）
 > 代码：`orthogonal/track.rs` · `orthogonal/nudge.rs`
-> 零件：`plotgram_algo::interval_color` · `plotgram_algo::vpsc`
+> 零件：`tautcore_algo::interval_color` · `tautcore_algo::vpsc`
 > 证据：[03 正交边路由](../../../../reference/yfiles/03-正交边路由.md) §通道内定序 / Nudging
 
 ---

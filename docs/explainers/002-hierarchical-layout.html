@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hierarchical 布局模块设计解读 · Plotgram Explainers 002</title>
+<title>Hierarchical 布局模块设计解读 · Tautcore Explainers 002</title>
 <style>
   :root {
     --bg: #f7f8fa;
@@ -182,7 +182,7 @@
 
 <header class="hero">
   <div class="wrap">
-    <span class="kicker">Plotgram Explainers · 002</span>
+    <span class="kicker">Tautcore Explainers · 002</span>
     <h1>Hierarchical 布局模块设计解读</h1>
     <p class="sub">一个 Sugiyama 风格的分层布局器如何把有向图变成像素坐标——
       <b>Compose → Channel → Metric → Ink</b> 四相写权、canonical-TB 单核 + 四方向投影、
@@ -191,7 +191,7 @@
       TrackOrder + DemandBoard LayerGap / 正交 Ink（含 bus 与 cubic）。
       本页带你逐文件读懂 <code class="inline">layout/hierarchical/</code>。</p>
     <div class="meta">
-      对应源码：<code>crates/plotgram-layout/src/layout/hierarchical/</code>
+      对应源码：<code>crates/tautcore-layout/src/layout/hierarchical/</code>
       &nbsp;·&nbsp; 目标架构真源：<code>docs/design/layout/hierarchical/architecture.md</code>
       &nbsp;·&nbsp; 取舍记录：<code>docs/design/layout/hierarchical/architecture.md</code>
     </div>
@@ -227,7 +227,7 @@
 <!-- ═══════════════ 1 ═══════════════ -->
 <section id="s1">
   <h2 class="sec"><span class="num">1</span>这个 mod 是什么</h2>
-  <p class="lead">一句话：<b>plotgram 的主布局核</b>，把任意有向图（含环、长边、自环、组）
+  <p class="lead">一句话：<b>tautcore 的主布局核</b>，把任意有向图（含环、长边、自环、组）
   排成"主流方向同向、层内少交叉、边走正交"的可读图。</p>
 
   <div class="cards">
@@ -238,9 +238,9 @@
     </div>
     <div class="card amber">
       <h4>实现位置</h4>
-      <p>单独 crate：<code>plotgram-layout</code> 下的 <code>layout/hierarchical/</code>。
+      <p>单独 crate：<code>tautcore-layout</code> 下的 <code>layout/hierarchical/</code>。
         通过 <code>LayoutAlgorithm</code> trait 接入 engine。</p>
-      <span class="sig">crates/plotgram-layout/src/layout/hierarchical/</span>
+      <span class="sig">crates/tautcore-layout/src/layout/hierarchical/</span>
     </div>
     <div class="card green">
       <h4>注册名</h4>
@@ -254,7 +254,7 @@
     <div class="card purple">
       <h4>方向支持</h4>
       <p>核心<b>只实现 canonical TB</b>（自上而下）；LR/RL/BT 通过
-        <code>plotgram_algo::orientation</code> 在入/出口做坐标变换。</p>
+        <code>tautcore_algo::orientation</code> 在入/出口做坐标变换。</p>
     </div>
   </div>
 
@@ -301,7 +301,7 @@
         HierarchicalLayout::compute(input) → Result&lt;(LayoutOutput, Captures)&gt;
       </text>
       <text x="40" y="68" font-size="11.5" fill="#94a3b8">
-        crates/plotgram-layout/src/layout/hierarchical/mod.rs
+        crates/tautcore-layout/src/layout/hierarchical/mod.rs
       </text>
 
       <!-- 输入 -->
@@ -485,7 +485,7 @@
 <!-- ═══════════════ 3 ═══════════════ -->
 <section id="s3">
   <h2 class="sec"><span class="num">3</span>数据结构谱系</h2>
-  <p class="lead">从一个 <code class="inline">plotgram_model::Graph</code> 进来，
+  <p class="lead">从一个 <code class="inline">tautcore_model::Graph</code> 进来，
     最终吐出 <code class="inline">LayoutOutput</code>。中间跨四相（Compose / Channel /
     Metric / Ink）的内部 IR，每个都有明确的"什么时候被填满、什么时候只读"。
     Channel 与 Metric 之间通过 <b>DemandBoard</b> 单向握手——这是写权纪律（§10）
@@ -515,7 +515,7 @@
       <!-- Graph -->
       <g font-size="13" text-anchor="middle">
         <rect x="40" y="92" width="160" height="120" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
-        <text x="120" y="116" font-weight="700" fill="#475569">plotgram_model::Graph</text>
+        <text x="120" y="116" font-weight="700" fill="#475569">tautcore_model::Graph</text>
         <text x="50" y="138" text-anchor="start" font-size="11.5" fill="#5b6472">nodes · edges · groups</text>
         <text x="50" y="156" text-anchor="start" font-size="11.5" fill="#5b6472">partition: Option&lt;_&gt;</text>
         <text x="50" y="186" text-anchor="start" font-size="11" fill="#64748b" font-style="italic">DSL 解析产物</text>
@@ -725,7 +725,7 @@
     Metric → Ink 四相流水，外加入口的参数绑定 / 方向变换和出口的 orient-out / normalize。
     下面把它的关键步骤和源文件一一对应（精简了诊断、错误处理和 captures 装配）。</p>
 
-  <pre><span class="cm">// crates/plotgram-layout/src/layout/hierarchical/mod.rs</span>
+  <pre><span class="cm">// crates/tautcore-layout/src/layout/hierarchical/mod.rs</span>
 <span class="kw">fn</span> <span class="fn">compute</span>(input: LayoutInput&lt;<span class="kw">'_</span>&gt;) -&gt; <span class="ty">Result</span>&lt;(LayoutOutput, Captures), LayoutError&gt; {
     <span class="kw">let</span> bound      = HierarchicalParams::<span class="fn">bind</span>(input.options)?;            <span class="cm">// params.rs</span>
     <span class="kw">let</span> params     = &bound.params;
@@ -968,7 +968,7 @@
 <section id="s5-2">
   <h3>5.2 cycle — Greedy-FAS 去环 <span class="ph compose">Compose</span></h3>
   <p class="lead">Sugiyama 框架要求 DAG，所以有环图必须先反转一部分边。
-    实现直接复用 <code class="inline">plotgram_algo::fas::greedy_fas</code>。</p>
+    实现直接复用 <code class="inline">tautcore_algo::fas::greedy_fas</code>。</p>
 
   <figure class="diagram">
     <svg viewBox="0 0 800 280" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'PingFang SC',sans-serif">
@@ -1036,7 +1036,7 @@
   <div class="note tip">
     <b>为什么用 Greedy-FAS 而不是精确 FAS？</b>
     精确 FAS 是 NP-hard。Greedy-FAS（Eades 1993）在实践中给出非常接近最优的反转集，
-    且实现简单、确定。<code>plotgram_algo::fas</code> 已经提供，本模块直接复用。
+    且实现简单、确定。<code>tautcore_algo::fas</code> 已经提供，本模块直接复用。
   </div>
 </section>
 
@@ -2051,7 +2051,7 @@
   <h2 class="sec"><span class="num">9</span>Orientation 转换 <span class="pill orient">Orient</span></h2>
   <p class="lead">核心（Compose / Channel / Metric / Ink）只在 <b>canonical TB 空间</b>工作——
     main=y↓、cross=x→、rank 0 在最顶。物理方向（LR/RL/BT）通过
-    <code class="inline">plotgram_algo::orientation</code> 在入口/出口做<b>一次性</b>变换，
+    <code class="inline">tautcore_algo::orientation</code> 在入口/出口做<b>一次性</b>变换，
     内核代码完全感知不到方向。<code class="inline">orient.rs</code> 是 model 几何类型和
     algo orientation 类型之间的薄桥。</p>
 
@@ -2291,7 +2291,7 @@
       <tr><td><b>CanonicalEdge</b></td><td>Ink 的产物：仍在 TB 空间的 InkPath（Polyline / Cubic）+ 端口。</td><td>ink/route.rs</td></tr>
       <tr><td><b>InkPath</b></td><td>折线或三次贝塞尔：<code>Polyline(Vec&lt;Point&gt;)</code> / <code>Cubic { start, end, controls }</code>。</td><td>ink/route.rs</td></tr>
       <tr><td><b>RoutingStyle</b></td><td>orthogonal / polyline / curved。auto_edge_grouping 与 octilinear 互斥（硬失败）。</td><td>params.rs</td></tr>
-      <tr><td><b>normalize_orthogonal</b></td><td>正交路径清理：去共线点、吸收短段、保端点像素不变。</td><td>plotgram_algo::path_ortho</td></tr>
+      <tr><td><b>normalize_orthogonal</b></td><td>正交路径清理：去共线点、吸收短段、保端点像素不变。</td><td>tautcore_algo::path_ortho</td></tr>
       <tr><td><b>InkVerifier</b></td><td>折线硬校验：verify_no_illegal_overlap（bundle 豁免）+ verify_no_node_penetration。</td><td>ink/verify.rs</td></tr>
       <tr><td><b>StrongMacro</b></td><td>组强收缩策略。<b>Unsupported 硬失败</b>。</td><td>params.rs</td></tr>
     </tbody>
@@ -2299,7 +2299,7 @@
 </section>
 
 <footer>
-  <p>本解读对应 <code>crates/plotgram-layout/src/layout/hierarchical/</code> 当前实现。
+  <p>本解读对应 <code>crates/tautcore-layout/src/layout/hierarchical/</code> 当前实现。
   若与 <code>docs/design/layout/hierarchical/architecture.md</code> 冲突，以设计档为准。
   实现取舍记录见 <code>docs/design/layout/hierarchical/architecture.md</code>。</p>
 </footer>

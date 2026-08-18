@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { isNodeWasmAvailable, validateSource } from './wasm/node';
 
-const DIAGNOSTIC_SOURCE = 'plotgram';
+const DIAGNOSTIC_SOURCE = 'tautcore';
 const LINE_COL_RE = /\[line (\d+):(\d+)\]/;
 
 function cleanMessage(message: string): string {
@@ -23,7 +23,7 @@ function toDiagnostic(message: string, severity: vscode.DiagnosticSeverity): vsc
   return new vscode.Diagnostic(range, text, severity);
 }
 
-export class PlotgramDiagnostics {
+export class TautcoreDiagnostics {
   private readonly collection = vscode.languages.createDiagnosticCollection(DIAGNOSTIC_SOURCE);
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -47,7 +47,7 @@ export class PlotgramDiagnostics {
   }
 
   private schedule(document: vscode.TextDocument): void {
-    if (document.languageId !== 'plotgram') {
+    if (document.languageId !== 'tautcore') {
       return;
     }
 
@@ -76,7 +76,7 @@ export class PlotgramDiagnostics {
       this.collection.set(document.uri, [
         new vscode.Diagnostic(
           new vscode.Range(0, 0, 0, 1),
-          'Plotgram WASM 未构建，请执行 npm run build:wasm',
+          'Tautcore WASM 未构建，请执行 npm run build:wasm',
           vscode.DiagnosticSeverity.Warning,
         ),
       ]);

@@ -36,7 +36,7 @@
         <!-- ============ §1 VPSC ============ -->
         <h2 id="sec-1"><span class="h2-num">1</span>核心武器：VPSC（Variable Placement with Separation Constraints）</h2>
 
-        <p><strong>这是约束布局的基础设施，建议作为 plotgram 的公共求解器。</strong></p>
+        <p><strong>这是约束布局的基础设施，建议作为 tautcore 的公共求解器。</strong></p>
 
         <h3>1.1 问题</h3>
         <div class="formula" data-tex="\min \sum_i w_i (x_i - x_i^{des})^2 \quad\text{s.t.}\quad x_j - x_i \ge g_{ij}\ \forall (i,j)\in C"></div>
@@ -150,7 +150,7 @@
 
         <div class="callout good">
           <div class="ct-title"><span class="icon">✓</span>organic + 语义约束的最佳落点</div>
-          <p>这是 WebCola 的核心。若 plotgram 要做"知识图谱但要体现层级"，此路线优于强行分层。</p>
+          <p>这是 WebCola 的核心。若 tautcore 要做"知识图谱但要体现层级"，此路线优于强行分层。</p>
         </div>
 
         <!-- ============ §3 yFiles 离散约束 ============ -->
@@ -357,11 +357,11 @@
           <li><strong>Supergraph 方案</strong>：对所有帧的并图布局一次，每帧只显示子集 ⇒ 完美稳定但单帧质量差。折中：并图布局作为"锚"，每帧在锚附近微调。</li>
         </ul>
 
-        <!-- ============ §7 与 plotgram 对接 ============ -->
-        <h2 id="sec-7"><span class="h2-num">7</span>与 plotgram 的对接建议</h2>
+        <!-- ============ §7 与 tautcore 对接 ============ -->
+        <h2 id="sec-7"><span class="h2-num">7</span>与 tautcore 的对接建议</h2>
 
         <ol>
-          <li><strong>把 VPSC 做成 crate 内的公共求解器</strong>（<code>plotgram-engine</code> 的 <code>solver</code> 模块），供：层内间距、消重叠、nudging、正交紧致化、组框边距共用。这是本文库里<strong>投入产出比最高的单一建议</strong>。</li>
+          <li><strong>把 VPSC 做成 crate 内的公共求解器</strong>（<code>tautcore-engine</code> 的 <code>solver</code> 模块），供：层内间距、消重叠、nudging、正交紧致化、组框边距共用。这是本文库里<strong>投入产出比最高的单一建议</strong>。</li>
           <li><strong>约束分两类明确区分</strong>：
             <ul>
               <li><em>离散约束</em>（层、序、端口）→ 影响 P2/P3，必须在对应相实现（受约束排序用 PAV 投影）；</li>
@@ -380,7 +380,7 @@
 
         <div class="callout good">
           <div class="ct-title"><span class="icon">✓</span>一句话收敛</div>
-          <p>把"约束""增量""稳定性"三件事统一到 <strong>VPSC + PAV + 位移惩罚</strong> 三件套上，是 plotgram 把补丁式 hack 升级为一等工程的分水岭。</p>
+          <p>把"约束""增量""稳定性"三件事统一到 <strong>VPSC + PAV + 位移惩罚</strong> 三件套上，是 tautcore 把补丁式 hack 升级为一等工程的分水岭。</p>
         </div>
 
       </div>

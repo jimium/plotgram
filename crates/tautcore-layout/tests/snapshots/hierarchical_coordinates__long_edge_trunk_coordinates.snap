@@ -1,0 +1,218 @@
+---
+source: crates/tautcore-layout/tests/hierarchical_coordinates.rs
+expression: "layout_json(graph, Size::new(120.0, 40.0))"
+---
+{
+  "edges": [
+    {
+      "from_port": {
+        "along": {
+          "LocalOffset": {
+            "x": 30.0,
+            "y": 40.0
+          }
+        },
+        "side": "south"
+      },
+      "id": "e0",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 102.0,
+              "y": 40.0
+            },
+            {
+              "x": 102.0,
+              "y": 60.0
+            },
+            {
+              "x": 60.0,
+              "y": 60.0
+            },
+            {
+              "x": 60.0,
+              "y": 80.0
+            }
+          ]
+        }
+      },
+      "source": "a",
+      "target": "b",
+      "to_port": {
+        "along": {
+          "LocalOffset": {
+            "x": 60.0,
+            "y": 0.0
+          }
+        },
+        "side": "north"
+      }
+    },
+    {
+      "from_port": {
+        "along": {
+          "LocalOffset": {
+            "x": 60.0,
+            "y": 40.0
+          }
+        },
+        "side": "south"
+      },
+      "id": "e1",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 60.0,
+              "y": 120.0
+            },
+            {
+              "x": 60.0,
+              "y": 160.0
+            }
+          ]
+        }
+      },
+      "source": "b",
+      "target": "c",
+      "to_port": {
+        "along": {
+          "LocalOffset": {
+            "x": 60.0,
+            "y": 0.0
+          }
+        },
+        "side": "north"
+      }
+    },
+    {
+      "from_port": {
+        "along": {
+          "LocalOffset": {
+            "x": 60.0,
+            "y": 40.0
+          }
+        },
+        "side": "south"
+      },
+      "id": "e2",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 60.0,
+              "y": 200.0
+            },
+            {
+              "x": 60.0,
+              "y": 236.0
+            },
+            {
+              "x": 174.0,
+              "y": 236.0
+            },
+            {
+              "x": 174.0,
+              "y": 256.0
+            }
+          ]
+        }
+      },
+      "source": "c",
+      "target": "d",
+      "to_port": {
+        "along": {
+          "LocalOffset": {
+            "x": 30.0,
+            "y": 0.0
+          }
+        },
+        "side": "north"
+      }
+    },
+    {
+      "from_port": {
+        "along": {
+          "LocalOffset": {
+            "x": 80.0,
+            "y": 40.0
+          }
+        },
+        "side": "south"
+      },
+      "id": "e3",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 152.0,
+              "y": 40.0
+            },
+            {
+              "x": 152.0,
+              "y": 220.0
+            },
+            {
+              "x": 190.0,
+              "y": 220.0
+            },
+            {
+              "x": 190.0,
+              "y": 256.0
+            }
+          ]
+        }
+      },
+      "source": "a",
+      "target": "d",
+      "to_port": {
+        "along": {
+          "LocalOffset": {
+            "x": 46.0,
+            "y": 0.0
+          }
+        },
+        "side": "north"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "frame": {
+        "height": 40.0,
+        "width": 120.0,
+        "x": 72.0,
+        "y": 0.0
+      },
+      "id": "a"
+    },
+    {
+      "frame": {
+        "height": 40.0,
+        "width": 120.0,
+        "x": 0.0,
+        "y": 80.0
+      },
+      "id": "b"
+    },
+    {
+      "frame": {
+        "height": 40.0,
+        "width": 120.0,
+        "x": 0.0,
+        "y": 160.0
+      },
+      "id": "c"
+    },
+    {
+      "frame": {
+        "height": 40.0,
+        "width": 120.00000000000001,
+        "x": 144.0,
+        "y": 256.0
+      },
+      "id": "d"
+    }
+  ]
+}

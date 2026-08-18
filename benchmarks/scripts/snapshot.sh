@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# v2 门禁快照：批量调 `plotgram measure --json` 采集指标，归档到 baselines/。
+# v2 门禁快照：批量调 `tautcore measure --json` 采集指标，归档到 baselines/。
 #
 # 用法（仓库根目录）:
 #   ./benchmarks/snapshot.sh
@@ -15,7 +15,7 @@
 #
 # --out BASE  CI 模式：只写 BASE.json，不写 .md，不 sync latest（避免覆盖已提交基线）
 #
-# 单样例 `plotgram measure` 在硬失败（parse-error / render-error / det=false /
+# 单样例 `tautcore measure` 在硬失败（parse-error / render-error / det=false /
 # 任何 overlap > 0）时 exit ≠ 0；本脚本捕获 stdout JSON 不被 pipefail 杀掉。
 
 set -euo pipefail
@@ -90,12 +90,12 @@ if [[ ${#FILES[@]} -eq 0 ]]; then
 fi
 
 # 1. build
-echo "▶ 构建 plotgram-cli (release)..."
+echo "▶ 构建 tautcore-cli (release)..."
 # 避免沙箱注入 CARGO_TARGET_DIR 把产物写到临时目录
 unset CARGO_TARGET_DIR || true
-( cd "$ROOT" && cargo build --release -p plotgram-cli ) 2>&1 | tail -3
-PLOTGRAM="$ROOT/target/release/plotgram"
-[[ -x "$PLOTGRAM" ]] || { echo "error: plotgram 二进制缺失 ($PLOTGRAM)" >&2; exit 1; }
+( cd "$ROOT" && cargo build --release -p tautcore-cli ) 2>&1 | tail -3
+TAUTCORE="$ROOT/target/release/tautcore"
+[[ -x "$TAUTCORE" ]] || { echo "error: tautcore 二进制缺失 ($TAUTCORE)" >&2; exit 1; }
 echo
 
 echo "▶ 共 ${#FILES[@]} 个样例（来自 ${#SET_FILES[@]} 个 set 文件）"
@@ -111,11 +111,11 @@ if [[ -n "$OUT_BASE" ]]; then
 fi
 
 # 2. run measure for each sample, capture stdout regardless of exit code.
-# argv layout: plotgram / showcase / json / stamp / n_sets / sets... / files...
-python3 - "$PLOTGRAM" "$SHOWCASE" "$JSON_OUT" "$STAMP" "${#SET_FILES[@]}" "${SET_FILES[@]}" "${FILES[@]}" <<'PY'
+# argv layout: tautcore / showcase / json / stamp / n_sets / sets... / files...
+python3 - "$TAUTCORE" "$SHOWCASE" "$JSON_OUT" "$STAMP" "${#SET_FILES[@]}" "${SET_FILES[@]}" "${FILES[@]}" <<'PY'
 import json, subprocess, sys, os, time
 
-plotgram  = sys.argv[1]
+tautcore  = sys.argv[1]
 showcase  = sys.argv[2]
 out_json  = sys.argv[3]
 stamp     = sys.argv[4]
@@ -134,7 +134,7 @@ for i, f in enumerate(files, 1):
     t0 = time.time()
     try:
         proc = subprocess.run(
-            [plotgram, "measure", f, "--json"],
+            [tautcore, "measure", f, "--json"],
             cwd=showcase,
             capture_output=True, text=True,
         )
@@ -158,7 +158,7 @@ for i, f in enumerate(files, 1):
             "schema_version": 1,
             "path": f, "layout": layout, "role": role,
             "status": "render-error",
-            "error": f"no stdout from `plotgram measure` (rc={proc.returncode}, stderr={proc.stderr[:300]})",
+            "error": f"no stdout from `tautcore measure` (rc={proc.returncode}, stderr={proc.stderr[:300]})",
             "elapsed_ms": wall_ms,
             "correctness": None, "quality": None, "observation": None,
         })

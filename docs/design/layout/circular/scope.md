@@ -23,7 +23,7 @@
 |-----------|------------|------|
 | `er` | 已是 `circular` | 关系团块，不是 ER 专核 |
 | `state` | **仍是 `hierarchical`** | 分层状态机走 Hier；环形状态机作者写 `layout: circular` |
-| 其它 | 不自动改到本核 | 禁止 `if state` / `if er` 出现在 `plotgram-layout` |
+| 其它 | 不自动改到本核 | 禁止 `if state` / `if er` 出现在 `tautcore-layout` |
 
 将来若要「state 偏环则填空 circular」，只许在 profile 展开表做，且不得覆盖作者已写的 `layout:`。
 

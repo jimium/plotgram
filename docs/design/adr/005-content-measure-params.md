@@ -14,11 +14,11 @@
 
 同时存在几处易踩坑：
 
-- 主题（含 `font_size`）目前住在 `plotgram-render`，若布局后再加载主题，度量与出图**双真源**  
+- 主题（含 `font_size`）目前住在 `tautcore-render`，若布局后再加载主题，度量与出图**双真源**  
 - 真读字体文件可对齐字形，但与 headless / WASM /「不想读字体」产品偏好冲突  
 - 若在 Ink/render 因「字挤了」再改节点高，违反落笔零新决策  
 
-yFiles（HTML）的纪律是：样式侧 `measureText` → preferred size → 布局消费；量与画共用策略。其「真字宽」来自**浏览器环境**，不是布局内核解析 TTF。plotgram 无 DOM，不能照搬机制，但应照搬职责切分。
+yFiles（HTML）的纪律是：样式侧 `measureText` → preferred size → 布局消费；量与画共用策略。其「真字宽」来自**浏览器环境**，不是布局内核解析 TTF。tautcore 无 DOM，不能照搬机制，但应照搬职责切分。
 
 **ER 图**：框内字段表 / 结构化属性 **不**由本 ADR 的 MD 内容块解决；ER 另案（结构化字段或专用语法）。MD 不承担「画出正规 ER」的期望。
 
@@ -87,7 +87,7 @@ parse / profile
   → render（同一套字号画字；颜料用 Theme）
 ```
 
-- **禁止** `plotgram-engine` 依赖 `plotgram-render` 整包主题。  
+- **禁止** `tautcore-engine` 依赖 `tautcore-render` 整包主题。  
 - MeasureParams 可与主题 JSON **同源字段**（编排层先抽），或抽到共享小模块；render 继续拥有色板 / variant。
 
 ### 5. crate / 模块边界（方向）

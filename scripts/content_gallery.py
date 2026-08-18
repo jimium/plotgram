@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-page gallery for plotgram-content: rendered results vs estimates.
+"""One-page gallery for tautcore-content: rendered results vs estimates.
 
 Rebuilds every sample (SVG + ContentLayout JSON via the Rust example, true-font
 PNG via calibrate_content_measure.py render-layout), computes per-run
@@ -40,7 +40,7 @@ PNG_SCALE = 2  # render-layout supersampling; displayed at logical px
 
 def rebuild() -> None:
     subprocess.run(
-        ["cargo", "run", "-q", "-p", "plotgram-content", "--example", "render_samples"],
+        ["cargo", "run", "-q", "-p", "tautcore-content", "--example", "render_samples"],
         cwd=REPO, check=True,
     )
     layouts = sorted(str(p) for p in OUT_DIR.glob("*.layout.json"))
@@ -55,7 +55,7 @@ def sample_order() -> list[str]:
     """Sample order as authored in render_samples.rs (meta files carry no
     index, so ask the example itself — it prints names in order)."""
     out = subprocess.run(
-        ["cargo", "run", "-q", "-p", "plotgram-content", "--example", "render_samples"],
+        ["cargo", "run", "-q", "-p", "tautcore-content", "--example", "render_samples"],
         cwd=REPO, check=True, capture_output=True, text=True,
     ).stdout
     return [line.split(":")[0] for line in out.splitlines() if ": " in line and " x " in line]
@@ -179,10 +179,10 @@ def build_page(names: list[str]) -> str:
                f'<span style="color:#c0392b;font-weight:700">低估 {total_under}</span>')
     return f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
-<title>plotgram-content 渲染 vs 预估画廊</title>
+<title>tautcore-content 渲染 vs 预估画廊</title>
 <style>{CSS}</style></head>
 <body class="show-runs">
-<h1>plotgram-content：渲染结果 vs 尺寸预估</h1>
+<h1>tautcore-content：渲染结果 vs 尺寸预估</h1>
 <div class="sub">measure 为唯一几何写者（ADR-005）：左侧为引擎 SVG 输出与预估几何叠加，
 右侧为真字体光栅真值。全部 {len(names)} 个样例 · {n} 个 run · {verdict} ·
 比率区间 {min(all_ratios):.3f} – {max(all_ratios):.3f}（硬约束：下界 ≥ 1.0 防溢出；

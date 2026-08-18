@@ -1,6 +1,6 @@
-# Plotgram 规范目录
+# Tautcore 规范目录
 
-> 本目录存放 Plotgram 的**现行**语言与契约规范。重建期（v2）以标「现行」的文档为准。
+> 本目录存放 Tautcore 的**现行**语言与契约规范。重建期（v2）以标「现行」的文档为准。
 
 ## 现行
 
@@ -13,15 +13,15 @@
 
 四者互不重叠：一个属性只在一处被定义，跨文档只引用、不复制表格（见 dsl-spec §14.10）。
 
-CSV 真源：`crates/plotgram-model/assets/archetypes.csv`。
+CSV 真源：`crates/tautcore-model/assets/archetypes.csv`。
 
 ## v1 遗留（待重写，不驱动 v2 实现）
 
 | 文档 | 状态 |
 |------|------|
-| [ast-spec.md](ast-spec.md) | 0.1.0-draft；描述 v1 AST，与 `plotgram-model` 的 `Graph` / `LayoutContract` 不对齐 |
+| [ast-spec.md](ast-spec.md) | 0.1.0-draft；描述 v1 AST，与 `tautcore-model` 的 `Graph` / `LayoutContract` 不对齐 |
 | [export-scene-spec.md](export-scene-spec.md) | 0.1.0-draft；基于 v1 `PreparedDiagram` / Exporter 分层 |
-| [error-model.md](error-model.md) | 0.1.0；实现引用已不存在的 `crates/plotgram-core` |
+| [error-model.md](error-model.md) | 0.1.0；实现引用已不存在的 `crates/tautcore-core` |
 
 ## 相关
 

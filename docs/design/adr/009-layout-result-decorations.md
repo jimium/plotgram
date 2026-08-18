@@ -99,17 +99,17 @@ Decoration =
 | 项 | 状态 |
 |----|------|
 | 本文契约 | **accepted** |
-| `plotgram-model` 类型 | **landed**（`Decoration` + `LayoutResult.decorations`） |
-| `plotgram-engine-api` `LayoutOutput` 通道 | **landed** — 方案 **A**（`LayoutOutput.decorations`；finalize 只 translate 透传） |
+| `tautcore-model` 类型 | **landed**（`Decoration` + `LayoutResult.decorations`） |
+| `tautcore-engine-api` `LayoutOutput` 通道 | **landed** — 方案 **A**（`LayoutOutput.decorations`；finalize 只 translate 透传） |
 | Sequence layout 写出 | **landed**（M1：`Lifeline` / `Activation`；M2：`gaps`；M4：`FragmentFrame`） |
-| `plotgram-render` 消费 | **landed**（按 kind 分派；Hier/Tree 空切片无回归） |
+| `tautcore-render` 消费 | **landed**（按 kind 分派；Hier/Tree 空切片无回归） |
 | 删除 v1 式 diagram-type paint 几何 | 重建达到后禁止回归 |
 
 未实现前：不得用 render 特判冒充已完成；不得再扩大 `LayoutHints` 旁路。
 
 ### 7.1 `LayoutOutput` 通道选择（已钉死：方案 A）
 
-当前 [`LayoutOutput`](../../crates/plotgram-engine-api/src/traits.rs) 携带 `nodes / edges / groups / diagnostics / decorations`，[`finalize`](../../crates/plotgram-engine/src/finalize.rs) 对 decorations **只 translate、不发明几何**。
+当前 [`LayoutOutput`](../../crates/tautcore-engine-api/src/traits.rs) 携带 `nodes / edges / groups / diagnostics / decorations`，[`finalize`](../../crates/tautcore-engine/src/finalize.rs) 对 decorations **只 translate、不发明几何**。
 
 | 方案 | 改动 | 优点 | 缺点 |
 |------|------|------|------|

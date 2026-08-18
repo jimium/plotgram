@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Decide which samples need re-rendering (mtime-based incremental).
 
-Reads candidate .pgm paths (one per line, posix-relative to showcase dir) on
-stdin. For each, compares mtime of the .pgm source and the plotgram binary
-against the SVG at _out/{path without .pgm}.svg (mirrors source tree, including
+Reads candidate .taut paths (one per line, posix-relative to showcase dir) on
+stdin. For each, compares mtime of the .taut source and the tautcore binary
+against the SVG at _out/{path without .taut}.svg (mirrors source tree, including
 optional facet dirs). If the SVG is missing or older than either the source or
 the binary, the sample needs re-rendering.
 
@@ -22,14 +22,14 @@ from pathlib import Path
 
 
 def svg_rel_for(pgm_rel: str) -> str:
-    """Mirror source tree: hierarchical/flat/smoke.x.pgm -> _out/hierarchical/flat/smoke.x.svg"""
-    stem = pgm_rel[:-4] if pgm_rel.endswith(".pgm") else pgm_rel
+    """Mirror source tree: hierarchical/flat/smoke.x.taut -> _out/hierarchical/flat/smoke.x.svg"""
+    stem = pgm_rel[:-4] if pgm_rel.endswith(".taut") else pgm_rel
     return f"_out/{stem}.svg"
 
 
 def facts_rel_for(pgm_rel: str) -> str:
     """Layout facts sidecar (ADR-007 explain): _out/{stem}.facts.txt"""
-    stem = pgm_rel[:-4] if pgm_rel.endswith(".pgm") else pgm_rel
+    stem = pgm_rel[:-4] if pgm_rel.endswith(".taut") else pgm_rel
     return f"_out/{stem}.facts.txt"
 
 
@@ -48,7 +48,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--showcase-dir", required=True, type=Path)
     parser.add_argument(
-        "--binary", required=True, type=Path, help="plotgram binary path"
+        "--binary", required=True, type=Path, help="tautcore binary path"
     )
     parser.add_argument(
         "--force", action="store_true", help="emit all inputs (skip mtime check)"

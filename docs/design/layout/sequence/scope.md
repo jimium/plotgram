@@ -17,7 +17,7 @@
 
 ### 自调用 vs profile 自环
 
-[`profile.rs`](../../../../crates/plotgram-model/src/profile.rs) 给 `DiagramType::Sequence` 设了 `allow_self_loop: true`。Sequence 的 `A -> A` 是**消息时间轴上的自调用**（`MessagePlan.kind = SelfCall`，`route = SelfLoop`），不是通用图的孤立回环：
+[`profile.rs`](../../../../crates/tautcore-model/src/profile.rs) 给 `DiagramType::Sequence` 设了 `allow_self_loop: true`。Sequence 的 `A -> A` 是**消息时间轴上的自调用**（`MessagePlan.kind = SelfCall`，`route = SelfLoop`），不是通用图的孤立回环：
 
 1. parse/lift：`profile: sequence`（或显式 `layout: sequence`）放行 `A -> A` 进入 `Graph::edges`。
 2. Compose：`from == to` 分类为 `SelfCall`，挂 `SelfLoop { East }`。

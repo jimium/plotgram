@@ -1,0 +1,24 @@
+---
+source: crates/tautcore-core/src/layout/snapshot_tests.rs
+expression: summary
+---
+{
+  "canvas_h": 258.0,
+  "canvas_w": 212.0,
+  "nodes": [
+    {
+      "h": 50.0,
+      "id": "a",
+      "w": 112.0,
+      "x": 50.0,
+      "y": 50.0
+    },
+    {
+      "h": 50.0,
+      "id": "b",
+      "w": 112.0,
+      "x": 50.0,
+      "y": 158.0
+    }
+  ]
+}

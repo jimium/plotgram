@@ -3,7 +3,7 @@
 # 文件名角色 = smoke；正确性 + 质量均硬 FAIL。
 # 新布局内核毕业后，要求先有 smoke 稳定本地绿，再追加 {layout}/ 行入 CI。
 
-hierarchical/flat/smoke.client-api-db.pgm
-hierarchical/flat/smoke.decision-loop.pgm
-hierarchical/flat/smoke.fan-out-four.pgm
-hierarchical/flat/smoke.flat-gateway-fanout.pgm
+hierarchical/flat/smoke.client-api-db.taut
+hierarchical/flat/smoke.decision-loop.taut
+hierarchical/flat/smoke.fan-out-four.taut
+hierarchical/flat/smoke.flat-gateway-fanout.taut

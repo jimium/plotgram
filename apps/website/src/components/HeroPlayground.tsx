@@ -6,7 +6,7 @@ import { bracketMatching, HighlightStyle, syntaxHighlighting } from '@codemirror
 import { tags as t } from '@lezer/highlight';
 import { useWasm } from '../hooks/useWasm';
 import { renderSvg, renderMdOutlineSvg, type DiagnosticErrorJson } from '../lib/wasm';
-import { plotgram } from '../lib/plotgramLang';
+import { tautcore } from '../lib/tautcoreLang';
 import { markdownOutline } from '../lib/markdownOutlineLang';
 
 const DEFAULT_SOURCE = `diagram architecture {
@@ -29,7 +29,7 @@ const DEFAULT_SOURCE = `diagram architecture {
 interface Preset {
   label: string;
   source: string;
-  /** 输入语法：plotgram DSL 或 markdown 大纲（仅 mindmap 支持）。 */
+  /** 输入语法：tautcore DSL 或 markdown 大纲（仅 mindmap 支持）。 */
   inputMode?: 'dfy' | 'md-outline';
 }
 
@@ -143,7 +143,7 @@ function formatErrors(errors: DiagnosticErrorJson[]): string {
   return `${locStr}${first.message}`;
 }
 
-const plotgramHighlightStyle = HighlightStyle.define([
+const tautcoreHighlightStyle = HighlightStyle.define([
   { tag: t.keyword, color: '#c678dd', fontWeight: '600' },
   { tag: t.typeName, color: '#56b6c2' },
   { tag: t.string, color: '#98c379' },
@@ -290,11 +290,11 @@ export default function HeroPlayground() {
         history(),
         bracketMatching(),
         languageCompartmentRef.current.of(
-          initialMode === 'md-outline' ? markdownOutline() : plotgram(),
+          initialMode === 'md-outline' ? markdownOutline() : tautcore(),
         ),
         highlightCompartmentRef.current.of(
           syntaxHighlighting(
-            initialMode === 'md-outline' ? markdownOutlineHighlightStyle : plotgramHighlightStyle,
+            initialMode === 'md-outline' ? markdownOutlineHighlightStyle : tautcoreHighlightStyle,
           ),
         ),
         editorTheme,
@@ -325,11 +325,11 @@ export default function HeroPlayground() {
     view.dispatch({
       effects: [
         languageCompartmentRef.current.reconfigure(
-          inputMode === 'md-outline' ? markdownOutline() : plotgram(),
+          inputMode === 'md-outline' ? markdownOutline() : tautcore(),
         ),
         highlightCompartmentRef.current.reconfigure(
           syntaxHighlighting(
-            inputMode === 'md-outline' ? markdownOutlineHighlightStyle : plotgramHighlightStyle,
+            inputMode === 'md-outline' ? markdownOutlineHighlightStyle : tautcoreHighlightStyle,
           ),
         ),
       ],
@@ -585,7 +585,7 @@ export default function HeroPlayground() {
           <span className="hero-visual-dot yellow" />
           <span className="hero-visual-dot green" />
         </div>
-        <span className="hero-playground-title">plotgram demo</span>
+        <span className="hero-playground-title">tautcore demo</span>
         <div className="hero-playground-presets">
           {PRESETS.map((p, i) => (
             <button

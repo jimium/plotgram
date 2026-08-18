@@ -25,31 +25,31 @@
 ## Phase 2: Tier A — 零风险清理
 
 ### 备份基础设施
-- [x] `/tmp/plotgram-simplify-r2-backup/` 及子目录存在
+- [x] `/tmp/tautcore-simplify-r2-backup/` 及子目录存在
 - [x] `NOTES.md` 已创建并写入 header
 - [x] Tier A before 基线已采集（`tier-a-before` tag，2026-07-20-053914）
 
 ### A.1 DEBUG 日志统一
-- [x] `space_budget.rs:354` 的 `PLOTGRAM_DEBUG_EDGE_PRESSURE` 守卫块改用 `perf_log!`
-- [x] `phases/refine.rs:181` 的 `PLOTGRAM_DEBUG_EDGE_ORDER` 守卫块改用 `perf_log!`
-- [x] `phases/port_slot.rs:806` 的 `PLOTGRAM_DEBUG_PORT_PRESSURE` 守卫块改用 `perf_log!`
+- [x] `space_budget.rs:354` 的 `TAUTCORE_DEBUG_EDGE_PRESSURE` 守卫块改用 `perf_log!`
+- [x] `phases/refine.rs:181` 的 `TAUTCORE_DEBUG_EDGE_ORDER` 守卫块改用 `perf_log!`
+- [x] `phases/port_slot.rs:806` 的 `TAUTCORE_DEBUG_PORT_PRESSURE` 守卫块改用 `perf_log!`
 - [x] 3 处 `var_os(...)` 读取已删除
 - [x] 未引入裸 `std::time::{Instant, SystemTime}`（用 `crate::layout::perf::Instant`）
-- [x] `cargo build -p plotgram-core` 通过
-- [x] `cargo check -p plotgram-wasm --target wasm32-unknown-unknown` 通过（沙箱缺 wasm32 target，降级为代码审查：Grep 确认 3 文件无 `std::time` / `var_os` / `eprintln!` 残留，`perf_log!` 宏自身 WASM-safe，详见 NOTES.md A.1）
-- [x] `cargo test -p plotgram-core --lib` 无新增失败（921 passed / 19 failed，既有 19 项忽略）
+- [x] `cargo build -p tautcore-core` 通过
+- [x] `cargo check -p tautcore-wasm --target wasm32-unknown-unknown` 通过（沙箱缺 wasm32 target，降级为代码审查：Grep 确认 3 文件无 `std::time` / `var_os` / `eprintln!` 残留，`perf_log!` 宏自身 WASM-safe，详见 NOTES.md A.1）
+- [x] `cargo test -p tautcore-core --lib` 无新增失败（921 passed / 19 failed，既有 19 项忽略）
 - [x] after 基线已采集（`a-1-after`），`compare.sh` vs before PASS（product 硬门禁零退化）
 - [x] 笔记已记录（before/after tag + PASS/FAIL + 处置）
 
-### A.2 删除 `PLOTGRAM_ARCH_PACK` / `PLOTGRAM_FLOW_ASPECT`
+### A.2 删除 `TAUTCORE_ARCH_PACK` / `TAUTCORE_FLOW_ASPECT`
 - [x] Grep 全仓库 + 部署脚本 + playground 配置，确认无生产 setter
-- [x] `group_frame/spec.rs` 的 `PLOTGRAM_ARCH_PACK` 分支（`architecture_pack_enabled()` 函数 + doc）已删除，`resolve_architecture` 直接用 `TrackSizing::Equal`
-- [x] `group_frame/spec.rs` 的 `PLOTGRAM_FLOW_ASPECT` 分支（`flowchart_aspect_enabled()` 函数 + doc）已删除，`choose_arrangement_mode` / `parse_group_sizing` 简化
+- [x] `group_frame/spec.rs` 的 `TAUTCORE_ARCH_PACK` 分支（`architecture_pack_enabled()` 函数 + doc）已删除，`resolve_architecture` 直接用 `TrackSizing::Equal`
+- [x] `group_frame/spec.rs` 的 `TAUTCORE_FLOW_ASPECT` 分支（`flowchart_aspect_enabled()` 函数 + doc）已删除，`choose_arrangement_mode` / `parse_group_sizing` 简化
 - [x] 级联死代码 `position_macro_blocks_packed` (113 行) + `PACK_ASPECT_TARGET` 常量已删除（按 AGENTS.md §1 无向后兼容约束）
 - [x] 编译 + WASM check（代码审查）+ 单测 + 基线 + compare 通过
 - [x] 笔记已记录（实测 -179 行，超 spec 预期 ~50 行，主因死代码级联）
 
-### A.3 移除 `PLOTGRAM_PRESSURE_BUDGET=0` 分支
+### A.3 移除 `TAUTCORE_PRESSURE_BUDGET=0` 分支
 - [x] Grep 确认 `=0` 分支无测试/CI 显式触发（`congestion-baseline.rs` 是校准二进制，不在门禁管线）
 - [x] `space_budget.rs` `enrich_from_pressure` 顶部 `=0` 守卫块已删除，统一走默认开启路径
 - [x] `congestion-baseline.rs` `env::set_var` 默认设置已删除，文件头 doc / help / note 同步更新
@@ -81,9 +81,9 @@
 - [x] `enforce_horizontal_demand_gaps` 调用次数 4→3
 - [x] 所有 rebalance/enforce_gaps 实际逻辑保留
 - [x] architecture 5 样本（cloud-native / typical-microservice / ecommerce / three-tier / microservices）`node_fp` **全部字节级一致**（硬约束满足）
-- [x] ~~`compare.sh` vs Tier B before PASS~~（**FAIL**：`product.cloud-native.pgm: median_ms 18.99 → 22.51 (118.54% > +10%)`；其余 4 样本 perf 反而改善或持平；min/max variance 从 ±0.1ms 放大到 ±1.8ms → 真退化非 sandbox 噪声 → 按 spec §3.3 +10% 阈值回滚）
+- [x] ~~`compare.sh` vs Tier B before PASS~~（**FAIL**：`product.cloud-native.taut: median_ms 18.99 → 22.51 (118.54% > +10%)`；其余 4 样本 perf 反而改善或持平；min/max variance 从 ±0.1ms 放大到 ±1.8ms → 真退化非 sandbox 噪声 → 按 spec §3.3 +10% 阈值回滚）
 - [x] 回滚后 `compare.sh tier-b-before b-2-rollback` PASS 零漂移确认（24 样例全持平）
-- [x] 笔记已记录（NOTES.md B.2 章节 + 备份保留在 `/tmp/plotgram-simplify-r2-backup/tier-b/b-2-arch-phase-merge/originals/architecture_v2_pipeline.rs`）
+- [x] 笔记已记录（NOTES.md B.2 章节 + 备份保留在 `/tmp/tautcore-simplify-r2-backup/tier-b/b-2-arch-phase-merge/originals/architecture_v2_pipeline.rs`）
 
 ### Tier B 收尾
 - [x] Tier B final 基线已采集（= `b-2-rollback`，2026-07-20-064930；B.2 回滚后重采）
@@ -148,7 +148,7 @@
 - [x] `compare.sh tier-a-before tier-d-final` 全轮累计变化已记录（PASS，24 样例全持平；累计 -298 行 vs spec -1550 行）
 - [x] `docs/布局路由算法简化重构方案-2026-07.md` 追加 "## 12. 第二轮 Tier D 执行结论" + "## 13. 第二轮总执行结论"
 - [x] `docs/总结经验/简化重构经验-哪些不可精简-2026-07.md` 追加本轮新 keep-list（§2.7 + §3 表追加 1 行；第 15 项：非正交原图 fallback 不能改走 dogleg）
-- [x] 笔记收尾，备份目录归档（`/tmp/plotgram-simplify-r2-backup/tier-d/d-1-spline-fallback/originals/`）
+- [x] 笔记收尾，备份目录归档（`/tmp/tautcore-simplify-r2-backup/tier-d/d-1-spline-fallback/originals/`）
 
 ## 全轮通用核验（每 Step 必做）
 
@@ -156,9 +156,9 @@
 
 - [x] 改动前已备份原文件到 `<tier>/<step>/originals/`
 - [x] 改动前已采 before 基线
-- [x] 改动后 `cargo build -p plotgram-core` 通过
-- [x] 改动后 `cargo check -p plotgram-wasm --target wasm32-unknown-unknown` 通过（沙箱缺 wasm32 target，降级为代码审查，详见 NOTES.md）
-- [x] 改动后 `cargo test -p plotgram-core --lib` 无新增失败
+- [x] 改动后 `cargo build -p tautcore-core` 通过
+- [x] 改动后 `cargo check -p tautcore-wasm --target wasm32-unknown-unknown` 通过（沙箱缺 wasm32 target，降级为代码审查，详见 NOTES.md）
+- [x] 改动后 `cargo test -p tautcore-core --lib` 无新增失败
 - [x] 改动后采 after 基线
 - [x] `compare.sh before after` 有结论（A.1/A.2/A.3 均 PASS）
 - [x] 笔记已追加（改动 / 基线 / 门禁 / 处置）

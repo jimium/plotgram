@@ -288,7 +288,7 @@
           <tr><td><code>sets/demo-observe-set.txt</code></td><td><code>demo</code></td><td>观测 / 可债</td><td>正确性硬；质量 WARN</td></tr>
         </tbody>
       </table>
-      <p>日常宣称「无退化」默认只引用 <strong>product-gate</strong>。文件名首段即角色（<code>{role}.{slug}.pgm</code>），无需 manifest overrides。</p>
+      <p>日常宣称「无退化」默认只引用 <strong>product-gate</strong>。文件名首段即角色（<code>{role}.{slug}.taut</code>），无需 manifest overrides。</p>
 
       <h3>脚本与产物</h3>
       <table>
@@ -337,7 +337,7 @@
           <text x="320" y="204" text-anchor="middle" font-size="10" font-family="IBM Plex Sans, sans-serif" fill="#5a574f">median_ms</text>
 
           <rect x="460" y="164" width="160" height="56" rx="8" fill="#fffcf6" stroke="#d4cec0"/>
-          <text x="540" y="186" text-anchor="middle" font-size="11" font-family="IBM Plex Mono, monospace" fill="#2a4a6b">plotgram ×2</text>
+          <text x="540" y="186" text-anchor="middle" font-size="11" font-family="IBM Plex Mono, monospace" fill="#2a4a6b">tautcore ×2</text>
           <text x="540" y="204" text-anchor="middle" font-size="10" font-family="IBM Plex Sans, sans-serif" fill="#5a574f">SVG hash → det</text>
 
           <line x1="100" y1="220" x2="100" y2="240" stroke="#5a574f" stroke-width="1.5"/>
@@ -480,7 +480,7 @@ raise stress (expected): …探针可接受…；残余: stress.layout-stress-ne
           <tr><td>快照脚本</td><td><code>bench-phases</code> + 两次 SVG hash</td><td><code>median_ms</code> / <code>min_ms</code> / <code>max_ms</code> / <code>det</code></td></tr>
         </tbody>
       </table>
-      <p>实现入口：<code>plotgram-core</code> 的 <code>gate-baseline</code> 二进制。顶层还有 <code>date</code>、<code>note</code>（抬基线必写）、<code>perf_runs</code>、<code>samples[]</code>。</p>
+      <p>实现入口：<code>tautcore-core</code> 的 <code>gate-baseline</code> 二进制。顶层还有 <code>date</code>、<code>note</code>（抬基线必写）、<code>perf_runs</code>、<code>samples[]</code>。</p>
 
       <h2 id="metrics">指标词典</h2>
       <h3>图规模</h3>
@@ -586,7 +586,7 @@ raise stress (expected): …探针可接受…；残余: stress.layout-stress-ne
       <p>sev 是连续几何加权；lint 是规则命中条数——相关但不是同一套计数。</p>
 
       <h3 id="lint"><code>lint.*</code> — 来自 lint 模块</h3>
-      <p><code>compute_lint_metrics</code> 用 verbose 配置跑完整 <code>LayoutLinter</code>，按规则计数（与 <code>plotgram lint</code> 同源；基线只存摘要）：</p>
+      <p><code>compute_lint_metrics</code> 用 verbose 配置跑完整 <code>LayoutLinter</code>，按规则计数（与 <code>tautcore lint</code> 同源；基线只存摘要）：</p>
       <table>
         <thead><tr><th>字段</th><th>含义</th><th>门禁</th></tr></thead>
         <tbody>
@@ -663,7 +663,7 @@ raise stress (expected): …探针可接受…；残余: stress.layout-stress-ne
       <ul>
         <li><strong>只保留有意义的快照</strong>：同日可多次归档（时间戳不覆盖）；中间实验不必全进仓库，至少留 <code>latest</code> + 上一版对照。</li>
         <li><strong>不要改 latest 却不写 note</strong>：后续对比靠 note 理解 raise 原因。</li>
-        <li>验证用本脚本构建的 release 二进制，勿盲目信任陈旧 <code>./target/release/plotgram</code>。</li>
+        <li>验证用本脚本构建的 release 二进制，勿盲目信任陈旧 <code>./target/release/tautcore</code>。</li>
       </ul>
 
       <footer class="doc">

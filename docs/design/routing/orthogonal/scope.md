@@ -68,8 +68,8 @@ Hier Channel 与本 Router **共用** `route/core` 无策略原语（肘线规�
 
 | 模块 | 职责 |
 |------|------|
-| `plotgram-engine-api` | `EdgeRouter` / `RouteScene`（真输入）+ 过渡 `RouteInput` |
-| `plotgram-router/src/core` | 无策略原语（锚点、肘线、矩形、折线规范化、段重叠） |
-| `plotgram-router/src/orthogonal` | 本 Router 实现（ovg / search / track） |
-| `plotgram-router/src/{verify,score}` | 几何验收门 + 质量度量 |
-| `plotgram-algo` | 可复用零件（VPSC nudging、交叉计数等） |
+| `tautcore-engine-api` | `EdgeRouter` / `RouteScene`（真输入）+ 过渡 `RouteInput` |
+| `tautcore-router/src/core` | 无策略原语（锚点、肘线、矩形、折线规范化、段重叠） |
+| `tautcore-router/src/orthogonal` | 本 Router 实现（ovg / search / track） |
+| `tautcore-router/src/{verify,score}` | 几何验收门 + 质量度量 |
+| `tautcore-algo` | 可复用零件（VPSC nudging、交叉计数等） |

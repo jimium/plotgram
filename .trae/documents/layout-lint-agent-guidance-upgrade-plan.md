@@ -12,12 +12,12 @@
 
 ### Core lint
 
-- `crates/plotgram-core/src/layout/lint/violation.rs`
+- `crates/tautcore-core/src/layout/lint/violation.rs`
   - 当前 `LintReport` 只有 `violations`，没有建议层。
   - `LayoutViolation` 只有 `edge_index` 单值，无法完整表达 crossing / trunk merge 的双边归因。
-- `crates/plotgram-core/src/layout/lint/config.rs`
+- `crates/tautcore-core/src/layout/lint/config.rs`
   - 只有规则开关和 `fail_on_warning`，没有 advice 开关。
-- `crates/plotgram-core/src/layout/lint/mod.rs`
+- `crates/tautcore-core/src/layout/lint/mod.rs`
   - `LayoutLinter::run()` 仍是逐条 `if cfg.is_enabled(...)` 硬编码串联。
   - `LintMetricsSummary` 仅覆盖 9 类规则，缺少 `node_outside_group`、`child_group_outside_parent`、`edge_on_group_border`。
   - `unrelated_edge_trunk_merge` 仍把边 index 塞进 `entity_ids`。
@@ -25,19 +25,19 @@
 
 ### Layout hints / group 接线
 
-- `crates/plotgram-core/src/layout/mod.rs`
+- `crates/tautcore-core/src/layout/mod.rs`
   - `LayoutHints` 已有 `group_layout_warnings`，但没有 `group_frame_report`。
-- `crates/plotgram-core/src/layout/group_frame/pass.rs`
+- `crates/tautcore-core/src/layout/group_frame/pass.rs`
   - `apply_group_frame()` 的返回值被直接丢弃，没有写回 `LayoutResult.hints`。
-- `crates/plotgram-core/src/layout/node/common/group_bounds.rs`
+- `crates/tautcore-core/src/layout/node/common/group_bounds.rs`
   - `GroupLayoutWarning` 已经在 Sugiyama 路径中生成，可作为 advice 的并行上下文。
 
 ### CLI / WASM / Agent
 
-- `crates/plotgram-cli/src/main.rs`
+- `crates/tautcore-cli/src/main.rs`
   - `lint` 只有 `profile/ignore/fail-on-warning`，没有 `--advice`。
   - `validate --layout-check` 实际跑 strict，但帮助注释仍写“全量规则”。
-- `crates/plotgram-wasm/src/lib.rs`
+- `crates/tautcore-wasm/src/lib.rs`
   - 当前仅暴露 `render` / `validate` / `parse_to_json` / `layout_catalog`，没有 `lint` 导出。
 - `agent-demo/src/lib/wasm.ts`
   - TS 桥接层没有 lint 结果类型和调用封装。
@@ -52,8 +52,8 @@
 
 - `docs/guides/layout-lint.md`
   - 规则数、preset、strict 描述已落后于代码。
-- `docs/guides/plotgram-cli.md`
-  - 需要同步 `plotgram lint --advice` 和 `validate --layout-check` 的 strict 语义。
+- `docs/guides/tautcore-cli.md`
+  - 需要同步 `tautcore lint --advice` 和 `validate --layout-check` 的 strict 语义。
 - `docs/product/agent-mcp-skills-strategy.md`
   - 工具体系中还没有 lint。
 
@@ -64,7 +64,7 @@
 3. 边归因采用折中方案：
    - 保留 `edge_index: Option<usize>` 作为主索引，避免现有 CLI 文本输出重写过大。
    - 新增 `related_edge_indices: Vec<usize>`，用于 crossing / trunk merge 的完整归因。
-4. `FixAction` 直接复用 `crates/plotgram-core/src/error.rs` 里的现有结构，不新增平行 fix 类型。
+4. `FixAction` 直接复用 `crates/tautcore-core/src/error.rs` 里的现有结构，不新增平行 fix 类型。
 5. P2 的“MCP 接入”在本仓库内先落到 **文档与 agent-demo/wasm 工具面**；当前仓库里没有独立 MCP server 实现，因此本次不新增独立 MCP 进程代码。
 
 ## Proposed Changes
@@ -73,7 +73,7 @@
 
 #### 1.1 新增 advice 模块
 
-- 新增文件：`crates/plotgram-core/src/layout/lint/advice.rs`
+- 新增文件：`crates/tautcore-core/src/layout/lint/advice.rs`
 - 目标：
   - 定义 `LintAdvice`、`AdviceConfidence`、`LayoutKnob`。
   - 提供 `generate_lint_advices(diagram, result, violations, config) -> Vec<LintAdvice>`。
@@ -96,7 +96,7 @@
 
 #### 1.2 扩展 violation / report
 
-- 修改：`crates/plotgram-core/src/layout/lint/violation.rs`
+- 修改：`crates/tautcore-core/src/layout/lint/violation.rs`
 - 变更：
   - `LayoutViolation` 新增 `related_edge_indices: Vec<usize>`。
   - `LintReport` 新增 `advices: Vec<LintAdvice>`，并通过 serde `default + skip_serializing_if` 保持默认空输出。
@@ -108,7 +108,7 @@
 
 #### 1.3 扩展 lint config
 
-- 修改：`crates/plotgram-core/src/layout/lint/config.rs`
+- 修改：`crates/tautcore-core/src/layout/lint/config.rs`
 - 变更：
   - `LintConfig` 新增 `advice_enabled: bool`。
   - 新增 builder：`with_advice(bool) -> Self`。
@@ -121,7 +121,7 @@
 
 #### 2.1 接入 advice 生成
 
-- 修改：`crates/plotgram-core/src/layout/lint/mod.rs`
+- 修改：`crates/tautcore-core/src/layout/lint/mod.rs`
 - 变更：
   - `mod advice;` 并 re-export 新类型。
   - `LayoutLinter::run()` 在 `finalize_violations + sort_violations` 之后，按 `config.advice_enabled` 生成 `advices`。
@@ -129,7 +129,7 @@
 
 #### 2.2 修正 metrics 覆盖
 
-- 修改：`crates/plotgram-core/src/layout/lint/mod.rs`
+- 修改：`crates/tautcore-core/src/layout/lint/mod.rs`
 - 变更：
   - `LintMetricsSummary` 新增字段：
     - `node_outside_group`
@@ -141,7 +141,7 @@
 
 #### 2.3 修正边归因
 
-- 修改：`crates/plotgram-core/src/layout/lint/mod.rs`
+- 修改：`crates/tautcore-core/src/layout/lint/mod.rs`
 - 变更：
   - `check_edge_crossings()`：
     - `edge_index` 写第一条边；
@@ -156,7 +156,7 @@
 
 #### 2.4 改进排序与微性能
 
-- 修改：`crates/plotgram-core/src/layout/lint/mod.rs`
+- 修改：`crates/tautcore-core/src/layout/lint/mod.rs`
 - 变更：
   - `sort_violations()` 排序键改为：
     - `rule`
@@ -172,7 +172,7 @@
 
 #### 3.1 首批高价值规则
 
-- 文件：`crates/plotgram-core/src/layout/lint/advice.rs`
+- 文件：`crates/tautcore-core/src/layout/lint/advice.rs`
 - 必做映射：
   - `group_overlap`
     - 高优先级：`group_frame.gap += delta`
@@ -217,20 +217,20 @@
 
 #### 4.1 把 GroupFrameReport 写回 LayoutHints
 
-- 修改：`crates/plotgram-core/src/layout/mod.rs`
+- 修改：`crates/tautcore-core/src/layout/mod.rs`
 - 变更：
   - `LayoutHints` 新增 `group_frame_report: Option<group_frame::GroupFrameReport>`。
 
 #### 4.2 GroupFramePass 写入 hints
 
-- 修改：`crates/plotgram-core/src/layout/group_frame/pass.rs`
+- 修改：`crates/tautcore-core/src/layout/group_frame/pass.rs`
 - 变更：
   - 在 `apply_after_node_snap()` 与 `restore_after_node_moves()` 中捕获 `apply_group_frame()` 返回值，写入 `layout.hints.group_frame_report`。
   - 若同一轮多次调用，以最后一次为准。
 
 #### 4.3 advice 使用 hints
 
-- 修改：`crates/plotgram-core/src/layout/lint/advice.rs`
+- 修改：`crates/tautcore-core/src/layout/lint/advice.rs`
 - 变更：
   - 读取 `result.hints.group_frame_report` 和 `result.hints.group_layout_warnings`。
   - 用途：
@@ -239,9 +239,9 @@
 
 ### 5. CLI 升级
 
-#### 5.1 `plotgram lint --advice`
+#### 5.1 `tautcore lint --advice`
 
-- 修改：`crates/plotgram-cli/src/main.rs`
+- 修改：`crates/tautcore-cli/src/main.rs`
 - 变更：
   - `Lint` 子命令新增 `--advice` 布尔开关。
   - `build_lint_config()` 接收 `advice` 参数并设置 `with_advice(true)`。
@@ -260,7 +260,7 @@
 
 #### 6.1 新增 wasm lint API
 
-- 修改：`crates/plotgram-wasm/src/lib.rs`
+- 修改：`crates/tautcore-wasm/src/lib.rs`
 - 变更：
   - 新增：
     - `LintResultJson { report, success }` 或直接返回 `LintReport` 外加 `success/acceptable` 包装；
@@ -279,7 +279,7 @@
 
 - 修改：`agent-demo/src/lib/wasm.ts`
 - 变更：
-  - 扩充 `PlotgramWasm` 接口：`lint` / `lint_with_options`
+  - 扩充 `TautcoreWasm` 接口：`lint` / `lint_with_options`
   - 新增类型：
     - `LintSeverityJson`
     - `LintViolation`
@@ -330,9 +330,9 @@
 
 #### 7.2 CLI 指南
 
-- 修改：`docs/guides/plotgram-cli.md`
+- 修改：`docs/guides/tautcore-cli.md`
 - 变更：
-  - 补充 `plotgram lint --advice`
+  - 补充 `tautcore lint --advice`
   - 明确 `validate --layout-check` 等价 strict。
 
 #### 7.3 MCP / Agent 产品文档
@@ -354,7 +354,7 @@
    - 打通 `GroupFrameReport -> LayoutHints`
    - CLI `--advice`
 3. **P2 surface**
-   - `plotgram-wasm` 暴露 `lint`
+   - `tautcore-wasm` 暴露 `lint`
    - `agent-demo` tool / prompt / trace
    - 文档统一更新
 
@@ -362,16 +362,16 @@
 
 ### Rust tests
 
-1. `cargo test -p plotgram-core layout::lint`
-2. `cargo test -p plotgram-core group_frame`
-3. `cargo test -p plotgram-cli`
-4. `cargo test -p plotgram-wasm`
+1. `cargo test -p tautcore-core layout::lint`
+2. `cargo test -p tautcore-core group_frame`
+3. `cargo test -p tautcore-cli`
+4. `cargo test -p tautcore-wasm`
 
 ### CLI smoke
 
-1. `cargo run -p plotgram-cli -- lint showcase/architecture/c.k8s-multi-namespace-overview.pgm --format json`
-2. `cargo run -p plotgram-cli -- lint showcase/architecture/c.k8s-multi-namespace-overview.pgm --advice --format json`
-3. `cargo run -p plotgram-cli -- validate showcase/architecture/c.k8s-multi-namespace-overview.pgm --layout-check`
+1. `cargo run -p tautcore-cli -- lint showcase/architecture/c.k8s-multi-namespace-overview.taut --format json`
+2. `cargo run -p tautcore-cli -- lint showcase/architecture/c.k8s-multi-namespace-overview.taut --advice --format json`
+3. `cargo run -p tautcore-cli -- validate showcase/architecture/c.k8s-multi-namespace-overview.taut --layout-check`
 
 ### Advice acceptance
 

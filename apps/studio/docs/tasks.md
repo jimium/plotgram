@@ -1,6 +1,6 @@
 # 开发任务规划
 
-本文档定义 Plotgram Studio 的开发任务分解、优先级、验收标准与责任人分配。
+本文档定义 Tautcore Studio 的开发任务分解、优先级、验收标准与责任人分配。
 
 ## 1. 阶段总览
 
@@ -19,13 +19,13 @@
 
 | 项 | 内容 |
 |----|------|
-| 任务 | 验证现有 plotgram-wasm 的 render/validate/parse/layout_catalog 接口可用 |
-| 输入 | plotgram-wasm crate 已构建的产物 |
+| 任务 | 验证现有 tautcore-wasm 的 render/validate/parse/layout_catalog 接口可用 |
+| 输入 | tautcore-wasm crate 已构建的产物 |
 | 输出 | `src/lib/wasm.ts` 中 loadWasm/renderSource/validateSource 可正常调用 |
 | 验收标准 | `npm run test` 通过 wasm.test.ts;浏览器中能调用 render 生成 SVG |
 | 优先级 | P0 |
 | 责任人 | 前端开发 |
-| 依赖 | plotgram-wasm 已构建 |
+| 依赖 | tautcore-wasm 已构建 |
 
 ### 任务 P0-2:LLM 客户端实现
 
@@ -120,23 +120,23 @@
 
 **目标**:支持多轮对话增量修改图表,展示变更差异。
 
-### 任务 P1-1:plotgram-wasm 新增 diff_sources 绑定
+### 任务 P1-1:tautcore-wasm 新增 diff_sources 绑定
 
 | 项 | 内容 |
 |----|------|
-| 任务 | 在 plotgram-wasm crate 新增 diff_sources 导出 |
-| 输入 | plotgram-core 的 diff::diff 函数 |
+| 任务 | 在 tautcore-wasm crate 新增 diff_sources 导出 |
+| 输入 | tautcore-core 的 diff::diff 函数 |
 | 输出 | WASM 中可调用 diff_sources(old, new) → DiffResult JSON |
 | 验收标准 | Rust 单元测试通过;JS 端能解析返回的 DiffResult |
 | 优先级 | P0 |
 | 责任人 | Rust 开发 |
 | 依赖 | 无 |
 
-### 任务 P1-2:plotgram-core 新增 ast_to_source 能力
+### 任务 P1-2:tautcore-core 新增 ast_to_source 能力
 
 | 项 | 内容 |
 |----|------|
-| 任务 | 在 plotgram-core 新增 Diagram → DSL 文本的序列化能力 |
+| 任务 | 在 tautcore-core 新增 Diagram → DSL 文本的序列化能力 |
 | 输入 | Diagram AST 结构 |
 | 输出 | `ast_to_source(diagram) → String` 函数 |
 | 验收标准 | 能将 AST 反序列化为合法 DSL;round-trip(parse→serialize→parse)一致 |
@@ -144,12 +144,12 @@
 | 责任人 | Rust 开发 |
 | 依赖 | 无 |
 
-### 任务 P1-3:plotgram-wasm 新增 apply_patch 绑定
+### 任务 P1-3:tautcore-wasm 新增 apply_patch 绑定
 
 | 项 | 内容 |
 |----|------|
-| 任务 | 在 plotgram-wasm crate 新增 apply_patch 导出 |
-| 输入 | plotgram-core 的 diff::apply_patch + ast_to_source |
+| 任务 | 在 tautcore-wasm crate 新增 apply_patch 导出 |
+| 输入 | tautcore-core 的 diff::apply_patch + ast_to_source |
 | 输出 | WASM 中可调用 apply_patch(source, patch_json) → 新 DSL |
 | 验收标准 | Rust 单元测试通过;JS 端能应用 patch 并获取新 DSL |
 | 优先级 | P0 |
@@ -229,8 +229,8 @@
 
 | 项 | 内容 |
 |----|------|
-| 任务 | 优化 Prompt,指导 Agent 根据 Plotgram 错误码自动修复 |
-| 输入 | plotgram-core 的结构化诊断(错误码+行号+修复建议) |
+| 任务 | 优化 Prompt,指导 Agent 根据 Tautcore 错误码自动修复 |
+| 输入 | tautcore-core 的结构化诊断(错误码+行号+修复建议) |
 | 输出 | Agent 遇到 E003/E004 等错误时自动修正 DSL |
 | 验收标准 | 故意生成错误 DSL,Agent 能在 3 次迭代内修复 |
 | 优先级 | P1 |
@@ -363,7 +363,7 @@
 
 | 角色 | 职责 |
 |------|------|
-| Rust 开发 | plotgram-core 新增能力、plotgram-wasm 绑定扩展 |
+| Rust 开发 | tautcore-core 新增能力、tautcore-wasm 绑定扩展 |
 | 前端开发 | Studio 前端全部实现(Agent、UI、Hooks) |
 | 测试 | 单元测试、端到端测试、验收测试 |
 | 产品 | 需求确认、验收标准制定 |

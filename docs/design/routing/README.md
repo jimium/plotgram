@@ -1,7 +1,7 @@
 # 边路由（独立 EdgeRouter）
 
 > 状态：现行目标
-> 代码：`crates/plotgram-router/`（`core` 原语 + 各算法 router + `verify` + `score`）
+> 代码：`crates/tautcore-router/`（`core` 原语 + 各算法 router + `verify` + `score`）
 > 约束：[写权纪律](../layout/write-authority.md) · [AGENTS.md](../../AGENTS.md) §1 · [ADR-006](../adr/006-engine-io-and-crates.md)
 
 横切夹：描述**与各布局核解耦**的边几何契约与路由算法，避免把搜索逻辑写进某个核的 Ink 文档里。
@@ -10,7 +10,7 @@
 
 ## 核心概念
 
-节点与端口冻结之后，求边路径：避障、少弯、确定性。路径风格由 **注册名** 区分（如 `"orthogonal"`），各算法实现同一 [`EdgeRouter`](../../crates/plotgram-engine-api/src/traits.rs) trait。
+节点与端口冻结之后，求边路径：避障、少弯、确定性。路径风格由 **注册名** 区分（如 `"orthogonal"`），各算法实现同一 [`EdgeRouter`](../../crates/tautcore-engine-api/src/traits.rs) trait。
 
 ---
 
@@ -109,15 +109,15 @@ Router **不得**改端口或节点。纪律：[write-authority](../layout/write
 
 | 模块 | 职责 |
 |------|------|
-| `plotgram-engine-api` | `EdgeRouter` trait / `RouteScene` / `EdgeGeometryMode` |
-| `plotgram-router/src/core` | 无策略原语（锚点、肘线、矩形、折线规范化、段重叠） |
-| `plotgram-router/src/{verify,score}` | 几何验收门 + 质量度量（所有算法共用） |
-| `plotgram-algo` | 可复用零件（VPSC nudging、交叉计数等） |
-| `plotgram-router/src/orthogonal` | 正交 Router 实现（ovg / search / track） |
-| `plotgram-router/src/straight` | 直线 Router（端子直连） |
-| `plotgram-router/src/polyline` | 折线 Router（可见性图） |
-| `plotgram-router/src/octilinear` | 八方向 Router（H/V/45°） |
-| `plotgram-router/src/curved` | 曲线 Router（Cubic IR / Chaikin 回退） |
+| `tautcore-engine-api` | `EdgeRouter` trait / `RouteScene` / `EdgeGeometryMode` |
+| `tautcore-router/src/core` | 无策略原语（锚点、肘线、矩形、折线规范化、段重叠） |
+| `tautcore-router/src/{verify,score}` | 几何验收门 + 质量度量（所有算法共用） |
+| `tautcore-algo` | 可复用零件（VPSC nudging、交叉计数等） |
+| `tautcore-router/src/orthogonal` | 正交 Router 实现（ovg / search / track） |
+| `tautcore-router/src/straight` | 直线 Router（端子直连） |
+| `tautcore-router/src/polyline` | 折线 Router（可见性图） |
+| `tautcore-router/src/octilinear` | 八方向 Router（H/V/45°） |
+| `tautcore-router/src/curved` | 曲线 Router（Cubic IR / Chaikin 回退） |
 
 ---
 

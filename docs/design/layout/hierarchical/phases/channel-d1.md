@@ -163,7 +163,7 @@ Substrate 全图、Gate、ScopeMask、rip-up、多 rank 回边外侧走廊、`mi
 
 | 项 | 标准 |
 |----|------|
-| grouping off | `flat/smoke.fan-out-four.pgm`（及同类扇出）水平轨主轴坐标两两可区分 |
+| grouping off | `flat/smoke.fan-out-four.taut`（及同类扇出）水平轨主轴坐标两两可区分 |
 | grouping on | 同簇共享干线；现有 bus fixture 几何语义不变 |
 | 回归 | `hier_eval` 硬不变量全绿 |
 | 纪律 | Ink 无 mid_y 缺省；缺 track → `InternalInvariant` |
@@ -173,7 +173,7 @@ Substrate 全图、Gate、ScopeMask、rip-up、多 rank 回边外侧走廊、`mi
 
 ### 5.2 D1.1 · 顶层 Substrate + Channel 搜索
 
-**实现状态（代码）**：`crates/plotgram-layout/.../hierarchical/channel/` — root/group `cut_line` Substrate；**加权标量** Dijkstra（`route_w_*`，Occupancy 交叉项）；`ChannelPath.escape: EscapePlan`；Ink 只 `match` 展开（无扫框拓扑）。Gate 无容量上限（已删 `GateCapacity::Fixed`）。
+**实现状态（代码）**：`crates/tautcore-layout/.../hierarchical/channel/` — root/group `cut_line` Substrate；**加权标量** Dijkstra（`route_w_*`，Occupancy 交叉项）；`ChannelPath.escape: EscapePlan`；Ink 只 `match` 展开（无扫框拓扑）。Gate 无容量上限（已删 `GateCapacity::Fixed`）。
 
 - L2：`scalar = w_bend·bends + w_len·length + w_cross·crossings + …`，tiebreak 保确定性。
 - `EscapePlan`：Channel 搜索 J 唯一决定——host 走廊（og）与 escape 方式（`AtPortNormal` / `ViaGap(line)`）逐端枚举为 `EndCandidate`，离散增量（`extra_bends`/`extra_len`）计入既有 bends/length 项，多起点/多终点 Dijkstra 选出最优配对并直接写入；Ink 只 `match` 展开。PlanVerifier 校验与 `PortPlan.side` 相容。
@@ -261,12 +261,12 @@ Substrate 全图、Gate、ScopeMask、rip-up、多 rank 回边外侧走廊、`mi
 
 | 路径 | 角色 |
 |------|------|
-| `crates/plotgram-layout/.../hierarchical/mod.rs` | 管线插缝 |
+| `crates/tautcore-layout/.../hierarchical/mod.rs` | 管线插缝 |
 | `compose/ports.rs` | Port + BusPrefix；D1.0 后接 TrackOrder |
 | `metric/bus.rs` / `main_axis.rs` | track / bus 像素与 layer_gap |
 | `ink/route.rs` | 删除 mid_y 发明；展开 ChannelPath |
 | `params.rs` | `edge_gap` 恢复消费；D1.2 段长键 |
-| `plotgram-algo::interval_color` | L3 着色 |
+| `tautcore-algo::interval_color` | L3 着色 |
 
 ---
 

@@ -2,10 +2,10 @@
 # 构建并发布 showcase 到 plotgram.cn/showcase/
 #
 # 产物：
-#   - 主站:  /var/www/plotgram.cn/showcase/  （页面、.pgm、manifest，不含 .svg）
+#   - 主站:  /var/www/plotgram.cn/showcase/  （页面、.taut、manifest，不含 .svg）
 #   - CDN:   /showcase/                       （SVG 文件）
 #
-# 流程：cargo build plotgram-cli → 渲染 SVG → patch CDN/BUILD_HASH → 同步
+# 流程：cargo build tautcore-cli → 渲染 SVG → patch CDN/BUILD_HASH → 同步
 #
 # 用法:
 #   ./apps/deploy/deploy-showcase.sh                  # 渲染 SVG + 同步
@@ -50,9 +50,9 @@ CDN_SHOWCASE_REMOTE="$ASSET_HOST:$ASSET_REMOTE_DIR/showcase/"
 
 # ─── 渲染 SVG ──────────────────────────────────────────
 render_svgs() {
-  log "编译 plotgram CLI"
+  log "编译 tautcore CLI"
   require_cmd cargo
-  (cd "$ROOT_DIR" && cargo build --release -q -p plotgram-cli)
+  (cd "$ROOT_DIR" && cargo build --release -q -p tautcore-cli)
 
   log "渲染 showcase SVG"
   "$SHOWCASE_DIR/render.sh" --force

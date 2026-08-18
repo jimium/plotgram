@@ -4,7 +4,7 @@
 > 位置：`docs/design/layout/`
 > 约束入口：[AGENTS.md](../../../AGENTS.md) §1、[写权纪律](write-authority.md)
 
-本目录按**布局内核**立档（不按图种）。每个内核一个文件夹，描述 plotgram **要做什么**：基本逻辑、能力范围、典型域，以及可展开的相级设计。
+本目录按**布局内核**立档（不按图种）。每个内核一个文件夹，描述 tautcore **要做什么**：基本逻辑、能力范围、典型域，以及可展开的相级设计。
 
 图种差异只经 profile 展开进算法参数，见 [ADR-001](../adr/001-diagram-type-not-in-engine.md)。
 
@@ -30,9 +30,9 @@
 
 | 内核 | 注册名（目标） | 一句话 | 文档 | 代码（重建） |
 |------|----------------|--------|------|----------------|
-| Hierarchical | `hierarchical` | 有向分层；主核 | [hierarchical/](hierarchical/) | `plotgram-layout` → `layout/hierarchical` |
-| Tree | `tree` | 树形递归放置（SubtreePlacer） | [tree/](tree/) · [架构](tree/architecture.md) | `plotgram-layout` → `layout/tree`（M1–M5 + DemandBoard） |
-| Sequence | `sequence` | 参与者轴 + 消息时间序；Builtin 边 | [sequence/](sequence/) · [架构](sequence/architecture.md) | `plotgram-layout` → `layout/sequence`（M4） |
+| Hierarchical | `hierarchical` | 有向分层；主核 | [hierarchical/](hierarchical/) | `tautcore-layout` → `layout/hierarchical` |
+| Tree | `tree` | 树形递归放置（SubtreePlacer） | [tree/](tree/) · [架构](tree/architecture.md) | `tautcore-layout` → `layout/tree`（M1–M5 + DemandBoard） |
+| Sequence | `sequence` | 参与者轴 + 消息时间序；Builtin 边 | [sequence/](sequence/) · [架构](sequence/architecture.md) | `tautcore-layout` → `layout/sequence`（M4） |
 | Circular | `circular` | 圆环 / BCC 多环 | [circular/](circular/) · [架构](circular/architecture.md) · [后置](circular/deferred.md) | **M3** 节点 `circle` 自定义分区 |
 
 横切（按需生长，避免在每个内核里重复）：
@@ -42,7 +42,7 @@
 | [shared/](shared/) | group / port / label 等共享语义如何被各核消费 |
 | [debug-inspector.md](debug-inspector.md) | **跨核**布局调试 Trace 信封 + 检视 UI 壳（各核写 extension profile） |
 | [routing/](../routing/) | 独立 `EdgeRouter`（正交）与原语 · [架构](../routing/orthogonal/architecture.md) |
-| 实现零件 | [`crates/plotgram-algo`](../../../crates/plotgram-algo/PARTS.md) — VPSC / FAS 等可单测组件 |
+| 实现零件 | [`crates/tautcore-algo`](../../../crates/tautcore-algo/PARTS.md) — VPSC / FAS 等可单测组件 |
 
 新建内核时照 [_template.md](_template.md) 起夹。
 

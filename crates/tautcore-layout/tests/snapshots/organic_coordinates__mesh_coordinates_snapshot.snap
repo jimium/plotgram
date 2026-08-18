@@ -1,0 +1,535 @@
+---
+source: crates/tautcore-layout/tests/organic_coordinates.rs
+expression: "serde_json::json!({ \"nodes\": out.nodes, \"edges\": out.edges, })"
+---
+{
+  "edges": [
+    {
+      "from_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "south"
+      },
+      "id": "h0",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 204.16058622150916,
+              "y": 134.04652056882384
+            },
+            {
+              "x": 180.38081986788035,
+              "y": 158.04652056882384
+            }
+          ]
+        }
+      },
+      "source": "n00",
+      "target": "n01",
+      "to_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "north"
+      }
+    },
+    {
+      "from_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "north"
+      },
+      "id": "v1",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 207.36431724946155,
+              "y": 106.04652056882385
+            },
+            {
+              "x": 188.22208271262178,
+              "y": 80.92500535758954
+            }
+          ]
+        }
+      },
+      "source": "n00",
+      "target": "n10",
+      "to_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "south"
+      }
+    },
+    {
+      "from_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "west"
+      },
+      "id": "h2",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 152.04610347790725,
+              "y": 186.04652056882384
+            },
+            {
+              "x": 127.25207030586787,
+              "y": 210.04652056882384
+            }
+          ]
+        }
+      },
+      "source": "n01",
+      "target": "n02",
+      "to_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "east"
+      }
+    },
+    {
+      "from_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "north"
+      },
+      "id": "v3",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 155.29406799486793,
+              "y": 158.04652056882384
+            },
+            {
+              "x": 135.16954245835527,
+              "y": 132.92500535758955
+            }
+          ]
+        }
+      },
+      "source": "n01",
+      "target": "n11",
+      "to_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "south"
+      }
+    },
+    {
+      "from_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "north"
+      },
+      "id": "v4",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 101.54528660417238,
+              "y": 210.04652056882384
+            },
+            {
+              "x": 81.36984301385094,
+              "y": 184.92500535758955
+            }
+          ]
+        }
+      },
+      "source": "n02",
+      "target": "n12",
+      "to_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "south"
+      }
+    },
+    {
+      "from_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "west"
+      },
+      "id": "h5",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 163.1235242574195,
+              "y": 80.92500535758954
+            },
+            {
+              "x": 138.38508006849747,
+              "y": 104.92500535758954
+            }
+          ]
+        }
+      },
+      "source": "n10",
+      "target": "n11",
+      "to_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "east"
+      }
+    },
+    {
+      "from_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "north"
+      },
+      "id": "v6",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 166.26139351669985,
+              "y": 52.92500535758954
+            },
+            {
+              "x": 146.15601208548887,
+              "y": 28.0
+            }
+          ]
+        }
+      },
+      "source": "n10",
+      "target": "n20",
+      "to_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "south"
+      }
+    },
+    {
+      "from_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "west"
+      },
+      "id": "h7",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 109.46214675045444,
+              "y": 132.92500535758955
+            },
+            {
+              "x": 84.61841953701693,
+              "y": 156.92500535758955
+            }
+          ]
+        }
+      },
+      "source": "n11",
+      "target": "n12",
+      "to_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "east"
+      }
+    },
+    {
+      "from_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "north"
+      },
+      "id": "v8",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 112.79808391735855,
+              "y": 104.92500535758954
+            },
+            {
+              "x": 92.93599334479933,
+              "y": 80.0
+            }
+          ]
+        }
+      },
+      "source": "n11",
+      "target": "n21",
+      "to_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "south"
+      }
+    },
+    {
+      "from_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "north"
+      },
+      "id": "v9",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 59.51184045925166,
+              "y": 156.92500535758955
+            },
+            {
+              "x": 40.614404869926744,
+              "y": 132.0
+            }
+          ]
+        }
+      },
+      "source": "n12",
+      "target": "n22",
+      "to_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "south"
+      }
+    },
+    {
+      "from_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "west"
+      },
+      "id": "h10",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 120.57144679168398,
+              "y": 28.0
+            },
+            {
+              "x": 96.07143174674562,
+              "y": 52.0
+            }
+          ]
+        }
+      },
+      "source": "n20",
+      "target": "n21",
+      "to_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "east"
+      }
+    },
+    {
+      "from_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "south"
+      },
+      "id": "h11",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 67.8390526835936,
+              "y": 80.0
+            },
+            {
+              "x": 43.94070362027132,
+              "y": 104.0
+            }
+          ]
+        }
+      },
+      "source": "n21",
+      "target": "n22",
+      "to_port": {
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "north"
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "frame": {
+        "height": 28.0,
+        "width": 60.0,
+        "x": 188.0321165944593,
+        "y": 106.04652056882385
+      },
+      "id": "n00"
+    },
+    {
+      "frame": {
+        "height": 28.0,
+        "width": 60.0,
+        "x": 136.50928949493021,
+        "y": 158.04652056882384
+      },
+      "id": "n01"
+    },
+    {
+      "frame": {
+        "height": 28.0,
+        "width": 60.0,
+        "x": 82.78888428884491,
+        "y": 210.04652056882384
+      },
+      "id": "n02"
+    },
+    {
+      "frame": {
+        "height": 28.0,
+        "width": 60.0,
+        "x": 147.554283367624,
+        "y": 52.92500535758954
+      },
+      "id": "n10"
+    },
+    {
+      "frame": {
+        "height": 28.0,
+        "width": 60.0,
+        "x": 93.95432095829298,
+        "y": 104.92500535758954
+      },
+      "id": "n11"
+    },
+    {
+      "frame": {
+        "height": 28.0,
+        "width": 60.0,
+        "x": 40.1262453291784,
+        "y": 156.92500535758955
+      },
+      "id": "n12"
+    },
+    {
+      "frame": {
+        "height": 28.0,
+        "width": 60.0,
+        "x": 104.8631222345647,
+        "y": 0.0
+      },
+      "id": "n20"
+    },
+    {
+      "frame": {
+        "height": 28.0,
+        "width": 60.0,
+        "x": 51.779756303864914,
+        "y": 52.0
+      },
+      "id": "n21"
+    },
+    {
+      "frame": {
+        "height": 28.0,
+        "width": 60.0,
+        "x": 0.0,
+        "y": 104.0
+      },
+      "id": "n22"
+    }
+  ]
+}

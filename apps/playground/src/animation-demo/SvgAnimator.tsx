@@ -204,7 +204,7 @@ export function SvgAnimator({ svg, duration = DURATION, bgGrid = true }: AnimCan
 
     const newTitle = Array.from(newSvg.children).find((c) => c.tagName === 'text') as SVGElement | undefined;
     if (newTitle) { newTitle.style.opacity = '0.001'; }
-    const newAttr = newSvg.querySelector('g.plotgram-attribution') as SVGGElement | null;
+    const newAttr = newSvg.querySelector('g.tautcore-attribution') as SVGGElement | null;
     if (newAttr) { newAttr.style.opacity = '0.001'; }
 
     requestAnimationFrame(() => {
@@ -249,7 +249,7 @@ export function SvgAnimator({ svg, duration = DURATION, bgGrid = true }: AnimCan
         });
         const prevTitle = Array.from(prevSvg!.children).find((c) => c.tagName === 'text') as SVGElement | undefined;
         if (prevTitle) { setTransitions(prevTitle, ['opacity'], duration, EASE_IN); prevTitle.style.opacity = '0'; }
-        const prevAttr = prevSvg!.querySelector('g.plotgram-attribution') as SVGGElement | null;
+        const prevAttr = prevSvg!.querySelector('g.tautcore-attribution') as SVGGElement | null;
         if (prevAttr) { setTransitions(prevAttr, ['opacity'], duration, EASE_IN); prevAttr.style.opacity = '0'; }
 
         window.setTimeout(() => {

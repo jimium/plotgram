@@ -2,7 +2,7 @@
 
 > 状态：M0 + M1 已落地
 > 注册名：`orthogonal`
-> 代码：`crates/plotgram-router/src/orthogonal/`（ovg + search + track）
+> 代码：`crates/tautcore-router/src/orthogonal/`（ovg + search + track）
 > 姊妹页：[architecture.md](architecture.md) · [scope.md](scope.md) · [phases/group-crossing.md](phases/group-crossing.md)
 
 轴对齐正交折线路由：避障、少弯、确定性。独立于布局核，可手写 `RouteScene` 夹具开发与验真。

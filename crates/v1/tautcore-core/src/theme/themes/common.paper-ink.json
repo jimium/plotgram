@@ -1,0 +1,71 @@
+{
+  "version": "0.2",
+  "id": "common.paper-ink",
+  "name": "Paper & Ink",
+  "meta": {
+    "author": "Tautcore",
+    "description": "纸墨系统：暖纸画布 + 暖灰凹井 + 冷墨连线。有性格的亮色变体，适合独立导出；嵌入纯白文档时可能显暖色差",
+    "tags": [
+      "light",
+      "paper",
+      "ink",
+      "warm",
+      "expressive"
+    ]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#F3F0EA",
+      "muted_text": "#6B6560",
+      "border": "#C9C3B8",
+      "border_strong": "#A39E94",
+      "neutral_fill": "#FFFEFA",
+      "neutral_stroke": "#C9C3B8",
+      "edge_stroke": "#8A8790",
+      "group_fill": "#EAE6DF",
+      "group_stroke": "#A39E94"
+    }
+  },
+  "defaults": {
+    "group": {
+      "fill": "{colors.group_fill}",
+      "stroke": "{colors.group_stroke}",
+      "stroke_width": 1.25,
+      "stroke_dasharray": "none",
+      "text_fill": "{colors.muted_text}"
+    }
+  },
+  "diagrams": {
+    "flowchart": {
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "#EAE6DF", "stroke": "#A39E94", "stroke_width": 1.25, "border_radius": 10.0, "stroke_dasharray": "none" },
+            { "fill": "#E1DBD2", "stroke": "#B0A99E", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#D8D1C6", "stroke": "#B8B1A6", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#D0C8BC", "stroke": "#B8B1A6", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" }
+          ]
+        }
+      }
+    },
+    "architecture": {
+      "group": {
+        "fill": "{colors.group_fill}",
+        "stroke": "{colors.group_stroke}",
+        "stroke_width": 1.25,
+        "stroke_dasharray": "none"
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "#EAE6DF", "stroke": "#A39E94", "stroke_width": 1.25, "border_radius": 10.0, "stroke_dasharray": "none" },
+            { "fill": "#E1DBD2", "stroke": "#B0A99E", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#D8D1C6", "stroke": "#B8B1A6", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#D0C8BC", "stroke": "#B8B1A6", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" }
+          ]
+        }
+      }
+    }
+  }
+}

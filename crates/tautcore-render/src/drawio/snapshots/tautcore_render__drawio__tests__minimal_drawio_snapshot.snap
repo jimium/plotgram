@@ -1,0 +1,27 @@
+---
+source: crates/tautcore-render/src/drawio/mod.rs
+expression: xml
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="Tautcore/0.1.0" agent="Tautcore/0.1.0" version="1.0">
+  <diagram id="tautcore-diagram" name="Diagram">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="240" pageHeight="240" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="drawio-bg" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F7F7F8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="0" y="0" width="240" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="drawio-edge-e1" style="html=1;edgeStyle=none;endArrow=block;exitX=0.5000;exitY=1.0000;exitDx=0;exitDy=0;entryX=0.5000;entryY=0.0000;entryDx=0;entryDy=0;strokeColor=#9C9CA6;strokeWidth=1;dashed=1;strokeOpacity=100" edge="1" parent="1" source="drawio-node-a" target="drawio-node-b">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="drawio-node-a" value="a" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C9C9C9;fontColor=#18181B;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="30" y="30" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="drawio-node-b" value="b" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C9C9C9;fontColor=#18181B;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="30" y="130" width="80" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

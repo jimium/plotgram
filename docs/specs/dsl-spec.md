@@ -1,4 +1,4 @@
-# Plotgram DSL 规范
+# Tautcore DSL 规范
 
 > 版本：2.8-draft  
 > 状态：语法契约草案（相对 v1 `language-spec.md` 的瘦身重设计；该文档已删除）  
@@ -25,9 +25,9 @@ archetype 展开与 CSV 见 [`archetype-spec.md`](archetype-spec.md)；视觉属
 <file> ::= [<doc_comment>] <diagram_declaration>
 ```
 
-一个 `.pgm` 文件由可选的文档注释块和一个 `diagram` 声明组成：
+一个 `.taut` 文件由可选的文档注释块和一个 `diagram` 声明组成：
 
-```plotgram
+```tautcore
 // 文档注释（可选）
 
 diagram {
@@ -158,7 +158,7 @@ diagram {
 
 `diagram` 关键字出现之前的连续 `//` 行为文档注释（可选），存入 AST：
 
-```plotgram
+```tautcore
 // 用户认证流程
 // 作者：平台团队
 
@@ -176,7 +176,7 @@ diagram {
 
 图表体内任意位置可使用 `//` 行注释，解析时丢弃：
 
-```plotgram
+```tautcore
 node api "API 服务"   // 行尾注释
 // 独立行注释
 ```
@@ -235,7 +235,7 @@ node api "API 服务"   // 行尾注释
 - **首期不做**：`swimlane` 关键字、`group` 自动成列。  
 - **Parser**：块解析 **active**（model 类型 + parser 均已落地）。
 
-```plotgram
+```tautcore
 diagram {
     profile: flowchart
     layout: hierarchical { direction: top-to-bottom }
@@ -264,7 +264,7 @@ diagram {
 
 ### 4.4 示例
 
-```plotgram
+```tautcore
 diagram {
     profile: flowchart
     title: "用户登录流程"
@@ -281,7 +281,7 @@ diagram {
 
 纯算法、不绑预设名：
 
-```plotgram
+```tautcore
 diagram {
     layout: hierarchical { direction: left-to-right }
     theme: common.clean-light
@@ -313,13 +313,13 @@ diagram {
 
 最小节点（无显示文案、无外观覆盖）：
 
-```plotgram
+```tautcore
 node login {}
 ```
 
 完整规范写法：
 
-```plotgram
+```tautcore
 node db {
     label: "用户数据库"
     archetype: database
@@ -384,7 +384,7 @@ node spacer {
 
 ### 5.4 规范形态示例
 
-```plotgram
+```tautcore
 node login {
     label: "用户登录"
 }
@@ -452,7 +452,7 @@ node <id> <string> <archetype> <icon>      // ③ label + archetype + icon
 
 **空 label**：位置 string 为 `""` 时，parse 后**忽略 label**（`Node.label = None`），与省略 `label:` 等价。仍占位，以便后面写 archetype / icon：
 
-```plotgram
+```tautcore
 node spacer ""                          // → node spacer {}
 node db "" database                     // → { archetype: database }（无 label）
 node db "" database mysql               // → { archetype: database, icon: mysql }
@@ -465,7 +465,7 @@ node db "" database mysql               // → { archetype: database, icon: mysq
 3. **禁止** `node <id> <atom>…`（无 string 却写裸 atom）——避免与 id 后直接跟块/换行的歧义，也避免实现上难切分
 4. 位置糖的 0～2 个 atom 必须与 string **同一行**；换行即终止位置糖——避免下一条语句的裸标识符（如边源）被误读为 archetype
 
-```plotgram
+```tautcore
 node login                                      // 省空块
 node login "用户登录"                             // ①
 node db "用户库" database                         // ②
@@ -501,7 +501,7 @@ node db "" database                             // 无文案 + archetype
 
 #### 5.7.1 规范形态
 
-```plotgram
+```tautcore
 group frontend {
     label: "前端"
     node web { label: "Web" }
@@ -560,13 +560,13 @@ group frontend {
 
 最小 group（无标题、无成员）：
 
-```plotgram
+```tautcore
 group lane {}
 ```
 
 完整规范写法：
 
-```plotgram
+```tautcore
 group compute {
     label: "计算层",
     variant: muted
@@ -606,7 +606,7 @@ group **没有** `shape` / `icon` / `archetype`（容器不是节点几何）。
 
 ### 6.4 示例
 
-```plotgram
+```tautcore
 group frontend {
     label: "前端"
     variant: primary
@@ -640,7 +640,7 @@ mobile -> api
 | group id + string + 花括号体 | 在花括号体最前注入 label: string，再合并体中其余项 |
 | group id + string（无体） | group id { label: string } |
 
-```plotgram
+```tautcore
 group auth "认证服务" {
     node api { label: "API" }
 }
@@ -653,7 +653,7 @@ group auth {
 
 **空 label**：位置 string 为 `""` 时忽略 label（与省略 `label:` 等价），仍占位以便只写组级其它属性：
 
-```plotgram
+```tautcore
 group frame "" {
     variant: muted
     node x { label: "X" }
@@ -691,7 +691,7 @@ group frame "" {
 
 最小边（无标签、无覆盖）：
 
-```plotgram
+```tautcore
 a -> b
 ```
 
@@ -699,7 +699,7 @@ a -> b
 
 完整规范写法：
 
-```plotgram
+```tautcore
 user -> api {
     label: "请求"
 }
@@ -817,7 +817,7 @@ Side    = north | south | east | west
 
 一对多 / 多对一扇出的端口合流**不**用手写边级组 id。开布局开关即可：
 
-```plotgram
+```tautcore
 layout: hierarchical { auto_edge_grouping: true }
 
 hub -> a
@@ -835,7 +835,7 @@ hub -> c
 
 #### 7.4.4 示例（正反边固定侧）
 
-```plotgram
+```tautcore
 node a { label: "A" }
 node b { label: "B" }
 
@@ -881,7 +881,7 @@ b --> a {
 | `src arrow tgt <string>` | `{ label: <string> }` |
 | 上述 + `{ … }` | 先注入 `label`，再合并块；`label:` 冲突 → **错误** |
 
-```plotgram
+```tautcore
 user -> api "请求"
 // ≡
 user -> api { label: "请求" }
@@ -900,7 +900,7 @@ api -> db "查询" { variant: muted }
 
 端点标签（ER 基数等）**只**进属性块：
 
-```plotgram
+```tautcore
 api -> db {
     label: "查询"
     head_label: "1"
@@ -931,7 +931,7 @@ api -> db {
 - 无 `@`：必须是已声明的 **node** id（含既有 `group_anchor`）  
 - 允许混合：`@frontend -> api`、`web -> @backend`
 
-```plotgram
+```tautcore
 group frontend {
     label: "前端"
     node web { label: "Web" }
@@ -979,7 +979,7 @@ web -> @backend {
 
 ### 7.7 示例
 
-```plotgram
+```tautcore
 user -> api "请求"
 api --> user { label: "响应", variant: secondary }
 a <-> b { label: "同步" }
@@ -1012,7 +1012,7 @@ db -> api {
 ## 8. Profile 展开与引擎边界
 
 ```
-.pgm
+.taut
   → parse（AST 可保留 profile id，供诊断 / 展开）
   → 展开 @group 糖（§7.6 → group_anchor nodes + 普通边）
   → lift Node 结构字段（role / host_group / side / slot）
@@ -1066,7 +1066,7 @@ fragment <kind> <id> [<string>] { … [else { … }]* }
 - lower **不建 Group**：按声明序把边摊到 `graph.edges`，并盖章 `fragment` / `fragment_kind` / `fragment_label` / `fragment_operand`（多层时还有 `fragment_path_kinds` / `fragment_path_operands`）。
 - 嵌套由布局按区间包含推断；部分交叠硬失败。
 
-```plotgram
+```tautcore
 fragment alt checkout {
     client -> api { label: "下单" }
     api --> client { label: "201" }
@@ -1090,7 +1090,7 @@ v2 **仅**支持内联 `style.*`（写在 node / edge / group 属性中）。
 
 可写哪些 `style.<prop>`：`<prop>` 取自 [`style-sheet-spec.md`](style-sheet-spec.md) §5 属性词表中标记为该元素**可内联**的属性（构造规则见 §14.9）。本文不列键名。
 
-```plotgram
+```tautcore
 node api { label: "API", archetype: service, style.fill: "#E3F2FD", style.stroke: "#1976D2" }
 api -> db {
     label: "查询"
@@ -1222,7 +1222,7 @@ true, false
 
 ## 13. 完整示例
 
-```plotgram
+```tautcore
 // 登录认证示意
 
 diagram {
@@ -1289,11 +1289,11 @@ diagram {
 
 #### 14.1.3 当前实现基线
 
-重建期尚无 `.pgm` 解析器（`plotgram-cli` 仅占位），`Graph` 由程序构造。因此本表的「消费者」列一律指向 **render / engine** 侧代码；「写者」列中的「DSL 作者」表示解析器落地后的来源。
+重建期尚无 `.taut` 解析器（`tautcore-cli` 仅占位），`Graph` 由程序构造。因此本表的「消费者」列一律指向 **render / engine** 侧代码；「写者」列中的「DSL 作者」表示解析器落地后的来源。
 
-引擎侧（`plotgram-engine`）当前**完全不读 attrs**——算法参数只经 `LayoutContract` 的 `AlgorithmRef.options` 进入（自由 map，见 [ADR-002](../design/adr/002-no-config-block-freeform-options.md)）。这是本表里多数 `planned` 项的直接原因。
+引擎侧（`tautcore-engine`）当前**完全不读 attrs**——算法参数只经 `LayoutContract` 的 `AlgorithmRef.options` 进入（自由 map，见 [ADR-002](../design/adr/002-no-config-block-freeform-options.md)）。这是本表里多数 `planned` 项的直接原因。
 
-**相对代码的漂移（1.1）**：本规范已将节点外观定为 **`shape` × `variant` × `icon` 三轴正交**，废弃 `kind` / `kind_styles`。`plotgram-render` 实现仍走 `kind` 查表与 `KIND_ICON_MAP` 推断；§10 跟踪迁移。规范优先于旧实现。
+**相对代码的漂移（1.1）**：本规范已将节点外观定为 **`shape` × `variant` × `icon` 三轴正交**，废弃 `kind` / `kind_styles`。`tautcore-render` 实现仍走 `kind` 查表与 `KIND_ICON_MAP` 推断；§10 跟踪迁移。规范优先于旧实现。
 
 ---
 
@@ -1453,11 +1453,11 @@ variant **只**贡献 fill / stroke / font / dash / radius 等颜料；**不**�
 
 | 项 | 状态 |
 |----|------|
-| `Edge.from_port` / `to_port`（FREE / FixedSide） | **已落地**（plotgram-model） |
+| `Edge.from_port` / `to_port`（FREE / FixedSide） | **已落地**（tautcore-model） |
 | DSL 仅 `from_side`/`to_side` 校验与提升；其余边端口键硬拒绝 | **已落地** |
 | 布局 `auto_edge_grouping`（同源/同汇自动合流）；边级 `edge_group` **已移除** | **已落地** |
-| `Node.role` / `host_group` / `anchor`（group_anchor；可 FixedOrder） | **已落地**（plotgram-model；见 §5.7 / ADR-004） |
-| `Graph.partition` / `Node.partition_cell`（ADR-008） | **已落地**（plotgram-model + `validate_partition`；`cell_*` lift 已接） |
+| `Node.role` / `host_group` / `anchor`（group_anchor；可 FixedOrder） | **已落地**（tautcore-model；见 §5.7 / ADR-004） |
+| `Graph.partition` / `Node.partition_cell`（ADR-008） | **已落地**（tautcore-model + `validate_partition`；`cell_*` lift 已接） |
 | `partition { column/row … }` 块 parse | **已落地** |
 | Hier 消费 PartitionGrid（连续块 / 层区间） | **已落地**（PG-0–PG-4；render 只读 band 画泳道底色/标题） |
 | `@group` 糖展开（§7.6） | **待 parser** |
@@ -1542,7 +1542,7 @@ parallelogram   document        cloud           subprocess
 
 ### 14.8 Icon 目录
 
-83 个图标（6 个分类：`people` / `databases` / `messaging` / `services` / `cloud` / `generic`），资源内嵌于 `plotgram-render/assets/glyphs/<category>/<id>.svg`。id 与别名以 `icons/catalog.rs::ICONS` 为准，本文档不复制清单（避免第二份真源）；浏览用 `assets/glyphs/index.html`。
+83 个图标（6 个分类：`people` / `databases` / `messaging` / `services` / `cloud` / `generic`），资源内嵌于 `tautcore-render/assets/glyphs/<category>/<id>.svg`。id 与别名以 `icons/catalog.rs::ICONS` 为准，本文档不复制清单（避免第二份真源）；浏览用 `assets/glyphs/index.html`。
 
 ---
 

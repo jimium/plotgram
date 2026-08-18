@@ -401,8 +401,8 @@ SVG: L p_in  Q P p_out      // 二次贝塞尔，控制点就是原拐点</code>
         <h2 id="sec-10"><span class="h2-num">10</span>与本项目的对接</h2>
 
         <ul>
-          <li>落笔层属于 <code>plotgram-render</code>（几何展开 + SVG 序列化）；文本度量属于 <code>plotgram-content</code>（见 ADR-005）。</li>
-          <li><code>plotgram-engine</code> 输出的应是<strong>规范化前的语义路径</strong>（拐点序列 + 端口引用 + 标签锚点参数），render 只做展开：这条边界让「引擎的快照测试」与「渲染的视觉测试」能分离，也让 §1 的写权表可执行。</li>
+          <li>落笔层属于 <code>tautcore-render</code>（几何展开 + SVG 序列化）；文本度量属于 <code>tautcore-content</code>（见 ADR-005）。</li>
+          <li><code>tautcore-engine</code> 输出的应是<strong>规范化前的语义路径</strong>（拐点序列 + 端口引用 + 标签锚点参数），render 只做展开：这条边界让「引擎的快照测试」与「渲染的视觉测试」能分离，也让 §1 的写权表可执行。</li>
           <li>需要在 render 层落地的清单：形状裁剪表、箭头规格表、规范化流水线（§3.1 六步）、圆角降半径、自环/平行边展开、量化、z 序、诊断 warning 通道。</li>
         </ul>
 

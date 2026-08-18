@@ -2,7 +2,7 @@
 
 > 父页：[architecture.md](architecture.md) · 对照：[vs-reference.md](vs-reference.md) · [scope.md](scope.md)
 > 状态：**目标契约**（未实现必须 `Unsupported`；不是进度日记）
-> 代码门闩：`crates/plotgram-layout/src/layout/circular/params.rs` `gate_m3`
+> 代码门闩：`crates/tautcore-layout/src/layout/circular/params.rs` `gate_m3`
 
 M0–M3 已构成可出图默认路径（`bcc-compact` + 谱序 + balloon + interior/exterior + `circle:`）。本文钉死架构里程碑表里的 **后置** 项：目标允许、尚未消费。落地前 bind 硬失败；**禁止**静默降成 `cycle` / `interior` / 共半径。
 
@@ -25,7 +25,7 @@ M0–M3 已构成可出图默认路径（`bcc-compact` + 谱序 + balloon + inte
 
 ## 1. 一览
 
-| 能力 | plotgram 键 | yFiles | 现行 |
+| 能力 | tautcore 键 | yFiles | 现行 |
 |------|-------------|--------|------|
 | 盘内 CYCLE 变体 | `partition_style: disk` | `DISK` | `Unsupported` |
 | 盘内有机 | `partition_style: organic` | `ORGANIC` | `Unsupported` |
@@ -212,4 +212,4 @@ yFiles 默认 `ComponentLayout` packed circle。后置；未开键。落地是 C
 2. 默认值保持 yFiles 对齐：`cycle` + `interior` + 共半径 true。后置项默认关。
 3. 每项至少一条 facade 测试：打开后几何与默认可区分；关闭后与今日 bit-identical。
 4. 双跑仍须 bit-identical（谱 / 启发式固定步数与平局）。
-5. 不在 `plotgram-layout` 里 `if er` / `if state`。
+5. 不在 `tautcore-layout` 里 `if er` / `if state`。

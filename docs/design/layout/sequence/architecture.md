@@ -1,9 +1,9 @@
 # Sequence · 目标架构设计
 
 > 状态：**现行目标架构 v1**（驱动重建；非当前能力声明）
-> 日期：2026-08-02（修订：2026-08-06，对齐 `plotgram-engine-api` Trait / `plotgram-model` 现状）
+> 日期：2026-08-02（修订：2026-08-06，对齐 `tautcore-engine-api` Trait / `tautcore-model` 现状）
 > 引擎注册名：`sequence`
-> 代码落点（目标）：`crates/plotgram-layout/src/layout/sequence/`（与 Hier 同 crate；见 [ADR-006](../../adr/006-engine-io-and-crates.md)）
+> 代码落点（目标）：`crates/tautcore-layout/src/layout/sequence/`（与 Hier 同 crate；见 [ADR-006](../../adr/006-engine-io-and-crates.md)）
 > 约束入口：[写权纪律](../write-authority.md) · [AGENTS.md](../../../../AGENTS.md) §1
 > 证据：[19 序列图与一维排列](../../../reference/yfiles/19-序列图与一维排列.md) · dsl-spec §8.1 · [model-boundary 时序](../../model-boundary.md)
 > v1 参考（功能与坑，非目录真源）：`crates/v1/.../recipes/sequence.rs`
@@ -13,9 +13,9 @@
 
 > **前置依赖**：
 >
-> 1. **[ADR-009](../../adr/009-layout-result-decorations.md) 已落地（方案 A）**。[`LayoutResult`](../../../../crates/plotgram-model/src/result.rs) 与 [`LayoutOutput`](../../../../crates/plotgram-engine-api/src/traits.rs) 均有 `decorations`；finalize 只 translate。片段框（`FragmentFrame`）已随 M4 落地。
-> 2. [`LayoutError`](../../../../crates/plotgram-engine-api/src/error.rs) 已含 `Unsupported` / `InvalidInput` / `InternalInvariant`。Sequence 经 `seq_err` 按消息前缀分类；失败表见 [message-routing §11](phases/message-routing.md)。
-> 3. [`model::port::Side`](../../../../crates/plotgram-model/src/port.rs) 是封闭四值枚举（`North/South/East/West`），无 `Center`。Sequence 的「附着侧」用本核私有 `LifelineSide`（见 §3.1），不污染 model。
+> 1. **[ADR-009](../../adr/009-layout-result-decorations.md) 已落地（方案 A）**。[`LayoutResult`](../../../../crates/tautcore-model/src/result.rs) 与 [`LayoutOutput`](../../../../crates/tautcore-engine-api/src/traits.rs) 均有 `decorations`；finalize 只 translate。片段框（`FragmentFrame`）已随 M4 落地。
+> 2. [`LayoutError`](../../../../crates/tautcore-engine-api/src/error.rs) 已含 `Unsupported` / `InvalidInput` / `InternalInvariant`。Sequence 经 `seq_err` 按消息前缀分类；失败表见 [message-routing §11](phases/message-routing.md)。
+> 3. [`model::port::Side`](../../../../crates/tautcore-model/src/port.rs) 是封闭四值枚举（`North/South/East/West`），无 `Center`。Sequence 的「附着侧」用本核私有 `LifelineSide`（见 §3.1），不污染 model。
 
 ---
 
@@ -43,7 +43,7 @@
 | S3 | **DemandBoard** | 标签宽、激活嵌套深、自调用高度 → 在上游坐标前 `max` 合并 |
 | S4 | **确定性** | 禁止 `HashMap` 迭代驱动序；生命线/消息遍历稳定 |
 | S5 | **无图种分支** | 引擎只认 `layout: sequence` + typed params（ADR-001） |
-| S6 | **BuiltinEdges** | 本核写出最终消息 path；`edge_routing: Some` → 由本核 `layout()` 入口返回 [`LayoutError::LayoutCannotDeferEdges`](../../../../crates/plotgram-engine-api/src/error.rs) |
+| S6 | **BuiltinEdges** | 本核写出最终消息 path；`edge_routing: Some` → 由本核 `layout()` 入口返回 [`LayoutError::LayoutCannotDeferEdges`](../../../../crates/tautcore-engine-api/src/error.rs) |
 | S7 | **声明序 = 时间轴** | 无 `Edge::seq`；重排时间 = 重排 DSL 边序 |
 
 ### 1.1 状态词
@@ -52,7 +52,7 @@
 
 ### 1.2 禁 Router 的执行点
 
-引擎门面 [`run`](../../../../crates/plotgram-engine/src/run.rs) 在 `edge_routing.is_some()` 时设 `EdgeGeometryMode::DeferToRouter` 后**无条件**调用 router 覆盖 `output.edges`——它不替 layout 拒绝。因此 S6 的「禁独立 Router」检查**必须由本核 `layout()` 入口自己做**：
+引擎门面 [`run`](../../../../crates/tautcore-engine/src/run.rs) 在 `edge_routing.is_some()` 时设 `EdgeGeometryMode::DeferToRouter` 后**无条件**调用 router 覆盖 `output.edges`——它不替 layout 拒绝。因此 S6 的「禁独立 Router」检查**必须由本核 `layout()` 入口自己做**：
 
 ```rust
 fn layout(&self, input: LayoutInput<'_>) -> Result<LayoutOutput, LayoutError> {
@@ -63,7 +63,7 @@ fn layout(&self, input: LayoutInput<'_>) -> Result<LayoutOutput, LayoutError> {
 }
 ```
 
-门面 [`LayoutError::LayoutCannotDeferEdges`](../../../../crates/plotgram-engine-api/src/error.rs) 的语义（"layout does not support deferred edge routing"）正好对上。本核不得依赖门面拦截。
+门面 [`LayoutError::LayoutCannotDeferEdges`](../../../../crates/tautcore-engine-api/src/error.rs) 的语义（"layout does not support deferred edge routing"）正好对上。本核不得依赖门面拦截。
 
 ---
 
@@ -130,7 +130,7 @@ LayoutResult { …, decorations }   // finalize 合并：只 translate decoratio
 ### 2.3 模块边界（目标）
 
 ```text
-plotgram-layout/layout/sequence/
+tautcore-layout/layout/sequence/
   params.rs
   compose/     # lifeline order · message rows · route topo · attachments
   plan/
@@ -139,10 +139,10 @@ plotgram-layout/layout/sequence/
   demand.rs
   verify.rs
 
-plotgram-algo/   # 1D arranger（复用）；非 sequence 私有第二宇宙
+tautcore-algo/   # 1D arranger（复用）；非 sequence 私有第二宇宙
 ```
 
-落点与 Hier 同 crate（[`plotgram-layout`](../../../../crates/plotgram-layout/src/layout/)），注册经 [`Registry::standard`](../../../../crates/plotgram-engine/src/registry.rs)；不依赖门面 `run`。
+落点与 Hier 同 crate（[`tautcore-layout`](../../../../crates/tautcore-layout/src/layout/)），注册经 [`Registry::standard`](../../../../crates/tautcore-engine/src/registry.rs)；不依赖门面 `run`。
 
 ---
 
@@ -181,7 +181,7 @@ MessageRouteTopo =
   StubLost | StubFound         # 后置
 ```
 
-**`LifelineSide` 是本核私有枚举，不映射到 [`model::port::Side`](../../../../crates/plotgram-model/src/port.rs)**（后者封闭四值 `North/South/East/West`，无 `Center`，且 `Side::parse` 对未知 atom 直接报错）。原因：
+**`LifelineSide` 是本核私有枚举，不映射到 [`model::port::Side`](../../../../crates/tautcore-model/src/port.rs)**（后者封闭四值 `North/South/East/West`，无 `Center`，且 `Side::parse` 对未知 atom 直接报错）。原因：
 
 - 序列图附着侧语义是「相对生命线中心轴的左/右/中」，与节点框的 NSEW 端口模型不同构；
 - 不污染 model 的端口词表，避免影响 Hier 的 PortRef/PortConstraint/render 端口逻辑；
@@ -297,7 +297,7 @@ Sequence **不得**把消息委托给 Hier Channel：时间轴与生命线穿越
 | Local search | `…: local` | 邻交换；显式钉住者不动 |
 
 硬约束：DSL/LayoutData 显式 `before` / 固定端点 **永不被优化覆盖**。
-实现复用 `plotgram-algo` 一维排列器，不在 sequence 内私有复制。
+实现复用 `tautcore-algo` 一维排列器，不在 sequence 内私有复制。
 
 ### 6.2 时间行
 

@@ -46,19 +46,19 @@ if [[ ${#SET_FILES[@]} -eq 0 ]]; then
   SET_FILES=("${DEFAULT_SET_FILES[@]}")
 fi
 
-export PLOTGRAM_FONTS_DIR="${PLOTGRAM_FONTS_DIR:-$ROOT/fonts}"
+export TAUTCORE_FONTS_DIR="${TAUTCORE_FONTS_DIR:-$ROOT/fonts}"
 # 避免 Cursor/沙箱注入的 CARGO_TARGET_DIR 把产物写到临时目录
 unset CARGO_TARGET_DIR || true
 
-echo "▶ 构建 collinear-baseline / bench-phases / plotgram (release)..."
-cargo build --release -p plotgram-core --bin collinear-baseline --bin bench-phases -p plotgram-cli 2>&1 | tail -5
+echo "▶ 构建 collinear-baseline / bench-phases / tautcore (release)..."
+cargo build --release -p tautcore-core --bin collinear-baseline --bin bench-phases -p tautcore-cli 2>&1 | tail -5
 
 COLLINEAR="$ROOT/target/release/collinear-baseline"
 BENCH="$ROOT/target/release/bench-phases"
-PLOTGRAM="$ROOT/target/release/plotgram"
+TAUTCORE="$ROOT/target/release/tautcore"
 
-if [[ ! -x "$COLLINEAR" || ! -x "$BENCH" || ! -x "$PLOTGRAM" ]]; then
-  echo "error: 缺少 release 二进制（$COLLINEAR / $BENCH / $PLOTGRAM）" >&2
+if [[ ! -x "$COLLINEAR" || ! -x "$BENCH" || ! -x "$TAUTCORE" ]]; then
+  echo "error: 缺少 release 二进制（$COLLINEAR / $BENCH / $TAUTCORE）" >&2
   exit 1
 fi
 
@@ -81,7 +81,7 @@ done < "$TMP_LIST"
 echo "▶ 共 ${#FILES[@]} 个样例（来自 ${#SET_FILES[@]} 个 set 文件）"
 
 echo "▶ 质量指标（collinear-baseline）..."
-# collinear-baseline 接受 [file.pgm ...]，跳过 --set 自动扫描，直接传文件列表
+# collinear-baseline 接受 [file.taut ...]，跳过 --set 自动扫描，直接传文件列表
 "$COLLINEAR" --runs 1 --date "$DATE" "${FILES[@]}" >"$JSON_OUT"
 
 echo "▶ 性能 + 确定性..."
@@ -90,7 +90,7 @@ TMP_PERF="$(mktemp)"
   echo "{"
   first=1
   for f in "${FILES[@]}"; do
-    name="$(basename "$f" .pgm)"
+    name="$(basename "$f" .taut)"
     if ! out="$("$BENCH" "$f" "$RUNS" 2>/dev/null)"; then
       med="null"; minv="null"; maxv="null"
     else
@@ -98,8 +98,8 @@ TMP_PERF="$(mktemp)"
       minv=$(echo "$out" | grep '最小值:' | sed -E 's/.*最小值:[[:space:]]*([0-9.]+)ms.*/\1/')
       maxv=$(echo "$out" | grep '最大值:' | sed -E 's/.*最大值:[[:space:]]*([0-9.]+)ms.*/\1/')
     fi
-    h1=$("$PLOTGRAM" render "$f" -f svg 2>/dev/null | shasum -a 256 | awk '{print $1}')
-    h2=$("$PLOTGRAM" render "$f" -f svg 2>/dev/null | shasum -a 256 | awk '{print $1}')
+    h1=$("$TAUTCORE" render "$f" -f svg 2>/dev/null | shasum -a 256 | awk '{print $1}')
+    h2=$("$TAUTCORE" render "$f" -f svg 2>/dev/null | shasum -a 256 | awk '{print $1}')
     if [[ "$h1" == "$h2" && -n "$h1" ]]; then det="true"; else det="false"; fi
     if [[ $first -eq 0 ]]; then echo ","; fi
     first=0

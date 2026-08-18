@@ -2,10 +2,10 @@
 # 构建并发布 Agent Demo 到 plotgram.cn/agent/
 #
 # 产物：
-#   - 主站:  /var/www/plotgram.cn/agent/  （index.html、logo，不含 assets/、plotgram-wasm/）
+#   - 主站:  /var/www/plotgram.cn/agent/  （index.html、logo，不含 assets/、tautcore-wasm/）
 #   - CDN:   /agent/assets/                （打包 js / css）
 #
-# 前置条件：agent-demo/plotgram-wasm/ 必须存在（由 deploy-wasm.sh 构建）。
+# 前置条件：agent-demo/tautcore-wasm/ 必须存在（由 deploy-wasm.sh 构建）。
 # 本脚本不构建 wasm，只负责 agent-demo 自身的 vite build 与同步。
 #
 # 用法:
@@ -26,7 +26,7 @@ usage() {
 
 构建 Agent Demo（vite build）并同步到 plotgram.cn/agent/ 与 CDN。
 
-前置：需先运行 ./apps/deploy/deploy-wasm.sh 生成 apps/agent-demo/plotgram-wasm/。
+前置：需先运行 ./apps/deploy/deploy-wasm.sh 生成 apps/agent-demo/tautcore-wasm/。
 
 选项:
   --skip-build    跳过 vite build，用已有 dist 同步
@@ -56,9 +56,9 @@ CDN_AGENT_REMOTE="$ASSET_HOST:$ASSET_REMOTE_DIR/agent/"
 
 # ─── 构建 ───────────────────────────────────────────────
 build() {
-  # vite build 时 alias 需要 plotgram-wasm/ 存在（开发中间件源，生产走 CDN）
-  if [[ ! -f "$AGENT_DIR/plotgram-wasm/plotgram_wasm_bg.wasm" ]]; then
-    die "缺少 apps/agent-demo/plotgram-wasm/，请先运行 ./apps/deploy/deploy-wasm.sh"
+  # vite build 时 alias 需要 tautcore-wasm/ 存在（开发中间件源，生产走 CDN）
+  if [[ ! -f "$AGENT_DIR/tautcore-wasm/tautcore_wasm_bg.wasm" ]]; then
+    die "缺少 apps/agent-demo/tautcore-wasm/，请先运行 ./apps/deploy/deploy-wasm.sh"
   fi
 
   log "构建 agent-demo (base=${AGENT_BASE}, cdn=${AGENT_CDN_BASE})"
@@ -80,7 +80,7 @@ stage_artifacts() {
 
   # 主站：agent 页面（不含 wasm / 打包 assets，走 CDN）
   rsync -a --delete \
-    --exclude='plotgram-wasm/' \
+    --exclude='tautcore-wasm/' \
     --exclude='assets/' \
     "$AGENT_DIR/dist/" "$STAGING_DIR/agent/"
 
@@ -133,7 +133,7 @@ verify() {
 main() {
   log "=== 发布 Agent Demo ==="
   log "  访问路径: https://www.plotgram.cn/agent/"
-  log "  CDN wasm: ${CDN_BASE}plotgram-wasm/（common，由 deploy-wasm.sh 维护）"
+  log "  CDN wasm: ${CDN_BASE}tautcore-wasm/（common，由 deploy-wasm.sh 维护）"
 
   setup_ssh_multiplexing "$DEPLOY_HOST" "$ASSET_HOST"
 
@@ -157,7 +157,7 @@ main() {
   echo "   Agent Demo: https://www.plotgram.cn/agent/"
   echo "   CDN assets: ${CDN_BASE}agent/assets/"
   echo "   Agent API:  $AGENT_API"
-  echo "   CDN WASM:   ${CDN_BASE}plotgram-wasm/（由 deploy-wasm.sh 维护）"
+  echo "   CDN WASM:   ${CDN_BASE}tautcore-wasm/（由 deploy-wasm.sh 维护）"
   echo ""
 
   verify

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { loadWasm, type PlotgramWasm } from '../lib/wasm';
+import { loadWasm, type TautcoreWasm } from '../lib/wasm';
 
 export interface WasmState {
-  wasm: PlotgramWasm | null;
+  wasm: TautcoreWasm | null;
   ready: boolean;
   error: string | null;
 }

@@ -95,7 +95,7 @@
           <div class="fig-caption"><span class="fnum">图 2.1</span>TSM 三段式：每段只写一个自由度——交叉数、弯折数、尺度依次定死</div>
         </figure>
 
-        <p><strong>这是最纯粹的"每个自由度一个写者"设计。</strong> 交叉数在 Step 1 定死，弯折数在 Step 2 定死，Step 3 只能改尺度不能改形状。plotgram 的写权纪律实际上就是这套思想在分层管线上的移植。</p>
+        <p><strong>这是最纯粹的"每个自由度一个写者"设计。</strong> 交叉数在 Step 1 定死，弯折数在 Step 2 定死，Step 3 只能改尺度不能改形状。tautcore 的写权纪律实际上就是这套思想在分层管线上的移植。</p>
 
         <!-- ============ §1 ============ -->
         <h2 id="sec-2"><span class="h2-num">1</span>Step 1 · Planarization（平面化）</h2>
@@ -382,7 +382,7 @@ contract each cycle back into a box; 环上的边成为节点边界上的"端口
         <p>关键约束：<strong>节点端口方向固定</strong>（上进下出 for top-to-bottom）→ 弯折数与形状几乎被决定，剩下的自由度只有 track 分配和 nudging。这就是为什么正交分层的实现远比 TSM 简单却能做到产品级观感。</p>
 
         <!-- ============ §6 ============ -->
-        <h2 id="sec-7"><span class="h2-num">6</span>实现建议（plotgram）</h2>
+        <h2 id="sec-7"><span class="h2-num">6</span>实现建议（tautcore）</h2>
 
         <ol>
           <li><strong>不要一开始上 TSM</strong>。先做"分层 + 正交路由"（01 + 03 篇），能覆盖架构/流程/BPMN 绝大多数需求。</li>

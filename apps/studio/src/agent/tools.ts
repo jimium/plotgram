@@ -1,7 +1,7 @@
 /**
  * Agent Tool 定义与执行器
  *
- * 每个 Tool 对应 plotgram-wasm 的一个能力,
+ * 每个 Tool 对应 tautcore-wasm 的一个能力,
  * Agent 通过 function-calling 调用这些 Tool 操控图表
  */
 
@@ -18,7 +18,7 @@ import {
   diffSources,
   applyPatch,
   loadWasm,
-  type PlotgramWasm,
+  type TautcoreWasm,
 } from '@lib/wasm';
 
 /** Agent 可用的 Tool Schema 列表(供 LLM function-calling) */
@@ -28,11 +28,11 @@ export const AGENT_TOOL_SCHEMAS: ToolSchema[] = [
     function: {
       name: 'render',
       description:
-        '渲染 Plotgram DSL 为指定格式(svg/ascii/json)。返回渲染结果或错误诊断。生成或修改图表后必须调用以获取可视化结果。',
+        '渲染 Tautcore DSL 为指定格式(svg/ascii/json)。返回渲染结果或错误诊断。生成或修改图表后必须调用以获取可视化结果。',
       parameters: {
         type: 'object',
         properties: {
-          source: { type: 'string', description: 'Plotgram DSL 源码' },
+          source: { type: 'string', description: 'Tautcore DSL 源码' },
           format: {
             type: 'string',
             enum: ['svg', 'ascii', 'json'],
@@ -57,11 +57,11 @@ export const AGENT_TOOL_SCHEMAS: ToolSchema[] = [
     function: {
       name: 'validate',
       description:
-        '校验 Plotgram DSL 语法和语义,返回错误和警告(含错误码、行号和修复建议)。生成 DSL 后应调用以自检。',
+        '校验 Tautcore DSL 语法和语义,返回错误和警告(含错误码、行号和修复建议)。生成 DSL 后应调用以自检。',
       parameters: {
         type: 'object',
         properties: {
-          source: { type: 'string', description: 'Plotgram DSL 源码' },
+          source: { type: 'string', description: 'Tautcore DSL 源码' },
         },
         required: ['source'],
       },
@@ -72,11 +72,11 @@ export const AGENT_TOOL_SCHEMAS: ToolSchema[] = [
     function: {
       name: 'parse',
       description:
-        '解析 Plotgram DSL 为 AST JSON,获取实体/关系/分组的结构化信息。用于理解当前图表结构。',
+        '解析 Tautcore DSL 为 AST JSON,获取实体/关系/分组的结构化信息。用于理解当前图表结构。',
       parameters: {
         type: 'object',
         properties: {
-          source: { type: 'string', description: 'Plotgram DSL 源码' },
+          source: { type: 'string', description: 'Tautcore DSL 源码' },
         },
         required: ['source'],
       },
@@ -87,7 +87,7 @@ export const AGENT_TOOL_SCHEMAS: ToolSchema[] = [
     function: {
       name: 'diff',
       description:
-        '比较两份 Plotgram DSL 的语义差异,返回结构化变更列表(新增/删除/修改的实体、关系、分组)。用于向用户展示变更摘要。',
+        '比较两份 Tautcore DSL 的语义差异,返回结构化变更列表(新增/删除/修改的实体、关系、分组)。用于向用户展示变更摘要。',
       parameters: {
         type: 'object',
         properties: {
@@ -149,7 +149,7 @@ export const AGENT_TOOL_SCHEMAS: ToolSchema[] = [
 
 /** 创建 Tool 执行器映射 */
 export function createToolExecutors(
-  getWasm: () => Promise<PlotgramWasm>,
+  getWasm: () => Promise<TautcoreWasm>,
 ): Record<string, ToolExecutor> {
   return {
     render: async (args, context) => {

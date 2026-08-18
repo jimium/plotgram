@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { loadWasm, renderSource, type PlotgramWasm } from '../lib/wasm';
+import { loadWasm, renderSource, type TautcoreWasm } from '../lib/wasm';
 import { SequenceAnimator, type StepInfo } from './SequenceAnimator';
 import { withBase } from '../lib/baseUrl';
 
@@ -92,7 +92,7 @@ function ArrowSym({ arrow }: { arrow: string }) {
 }
 
 export default function SequenceApp() {
-  const [wasm, setWasm] = useState<PlotgramWasm | null>(null);
+  const [wasm, setWasm] = useState<TautcoreWasm | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sceneIdx, setSceneIdx] = useState(0);
   const [step, setStep] = useState(0);

@@ -1,6 +1,6 @@
 # 部署服务器说明
 
-Plotgram 使用双域名 + 双服务器部署：
+Tautcore 使用双域名 + 双服务器部署：
 - **plotgram.dev**（海外站）：承载 demo 页面，由 demo 站服务器提供
 - **plotgram.cn**（国内主站，备案号 沪ICP备2026029910号-2）：镜像所有 demo 页面，由 shanxun 服务器提供
 - CDN 与 Agent API 始终部署在 shanxun，同时通过 `assets.pg.agcli.cn` / `assets.plotgram.cn` 与 `api.pg.agcli.cn` / `api.plotgram.cn` 双域名暴露
@@ -9,11 +9,11 @@ Plotgram 使用双域名 + 双服务器部署：
 
 | 角色 | SSH 别名 | 域名 | 部署目录 |
 |------|----------|------|----------|
-| Demo 站（海外页面） | `plotgram.dev` | `demo.plotgram.dev` | `/var/www/plotgram` |
+| Demo 站（海外页面） | `plotgram.dev` | `demo.plotgram.dev` | `/var/www/tautcore` |
 | 国内主站（页面镜像） | `shanxun` | `www.plotgram.cn` / `plotgram.cn` | `/var/www/plotgram.cn` |
 | 资源 CDN | `shanxun` | `assets.pg.agcli.cn` / `assets.plotgram.cn` | `/var/www/assets.pg.agcli.cn` |
-| Agent API | `shanxun` | `api.pg.agcli.cn` / `api.plotgram.cn` | `/opt/plotgram-agent-api` |
-| 源码（编译用） | `shanxun` | — | `/opt/plotgram`（Rust 1.96 + rsproxy.cn） |
+| Agent API | `shanxun` | `api.pg.agcli.cn` / `api.plotgram.cn` | `/opt/tautcore-agent-api` |
+| 源码（编译用） | `shanxun` | — | `/opt/tautcore`（Rust 1.96 + rsproxy.cn） |
 
 > **域名说明**：plotgram.cn 备案通过后，`api.plotgram.cn` 与 `assets.plotgram.cn` 作为 `api.pg.agcli.cn` / `assets.pg.agcli.cn` 的 server_name 别名指向同一份后端资源；`www.plotgram.cn` 与 `plotgram.cn` 是独立的国内主站，镜像 demo 站全部前端页面。
 
@@ -38,7 +38,7 @@ Plotgram 使用双域名 + 双服务器部署：
 | 系统 | Ubuntu 26.04 LTS |
 | 公网 IP | `45.77.27.170` |
 | 域名 | `demo.plotgram.dev` |
-| 部署路径 | `/var/www/plotgram` |
+| 部署路径 | `/var/www/tautcore` |
 | Web 服务 | nginx |
 | HTTPS | Let's Encrypt（certbot 自动续期） |
 | nginx 配置 | `/etc/nginx/conf.d/demo.plotgram.dev.conf` |
@@ -47,10 +47,10 @@ Plotgram 使用双域名 + 双服务器部署：
 ### 目录结构
 
 ```
-/var/www/plotgram/
-├── playground/          # HTML、favicon、logo（不含 assets/、plotgram-wasm/）
-├── agent/               # Agent Demo 页面（不含 assets/、plotgram-wasm/）
-├── showcase/            # 页面、.pgm、manifest（不含 .svg）
+/var/www/tautcore/
+├── playground/          # HTML、favicon、logo（不含 assets/、tautcore-wasm/）
+├── agent/               # Agent Demo 页面（不含 assets/、tautcore-wasm/）
+├── showcase/            # 页面、.taut、manifest（不含 .svg）
 └── assets/brand/        # 品牌 logo 等
 ```
 
@@ -80,13 +80,13 @@ Plotgram 使用双域名 + 双服务器部署：
 
 ### 目录结构
 
-镜像 demo 站（`/var/www/plotgram`）的全部前端页面：
+镜像 demo 站（`/var/www/tautcore`）的全部前端页面：
 
 ```
 /var/www/plotgram.cn/
-├── playground/          # HTML、favicon、logo（不含 assets/、plotgram-wasm/）
-├── agent/               # Agent Demo 页面（不含 assets/、plotgram-wasm/）
-├── showcase/            # 页面、.pgm、manifest（不含 .svg）
+├── playground/          # HTML、favicon、logo（不含 assets/、tautcore-wasm/）
+├── agent/               # Agent Demo 页面（不含 assets/、tautcore-wasm/）
+├── showcase/            # 页面、.taut、manifest（不含 .svg）
 └── assets/brand/        # 品牌 logo 等
 ```
 
@@ -131,10 +131,10 @@ ssh shanxun 'certbot certonly --cert-name assets.pg.agcli.cn --expand \
 ssh shanxun 'nginx -t && systemctl reload nginx'
 
 # 6. 更新服务器上 .env 的 CORS 白名单（加入 plotgram.cn origins）
-ssh shanxun 'sed -i "s|^DEMO_ALLOWED_ORIGINS=.*|DEMO_ALLOWED_ORIGINS=https://demo.plotgram.dev,https://plotgram.cn,https://www.plotgram.cn,https://assets.pg.agcli.cn,https://api.pg.agcli.cn,https://assets.plotgram.cn,https://api.plotgram.cn|" /opt/plotgram-agent-api/.env'
+ssh shanxun 'sed -i "s|^DEMO_ALLOWED_ORIGINS=.*|DEMO_ALLOWED_ORIGINS=https://demo.plotgram.dev,https://plotgram.cn,https://www.plotgram.cn,https://assets.pg.agcli.cn,https://api.pg.agcli.cn,https://assets.plotgram.cn,https://api.plotgram.cn|" /opt/tautcore-agent-api/.env'
 
 # 7. 重启 Agent API 使新 CORS 生效
-ssh shanxun 'cd /opt/plotgram-agent-api && ./stop.sh && ./start.sh'
+ssh shanxun 'cd /opt/tautcore-agent-api && ./stop.sh && ./start.sh'
 
 # 8. 全量发布
 ./apps/deploy/deploy-all.sh
@@ -162,10 +162,10 @@ ssh shanxun 'cd /opt/plotgram-agent-api && ./stop.sh && ./start.sh'
 /var/www/assets.pg.agcli.cn/
 ├── playground/
 │   ├── assets/         # 打包 js / css（main-*.js、wasm-*.js 等）
-│   └── plotgram-wasm/   # plotgram_wasm.js、plotgram_wasm_bg.wasm
+│   └── tautcore-wasm/   # tautcore_wasm.js、tautcore_wasm_bg.wasm
 ├── agent/
 │   ├── assets/         # Agent Demo 打包 js / css
-│   └── plotgram-wasm/   # 与 playground 共用同一份 wasm 产物
+│   └── tautcore-wasm/   # 与 playground 共用同一份 wasm 产物
 └── showcase/
     └── **/*.svg        # 各类型示例 SVG
 ```
@@ -175,10 +175,10 @@ ssh shanxun 'cd /opt/plotgram-agent-api && ./stop.sh && ./start.sh'
 | 资源 | URL 示例 |
 |------|----------|
 | Playground JS/CSS | `https://assets.pg.agcli.cn/playground/assets/main-*.js` |
-| WASM JS | `https://assets.pg.agcli.cn/playground/plotgram-wasm/plotgram_wasm.js` |
-| WASM 二进制 | `https://assets.pg.agcli.cn/playground/plotgram-wasm/plotgram_wasm_bg.wasm` |
+| WASM JS | `https://assets.pg.agcli.cn/playground/tautcore-wasm/tautcore_wasm.js` |
+| WASM 二进制 | `https://assets.pg.agcli.cn/playground/tautcore-wasm/tautcore_wasm_bg.wasm` |
 | Agent Demo JS/CSS | `https://assets.pg.agcli.cn/agent/assets/main-*.js` |
-| Agent Demo WASM | `https://assets.pg.agcli.cn/agent/plotgram-wasm/plotgram_wasm_bg.wasm` |
+| Agent Demo WASM | `https://assets.pg.agcli.cn/agent/tautcore-wasm/tautcore_wasm_bg.wasm` |
 | Showcase SVG | `https://assets.pg.agcli.cn/showcase/flowchart/product.linear-chain.svg` |
 
 ### 跨域（CORS）
@@ -199,13 +199,13 @@ Access-Control-Allow-Origin: *
 |------|-----|
 | SSH | `ssh shanxun` |
 | 域名 | `api.pg.agcli.cn` / `api.plotgram.cn`（server_name 别名，同证书） |
-| 部署路径 | `/opt/plotgram-agent-api` |
-| 二进制 | `plotgram-server`（Linux x86_64, glibc 动态链接） |
-| 编译位置 | `shanxun:/opt/plotgram`（Rust 1.96 + rsproxy.cn 镜像） |
+| 部署路径 | `/opt/tautcore-agent-api` |
+| 二进制 | `tautcore-server`（Linux x86_64, glibc 动态链接） |
+| 编译位置 | `shanxun:/opt/tautcore`（Rust 1.96 + rsproxy.cn 镜像） |
 | 监听 | `127.0.0.1:6080`（仅本地，nginx 反代） |
 | nginx 配置 | `/etc/nginx/conf.d/api.pg.agcli.cn.conf` |
 | 配置模板 | [`deploy/nginx/api.pg.agcli.cn.conf`](nginx/api.pg.agcli.cn.conf) |
-| 环境变量 | `/opt/plotgram-agent-api/.env`（含 `DEEPSEEK_API_KEY`，权限 600，不进 git） |
+| 环境变量 | `/opt/tautcore-agent-api/.env`（含 `DEEPSEEK_API_KEY`，权限 600，不进 git） |
 | HTTPS 证书 | Let's Encrypt，与 `assets.pg.agcli.cn` / `assets.plotgram.cn` 共用（SAN 四域名） |
 
 ### 架构
@@ -213,7 +213,7 @@ Access-Control-Allow-Origin: *
 ```
 浏览器 → HTTPS → api.pg.agcli.cn(443)
                     │
-                    ├─ /agent/chat → 127.0.0.1:6080(plotgram-server) → DeepSeek API
+                    ├─ /agent/chat → 127.0.0.1:6080(tautcore-server) → DeepSeek API
                     │                    ↑                              ↑
                     │               SSE 透传                    持有 API Key + 8 层防滥用
                     │
@@ -225,19 +225,19 @@ API Key (`DEEPSEEK_API_KEY`) 仅存在于服务器的 `.env` 文件中，永不�
 ### 目录结构
 
 ```
-/opt/plotgram-agent-api/     # 部署目录
-├── plotgram-server       # Linux 二进制（shanxun 本地编译）
+/opt/tautcore-agent-api/     # 部署目录
+├── tautcore-server       # Linux 二进制（shanxun 本地编译）
 ├── .env                  # 环境变量（含 API Key，权限 600）
 ├── .env.example          # 配置模板
 ├── start.sh              # 启动脚本（nohup 后台 + PID 文件）
 ├── stop.sh               # 停止脚本（SIGTERM → SIGKILL）
-├── plotgram-server.pid   # PID 文件（运行时生成）
+├── tautcore-server.pid   # PID 文件（运行时生成）
 └── server.log            # 日志（运行时生成）
 
-/opt/plotgram/               # 源码目录（常驻，rsync 增量同步）
+/opt/tautcore/               # 源码目录（常驻，rsync 增量同步）
 ├── Cargo.toml
 ├── crates/...
-└── target/release/plotgram-server  # 编译产物
+└── target/release/tautcore-server  # 编译产物
 ```
 
 ### 路由
@@ -251,16 +251,16 @@ API Key (`DEEPSEEK_API_KEY`) 仅存在于服务器的 `.env` 文件中，永不�
 
 ```bash
 # 启动
-ssh shanxun 'cd /opt/plotgram-agent-api && ./start.sh'
+ssh shanxun 'cd /opt/tautcore-agent-api && ./start.sh'
 
 # 停止
-ssh shanxun 'cd /opt/plotgram-agent-api && ./stop.sh'
+ssh shanxun 'cd /opt/tautcore-agent-api && ./stop.sh'
 
 # 重启
-ssh shanxun 'cd /opt/plotgram-agent-api && ./stop.sh && ./start.sh'
+ssh shanxun 'cd /opt/tautcore-agent-api && ./stop.sh && ./start.sh'
 
 # 查看日志
-ssh shanxun 'tail -f /opt/plotgram-agent-api/server.log'
+ssh shanxun 'tail -f /opt/tautcore-agent-api/server.log'
 ```
 
 ### 首次部署
@@ -273,11 +273,11 @@ ssh shanxun 'tail -f /opt/plotgram-agent-api/server.log'
 ./apps/deploy/deploy-agent-api.sh
 
 # 3. 登录服务器填入真实 API Key（如未在 .env 中）
-ssh shanxun 'vim /opt/plotgram-agent-api/.env'
+ssh shanxun 'vim /opt/tautcore-agent-api/.env'
 # 修改 DEEPSEEK_API_KEY=sk-xxx
 
 # 4. 重启服务使 .env 生效
-ssh shanxun 'cd /opt/plotgram-agent-api && ./stop.sh && ./start.sh'
+ssh shanxun 'cd /opt/tautcore-agent-api && ./stop.sh && ./start.sh'
 ```
 
 ### 后续发布
@@ -301,10 +301,10 @@ ssh shanxun 'cd /opt/plotgram-agent-api && ./stop.sh && ./start.sh'
 shanxun 已安装 Rust 1.96 + rsproxy.cn 镜像，编译在服务器本地进行，无需交叉编译：
 
 ```
-本机 rsync 源码 → shanxun:/opt/plotgram/（增量同步，~5s）
-shanxun cd /opt/plotgram && cargo build --release -p plotgram-server  # rsproxy.cn 镜像，~4-5 分钟
-shanxun cp target/release/plotgram-server → /opt/plotgram-agent-api/plotgram-server.new
-shanxun /opt/plotgram-agent-api/stop.sh && mv *.new → plotgram-server && start.sh
+本机 rsync 源码 → shanxun:/opt/tautcore/（增量同步，~5s）
+shanxun cd /opt/tautcore && cargo build --release -p tautcore-server  # rsproxy.cn 镜像，~4-5 分钟
+shanxun cp target/release/tautcore-server → /opt/tautcore-agent-api/tautcore-server.new
+shanxun /opt/tautcore-agent-api/stop.sh && mv *.new → tautcore-server && start.sh
 ```
 
 shanxun 的 `~/.cargo/config.toml` 已配置 rsproxy.cn 镜像，编译速度远快于直连 crates.io。
@@ -318,13 +318,13 @@ Agent Demo（对话即画图）部署在 demo 站的 `/agent/` 子路径下，�
 | 项目 | 值 |
 |------|-----|
 | 访问地址 | https://demo.plotgram.dev/agent/ 或 https://www.plotgram.cn/agent/ |
-| 页面部署路径（主站） | `/var/www/plotgram/agent` |
+| 页面部署路径（主站） | `/var/www/tautcore/agent` |
 | 页面部署路径（镜像） | `/var/www/plotgram.cn/agent` |
 | CDN 路径 | `/var/www/assets.pg.agcli.cn/agent/` |
 | nginx 配置 | `demo.plotgram.dev.conf` + `plotgram.cn.conf`（`/agent/` location）+ `assets.pg.agcli.cn.conf` |
 | Agent API | https://api.pg.agcli.cn/agent/chat（CORS 允许 plotgram.cn / plotgram.dev） |
 | 构建工具 | wasm-pack + vite build |
-| WASM 来源 | `crates/plotgram-wasm`（与 playground 共用） |
+| WASM 来源 | `crates/tautcore-wasm`（与 playground 共用） |
 
 ### 构建参数
 
@@ -358,7 +358,7 @@ Agent Demo（对话即画图）部署在 demo 站的 `/agent/` 子路径下，�
 
 ### WASM 加载策略
 
-与 playground 一致：构建时把 `plotgram_wasm_bg.wasm` 的 md5 注入 `VITE_WASM_BUILD_STAMP`，前端以 `?v=<md5>` 显式加载 wasm JS 与二进制；CDN nginx 对 `/agent/plotgram-wasm/` 使用 `no-cache`。
+与 playground 一致：构建时把 `tautcore_wasm_bg.wasm` 的 md5 注入 `VITE_WASM_BUILD_STAMP`，前端以 `?v=<md5>` 显式加载 wasm JS 与二进制；CDN nginx 对 `/agent/tautcore-wasm/` 使用 `no-cache`。
 
 ---
 
@@ -370,7 +370,7 @@ Agent Demo（对话即画图）部署在 demo 站的 `/agent/` 子路径下，�
 
 | 脚本 | 站点 | 访问地址 |
 |------|------|----------|
-| `deploy-wasm.sh` | WASM（三端共用 CDN common） | `https://assets.pg.agcli.cn/plotgram-wasm/`（或 `https://assets.plotgram.cn/plotgram-wasm/`） |
+| `deploy-wasm.sh` | WASM（三端共用 CDN common） | `https://assets.pg.agcli.cn/tautcore-wasm/`（或 `https://assets.plotgram.cn/tautcore-wasm/`） |
 | `deploy-website.sh` | Website（landing page） | `https://demo.plotgram.dev/` + `https://www.plotgram.cn/` |
 | `deploy-playground.sh` | Playground | `https://demo.plotgram.dev/playground/` + `https://www.plotgram.cn/playground/` |
 | `deploy-showcase.sh` | Showcase | `https://demo.plotgram.dev/showcase/` + `https://www.plotgram.cn/showcase/` |
@@ -424,11 +424,11 @@ Agent Demo（对话即画图）部署在 demo 站的 `/agent/` 子路径下，�
 ### 依赖关系
 
 ```
-deploy-wasm.sh ──┬─→ deploy-playground.sh    （build 时需要 playground/plotgram-wasm/）
-                  └─→ deploy-agent-demo.sh    （build 时需要 agent-demo/plotgram-wasm/）
+deploy-wasm.sh ──┬─→ deploy-playground.sh    （build 时需要 playground/tautcore-wasm/）
+                  └─→ deploy-agent-demo.sh    （build 时需要 agent-demo/tautcore-wasm/）
 
 deploy-website.sh    （独立）
-deploy-showcase.sh   （独立，依赖 plotgram-cli）
+deploy-showcase.sh   （独立，依赖 tautcore-cli）
 deploy-agent-api.sh  （独立，远程编译 Rust 服务端）
 ```
 
@@ -438,7 +438,7 @@ deploy-agent-api.sh  （独立，远程编译 Rust 服务端）
 |------|--------|------|
 | `DEPLOY_HOST` | `plotgram.dev`（agent-api 为 `shanxun`） | Demo 站 SSH 目标 |
 | `ASSET_HOST` | `shanxun` | CDN SSH 目标 |
-| `REMOTE_DIR` | `/var/www/plotgram` | Demo 站部署目录 |
+| `REMOTE_DIR` | `/var/www/tautcore` | Demo 站部署目录 |
 | `ASSET_REMOTE_DIR` | `/var/www/assets.pg.agcli.cn` | CDN 部署目录 |
 | `CDN_BASE` | `https://assets.pg.agcli.cn/` | 构建时注入的 CDN 根 URL |
 | `SITE_MIRROR_HOST` | `shanxun` | plotgram.cn 镜像站 SSH 目标 |
@@ -453,11 +453,11 @@ deploy-agent-api.sh  （独立，远程编译 Rust 服务端）
 | 镜像站 `/`（plotgram.cn） | 同上 | 同上 |
 | Demo 站 `/playground/` | playground 页面 | `assets/`、wasm（走 CDN） |
 | 镜像站 `/playground/` | 同上 | 同上 |
-| Demo 站 `/showcase/` | showcase 页面、.pgm、manifest | `.svg`（走 CDN） |
+| Demo 站 `/showcase/` | showcase 页面、.taut、manifest | `.svg`（走 CDN） |
 | 镜像站 `/showcase/` | 同上 | 同上 |
 | Demo 站 `/agent/` | agent 页面 | `assets/`、wasm（走 CDN） |
 | 镜像站 `/agent/` | 同上 | 同上 |
-| CDN `/plotgram-wasm/` | wasm 产物（三端共用） | — |
+| CDN `/tautcore-wasm/` | wasm 产物（三端共用） | — |
 | CDN `/website/assets/` | website 打包 js/css | — |
 | CDN `/playground/assets/` | playground 打包 js/css | — |
 | CDN `/showcase/` | SVG 文件 | — |
@@ -465,7 +465,7 @@ deploy-agent-api.sh  （独立，远程编译 Rust 服务端）
 
 **关键**：website 脚本对两站根目录均使用 `--delete`，但已排除 `playground/` `showcase/` `agent/` 子目录，不会误删其他站点。镜像站通过 `rsync_to_both` 与主站保持同步。
 
-WASM 缓存：CDN nginx 对 `/plotgram-wasm/` 使用 `no-cache` + ETag；前端以 `?v=<md5>` 加载 wasm。勿在 `public/plotgram-wasm/` 放置 wasm 副本。
+WASM 缓存：CDN nginx 对 `/tautcore-wasm/` 使用 `no-cache` + ETag；前端以 `?v=<md5>` 加载 wasm。勿在 `public/tautcore-wasm/` 放置 wasm 副本。
 
 ---
 

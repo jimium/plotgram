@@ -1,0 +1,147 @@
+{
+  "version": "0.2",
+  "id": "common.presentation",
+  "name": "Presentation",
+  "meta": {
+    "author": "Tautcore",
+    "description": "演示展示样式：更大字号、更强对比、饱满色彩与圆角，适合幻灯片与投影场景",
+    "tags": ["presentation", "slides", "bold", "large"]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#FFFDF8",
+      "text": "#111827",
+      "muted_text": "#4B5563",
+      "border": "#9CA3AF",
+      "primary": "#1D4ED8",
+      "neutral_fill": "#F3F4F6",
+      "neutral_stroke": "#1F2937",
+      "edge_stroke": "#374151",
+      "group_fill": "#FEF3C7",
+      "group_stroke": "#92400E"
+    },
+    "palette": {
+      "blue": { "fill": "#DBEAFE", "stroke": "#1D4ED8" },
+      "orange": { "fill": "#FFEDD5", "stroke": "#C2410C" },
+      "green": { "fill": "#BBF7D0", "stroke": "#15803D" },
+      "purple": { "fill": "#E9D5FF", "stroke": "#7E22CE" },
+      "yellow": { "fill": "#FEF08A", "stroke": "#A16207" },
+      "red": { "fill": "#FECACA", "stroke": "#B91C1C" },
+      "cyan": { "fill": "#A5F3FC", "stroke": "#0E7490" },
+      "brown": { "fill": "#E7E5E4", "stroke": "#57534E" },
+      "gray": { "fill": "#F3F4F6", "stroke": "#4B5563" },
+      "amber": { "fill": "#FEF3C7", "stroke": "#92400E" },
+      "blue_gray": { "fill": "#E5E7EB", "stroke": "#1F2937" },
+      "start_green": { "fill": "#BBF7D0", "stroke": "#15803D" },
+      "end_red": { "fill": "#FECACA", "stroke": "#B91C1C" },
+      "arch_blue": { "fill": "#BFDBFE", "stroke": "#1D4ED8" },
+      "root": { "fill": "#4338CA", "stroke": "#312E81", "text_fill": "#FFFFFF" }
+    },
+    "typography": {
+      "font_family": "'Inter', 'Noto Sans CJK SC', 'Segoe UI', sans-serif",
+      "title_size": 20,
+      "label_size": 15,
+      "small_size": 13,
+      "font_weight_medium": 600,
+      "font_weight_bold": 800
+    },
+    "strokes": {
+      "thin": 1.5,
+      "normal": 2.2,
+      "thick": 3.0,
+      "dashed": [8, 4],
+      "dotted": [2, 4]
+    },
+    "radius": {
+      "sm": 8,
+      "md": 12,
+      "lg": 18,
+      "pill": 999
+    },
+    "spacing": {
+      "node_padding_x": 16,
+      "node_padding_y": 11,
+      "group_padding": 20,
+      "label_gap": 8
+    }
+  },
+  "defaults": {
+    "node": {
+      "stroke": "{colors.neutral_stroke}",
+      "stroke_linecap": "round",
+      "stroke_linejoin": "round",
+      "label_weight": "medium"
+    },
+    "edge": {
+      "stroke": "{colors.edge_stroke}",
+      "stroke_linecap": "round",
+      "stroke_linejoin": "round",
+      "stroke_opacity": 1.0,
+      "arrow_style": "normal"
+    },
+    "group": {
+      "stroke": "{colors.group_stroke}",
+      "stroke_width": "{strokes.normal}"
+    }
+  },
+  "diagrams": {
+    "flowchart": {
+      "edge": { "stroke": "{colors.edge_stroke}" }
+    },
+    "sequence": { "edge": { "stroke": "{colors.edge_stroke}" } },
+    "state": { "edge": { "stroke": "{colors.edge_stroke}" } },
+    "architecture": {
+      "edge": { "stroke": "{colors.edge_stroke}" },
+      "group": {
+        "stroke": "{colors.primary}",
+        "stroke_width": "{strokes.thick}"
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "{colors.group_fill}", "stroke": "{colors.primary}", "stroke_width": 3.0, "border_radius": 14.0 },
+            { "fill": "{lighten({colors.group_fill}, 0.35)}", "stroke": "{lighten({colors.primary}, 0.25)}", "stroke_width": 2.0, "border_radius": 10.0 },
+            { "fill": "{lighten({colors.group_fill}, 0.55)}", "stroke": "{lighten({colors.primary}, 0.40)}", "stroke_width": 2.0, "border_radius": 10.0 },
+            { "fill": "{lighten({colors.group_fill}, 0.70)}", "stroke": "{lighten({colors.primary}, 0.55)}", "stroke_width": 2.0, "border_radius": 10.0 }
+          ],
+          "index": { "from": "group_depth", "cap": 3 },
+          "bindings": [
+            { "target": "group", "fields": { "fill": "fill", "stroke": "stroke", "stroke_width": "stroke_width", "border_radius": "border_radius" } }
+          ]
+        }
+      }
+    },
+    "er": {
+      "node": { "fill": "#FFFFFF", "stroke": "{colors.primary}", "stroke_width": "{strokes.normal}" },
+      "edge": { "stroke": "{colors.edge_stroke}" }
+    },
+    "mindmap": {
+      "edge": { "stroke_width": "{strokes.thin}" },
+      "node": { "radius": "{radius.lg}" },
+      "entity_types": {
+        "leaf": { "fill": "#F5F3FF" },
+        "main": { "label_weight": "bold" }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#DBEAFE", "stroke": "#1D4ED8", "text_fill": "#1E3A8A", "edge_stroke": "#3B82F6" },
+            { "fill": "#D1FAE5", "stroke": "#059669", "text_fill": "#065F46", "edge_stroke": "#34D399" },
+            { "fill": "#FEE2E2", "stroke": "#DC2626", "text_fill": "#991B1B", "edge_stroke": "#F87171" },
+            { "fill": "#FFEDD5", "stroke": "#EA580C", "text_fill": "#9A3412", "edge_stroke": "#FB923C" },
+            { "fill": "#EDE9FE", "stroke": "#7C3AED", "text_fill": "#5B21B6", "edge_stroke": "#A78BFA" },
+            { "fill": "#CFFAFE", "stroke": "#0891B2", "text_fill": "#155E75", "edge_stroke": "#22D3EE" }
+          ]
+        },
+        "edge_depth": {
+          "entries": [
+            { "stroke_width": 3.0, "stroke_opacity": 0.95 },
+            { "stroke_width": 2.0, "stroke_opacity": 0.75 },
+            { "stroke_width": 1.5, "stroke_opacity": 0.55 }
+          ]
+        }
+      }
+    }
+  }
+}

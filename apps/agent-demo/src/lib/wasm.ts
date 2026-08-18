@@ -1,8 +1,8 @@
 /**
- * plotgram-wasm 桥接层
+ * tautcore-wasm 桥接层
  *
- * 复用 playground 的 WASM 接口（最完整版），类型与 plotgram-wasm crate 实际导出对齐。
- * diff_sources / apply_patch / format_source 在 plotgram-wasm 中均已实现。
+ * 复用 playground 的 WASM 接口（最完整版），类型与 tautcore-wasm crate 实际导出对齐。
+ * diff_sources / apply_patch / format_source 在 tautcore-wasm 中均已实现。
  */
 
 /** 渲染格式标识，与 Rust 端 RenderFormat::from_str 对齐。 */
@@ -120,8 +120,8 @@ export interface PatchApplyResult {
   errors?: string[];
 }
 
-/** plotgram-wasm 模块接口 */
-export interface PlotgramWasm {
+/** tautcore-wasm 模块接口 */
+export interface TautcoreWasm {
   default: (input?: unknown) => Promise<unknown>;
   version: () => string;
   render: (source: string, format: string) => string;
@@ -136,7 +136,7 @@ export interface PlotgramWasm {
   format_source: (source: string) => string;
 }
 
-let modulePromise: Promise<PlotgramWasm> | null = null;
+let modulePromise: Promise<TautcoreWasm> | null = null;
 
 /** 开发调试：强制下次 loadWasm 重新拉取 WASM。 */
 export function resetWasmModule(): void {
@@ -145,37 +145,37 @@ export function resetWasmModule(): void {
 
 /** 生产环境 CDN common 路径（三端共用同一份 wasm 产物，靠 ETag 控制缓存）。 */
 function wasmCdnBase(): string {
-  return 'https://assets.plotgram.cn/plotgram-wasm/';
+  return 'https://assets.plotgram.cn/tautcore-wasm/';
 }
 
-/** plotgram_wasm.js 加载地址（开发走本地 vite 中间件，生产走 CDN common 路径）。 */
-function plotgramWasmJsUrl(): string {
+/** tautcore_wasm.js 加载地址（开发走本地 vite 中间件，生产走 CDN common 路径）。 */
+function tautcoreWasmJsUrl(): string {
   if (import.meta.env.DEV) {
-    return `../plotgram-wasm/plotgram_wasm.js`;
+    return `../tautcore-wasm/tautcore_wasm.js`;
   }
-  return `${wasmCdnBase()}plotgram_wasm.js`;
+  return `${wasmCdnBase()}tautcore_wasm.js`;
 }
 
 /** wasm 二进制加载地址。 */
-function plotgramWasmBinaryUrl(): string {
+function tautcoreWasmBinaryUrl(): string {
   if (import.meta.env.DEV) {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${origin}/plotgram-wasm/plotgram_wasm_bg.wasm`;
+    return `${origin}/tautcore-wasm/tautcore_wasm_bg.wasm`;
   }
-  return `${wasmCdnBase()}plotgram_wasm_bg.wasm`;
+  return `${wasmCdnBase()}tautcore_wasm_bg.wasm`;
 }
 
 /** 懒加载并初始化 WASM 模块（全局单例）。 */
-export function loadWasm(): Promise<PlotgramWasm> {
+export function loadWasm(): Promise<TautcoreWasm> {
   if (!modulePromise) {
     modulePromise = (async () => {
-      // WASM 产物由 wasm-pack 生成到 agent-demo/plotgram-wasm/
+      // WASM 产物由 wasm-pack 生成到 agent-demo/tautcore-wasm/
       const mod = (await import(
         /* @vite-ignore */ // @ts-ignore WASM 产物由 wasm-pack 生成，首次构建前不存在
         /* webpackIgnore: true */
-        plotgramWasmJsUrl()
-      )) as unknown as PlotgramWasm;
-      await mod.default({ module_or_path: plotgramWasmBinaryUrl() });
+        tautcoreWasmJsUrl()
+      )) as unknown as TautcoreWasm;
+      await mod.default({ module_or_path: tautcoreWasmBinaryUrl() });
       return mod;
     })();
   }
@@ -202,7 +202,7 @@ function fallbackDiag(message: string, severity: 'error' | 'warning' = 'error'):
 
 /** 按指定格式渲染，返回单格式结果。 */
 export function renderSource(
-  wasm: PlotgramWasm,
+  wasm: TautcoreWasm,
   source: string,
   format: RenderFormat,
   optionsJson?: string,
@@ -221,7 +221,7 @@ export function renderSource(
   });
 }
 
-export function validateSource(wasm: PlotgramWasm, source: string): ValidationResult {
+export function validateSource(wasm: TautcoreWasm, source: string): ValidationResult {
   const json = wasm.validate(source);
   return safeParse<ValidationResult>(json, {
     valid: false,
@@ -230,7 +230,7 @@ export function validateSource(wasm: PlotgramWasm, source: string): ValidationRe
   });
 }
 
-export function lintSource(wasm: PlotgramWasm, source: string, options?: LintOptions): LintResult {
+export function lintSource(wasm: TautcoreWasm, source: string, options?: LintOptions): LintResult {
   const json =
     options && typeof wasm.lint_with_options === 'function'
       ? wasm.lint_with_options(source, JSON.stringify(options))
@@ -244,7 +244,7 @@ export function lintSource(wasm: PlotgramWasm, source: string, options?: LintOpt
   });
 }
 
-export function parseSource(wasm: PlotgramWasm, source: string): ParseResult {
+export function parseSource(wasm: TautcoreWasm, source: string): ParseResult {
   const json = wasm.parse_to_json(source);
   return safeParse<ParseResult>(json, {
     diagram: null,
@@ -253,7 +253,7 @@ export function parseSource(wasm: PlotgramWasm, source: string): ParseResult {
   });
 }
 
-export function diffSources(wasm: PlotgramWasm, sourceA: string, sourceB: string): DiffResult {
+export function diffSources(wasm: TautcoreWasm, sourceA: string, sourceB: string): DiffResult {
   const json = wasm.diff_sources(sourceA, sourceB);
   return safeParse<DiffResult>(json, {
     success: false,
@@ -262,7 +262,7 @@ export function diffSources(wasm: PlotgramWasm, sourceA: string, sourceB: string
 }
 
 export function applyPatch(
-  wasm: PlotgramWasm,
+  wasm: TautcoreWasm,
   source: string,
   patch: ChangeSetJson,
 ): PatchApplyResult {
@@ -274,7 +274,7 @@ export function applyPatch(
   });
 }
 
-export function formatSource(wasm: PlotgramWasm, source: string): { success: boolean; text?: string; errors?: string[] } {
+export function formatSource(wasm: TautcoreWasm, source: string): { success: boolean; text?: string; errors?: string[] } {
   const json = wasm.format_source(source);
   return safeParse(json, { success: false, errors: ['无法解析 format 结果'] });
 }

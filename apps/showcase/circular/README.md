@@ -18,21 +18,21 @@
 
 | 文件 | 主题 |
 |------|------|
-| [`smoke.ring.pgm`](cycle/smoke.ring.pgm) | 六点环（`order: declaration`），点在一圈、相邻不叠 |
-| [`smoke.two-triangles.pgm`](cycle/smoke.two-triangles.pgm) | 与 `bcc/smoke.two-rings` 同一拓扑，挤成一圈 |
-| [`mech.exterior.pgm`](cycle/mech.exterior.pgm) | 密圈对角走外弧，邻接仍弦 |
-| [`mech.self-loop.pgm`](cycle/mech.self-loop.pgm) | 自环短弧在节点外侧 |
+| [`smoke.ring.taut`](cycle/smoke.ring.taut) | 六点环（`order: declaration`），点在一圈、相邻不叠 |
+| [`smoke.two-triangles.taut`](cycle/smoke.two-triangles.taut) | 与 `bcc/smoke.two-rings` 同一拓扑，挤成一圈 |
+| [`mech.exterior.taut`](cycle/mech.exterior.taut) | 密圈对角走外弧，邻接仍弦 |
+| [`mech.self-loop.taut`](cycle/mech.self-loop.taut) | 自环短弧在节点外侧 |
 
 ### `bcc/`
 
 | 文件 | 主题 |
 |------|------|
-| [`smoke.two-rings.pgm`](bcc/smoke.two-rings.pgm) | 两三角共割点；两圈 + 桥，不是一个巨圆 |
-| [`smoke.isolated-cut.pgm`](bcc/smoke.isolated-cut.pgm) | `bcc-isolated`：割点夹在两圆之间 |
-| [`product.two-cliques.pgm`](bcc/product.two-cliques.pgm) | 两团经桥相连；balloon 骨架把分区圆分开 |
+| [`smoke.two-rings.taut`](bcc/smoke.two-rings.taut) | 两三角共割点；两圈 + 桥，不是一个巨圆 |
+| [`smoke.isolated-cut.taut`](bcc/smoke.isolated-cut.taut) | `bcc-isolated`：割点夹在两圆之间 |
+| [`product.two-cliques.taut`](bcc/product.two-cliques.taut) | 两团经桥相连；balloon 骨架把分区圆分开 |
 
 ### `custom/`
 
 | 文件 | 主题 |
 |------|------|
-| [`smoke.two-groups.pgm`](custom/smoke.two-groups.pgm) | 6 环拆成 `circle: left` / `right` 两圈 |
+| [`smoke.two-groups.taut`](custom/smoke.two-groups.taut) | 6 环拆成 `circle: left` / `right` 两圈 |

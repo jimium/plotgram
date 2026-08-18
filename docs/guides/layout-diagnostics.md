@@ -2,7 +2,7 @@
 
 布局管线每次运行除了产出几何（节点 frame、边路径），还会带出一份**结构化观察报告**——`LayoutDiagnostics`：告诉你这次布局有没有被忽略的选项、参数指纹是什么、将来有没有发生过软放宽。
 
-> 契约类型：`crates/plotgram-model/src/diagnostics.rs`  
+> 契约类型：`crates/tautcore-model/src/diagnostics.rs`  
 > 设计依据：`docs/design/layout/hierarchical/architecture.md` §3.4、roadmap 阶段 C
 
 ---
@@ -53,8 +53,8 @@ pub struct LayoutDiagnostics {
 ### CLI：render（warnings 打到 stderr）
 
 ```bash
-plotgram render my.pgm -o out.svg
-# stderr: warning: my.pgm: unknown option `bogus_key`
+tautcore render my.taut -o out.svg
+# stderr: warning: my.taut: unknown option `bogus_key`
 ```
 
 warning 不影响退出码，stdout/输出文件仍是完整 SVG。
@@ -62,7 +62,7 @@ warning 不影响退出码，stdout/输出文件仍是完整 SVG。
 ### CLI：measure（进 JSON 报告）
 
 ```bash
-plotgram measure my.pgm --json
+tautcore measure my.taut --json
 ```
 
 ```json
@@ -76,12 +76,12 @@ plotgram measure my.pgm --json
 }
 ```
 
-回归排查套路：同一 `.pgm` 两次 measure，`params_hash` 不同 → 参数变了；相同但几何变了 → 代码变了。
+回归排查套路：同一 `.taut` 两次 measure，`params_hash` 不同 → 参数变了；相同但几何变了 → 代码变了。
 
 ### Rust API
 
 ```rust
-use plotgram_compile::{build_layout, BuildOptions};
+use tautcore_compile::{build_layout, BuildOptions};
 
 let result = build_layout(source, &BuildOptions::default())?;
 for w in &result.diagnostics.warnings {
@@ -104,7 +104,7 @@ HierarchicalParams::hash() →  params_hash
 compute() 组装 LayoutDiagnostics → LayoutOutput（engine-api）
         │
         ▼
-run() / finalize() → LayoutResult.diagnostics（plotgram-model）
+run() / finalize() → LayoutResult.diagnostics（tautcore-model）
         │
         ▼
 CLI render / measure · compile API · JSON 序列化

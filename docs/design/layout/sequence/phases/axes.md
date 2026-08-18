@@ -9,11 +9,11 @@
 
 ## 1. 生命线收集
 
-- 参与者 = [`NodeRole::Entity`](../../../../crates/plotgram-model/src/graph.rs) 的节点（sequence 图中头部框）。
+- 参与者 = [`NodeRole::Entity`](../../../../crates/tautcore-model/src/graph.rs) 的节点（sequence 图中头部框）。
 - **默认收集范围 = 仅顶层 `Graph::nodes`**（不递归进 `Graph::groups`）。理由：组合片段若用 `Graph::groups` 建模，下钻会把片段内 Entity 误当生命线，破坏时间轴。
-  - 用 [`Graph::nodes`](../../../../crates/plotgram-model/src/graph.rs) 迭代（不是 `all_nodes()`——后者会下钻进 groups）。
+  - 用 [`Graph::nodes`](../../../../crates/tautcore-model/src/graph.rs) 迭代（不是 `all_nodes()`——后者会下钻进 groups）。
   - 收集序 = `Graph::nodes` 向量序（声明序）。
-  - 顶层 `Graph::edges` + 顶层 `Graph::groups` 内 edges 共同构成时间轴（见 [`Graph::edges_in_declaration_order`](../../../../crates/plotgram-model/src/graph.rs)），但**生命线只来自顶层 nodes**。
+  - 顶层 `Graph::edges` + 顶层 `Graph::groups` 内 edges 共同构成时间轴（见 [`Graph::edges_in_declaration_order`](../../../../crates/tautcore-model/src/graph.rs)），但**生命线只来自顶层 nodes**。
 - `GroupAnchor` 节点（`NodeRole::GroupAnchor`）不作为生命线。
 - 容器：`Vec` / `IndexMap`；**禁止 `HashMap`** 迭代导出顺序（v1 坑）。
 
@@ -47,7 +47,7 @@ cost(π) = Σ_messages w(e) * |π(from) - π(to)|
 
 ### 2.3 复用
 
-实现落在 `plotgram-algo` 一维排列器；Sequence 只投影生命线加权图 + 约束。
+实现落在 `tautcore-algo` 一维排列器；Sequence 只投影生命线加权图 + 约束。
 同一零件服务泳道/组内序（Hier）时，**参数不同、代码同一**。
 
 ---

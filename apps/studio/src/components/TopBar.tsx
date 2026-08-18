@@ -39,7 +39,7 @@ export function TopBar({
   return (
     <div className="studio-topbar">
       <Text strong style={{ color: '#7c3aed', fontSize: 15 }}>
-        Plotgram Studio
+        Tautcore Studio
       </Text>
 
       <Space size="small" style={{ marginLeft: 16 }}>

@@ -1,13 +1,13 @@
 # Fonts Directory
 
-Plotgram 渲染图表所用的字体文件，主要用于解决 resvg 渲染 PNG/WebP 时中文显示问题。
+Tautcore 渲染图表所用的字体文件，主要用于解决 resvg 渲染 PNG/WebP 时中文显示问题。
 
 ## 加载方式
 
 字体**不会**编译进二进制程序，运行时从文件系统加载。优先级（高 → 低）：
 
-1. **CLI 参数**：`plotgram render --fonts-dir /path/to/fonts ...`
-2. **环境变量**：`PLOTGRAM_FONTS_DIR=/path/to/fonts`
+1. **CLI 参数**：`tautcore render --fonts-dir /path/to/fonts ...`
+2. **环境变量**：`TAUTCORE_FONTS_DIR=/path/to/fonts`
 3. **默认路径**：当前工作目录（cwd）下的 `fonts/` 文件夹
 
 请将本目录中的字体文件部署到运行环境的 `fonts/` 目录，或通过环境变量 / `--fonts-dir` 指向实际位置。

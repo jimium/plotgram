@@ -13,10 +13,10 @@ import {
   applyPatch,
   checkStudioCapabilities,
 } from '@lib/wasm';
-import type { PlotgramWasm } from '@lib/wasm';
+import type { TautcoreWasm } from '@lib/wasm';
 
 /** 创建 mock WASM 模块 */
-function createMockWasm(overrides?: Partial<PlotgramWasm>): PlotgramWasm {
+function createMockWasm(overrides?: Partial<TautcoreWasm>): TautcoreWasm {
   return {
     default: vi.fn(async () => {}),
     version: vi.fn(() => '0.1.0-test'),

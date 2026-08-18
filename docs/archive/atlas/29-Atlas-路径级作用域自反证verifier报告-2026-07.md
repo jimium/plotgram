@@ -1,13 +1,13 @@
 # 29 · Atlas 路径级作用域自反证 verifier 报告（2026-07-26）
 
 > **动机**：兑现 [22 号文 §8 风险台账第二项](22-Atlas下一代布局与路由架构-总纲-2026-07.md)——「『由构造保证』缺少证明义务，实际不成立」。
-> **交付**：`crates/plotgram-core/src/layout/atlas/channel/verify.rs`（独立验证器）+ 探针 A2 语义升级 / A2b 新指标。
+> **交付**：`crates/tautcore-core/src/layout/atlas/channel/verify.rs`（独立验证器）+ 探针 A2 语义升级 / A2b 新指标。
 > **复现命令**（debug profile，AGENTS.md §9）：
 > ```bash
-> cargo test -p plotgram-core --lib                                                          # 972 passed
-> cargo run -p plotgram-eval --bin atlas_probe                                               # product 集（默认）
-> cargo run -p plotgram-eval --bin atlas_probe -- --set benchmarks/sets/stress-probe-set.txt
-> cargo run -p plotgram-eval --bin atlas_probe -- --set benchmarks/sets/demo-observe-set.txt
+> cargo test -p tautcore-core --lib                                                          # 972 passed
+> cargo run -p tautcore-eval --bin atlas_probe                                               # product 集（默认）
+> cargo run -p tautcore-eval --bin atlas_probe -- --set benchmarks/sets/stress-probe-set.txt
+> cargo run -p tautcore-eval --bin atlas_probe -- --set benchmarks/sets/demo-observe-set.txt
 > ```
 
 ## 0. 一页结论
@@ -38,7 +38,7 @@
 
 ## 2. 设计：`verify_route_scope`
 
-位置：[`channel/verify.rs`](../../crates/plotgram-core/src/layout/atlas/channel/verify.rs)（115 行）。
+位置：[`channel/verify.rs`](../../crates/tautcore-core/src/layout/atlas/channel/verify.rs)（115 行）。
 
 ```rust
 pub fn verify_route_scope(

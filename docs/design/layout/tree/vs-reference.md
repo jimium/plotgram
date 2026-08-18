@@ -4,25 +4,25 @@
 > 上游：[Tree Layouts](https://docs.yfiles.com/yfiles-html/dguide/tree_layouts/) · [TreeLayout](https://docs.yfiles.com/yfiles-html/api/TreeLayout.html) · [ISubtreePlacer](https://docs.yfiles.com/yfiles-html/api/ISubtreePlacer.html)
 > 算法证据：[05 树与径向](../../../reference/yfiles/05-树与径向布局.md)
 
-学理念与能力边界，**不**复刻全量类层次。本表回答：yFiles 有什么、plotgram 取哪几个、为什么。
+学理念与能力边界，**不**复刻全量类层次。本表回答：yFiles 有什么、tautcore 取哪几个、为什么。
 
 ---
 
 ## 1. 产品结构对照
 
-| yFiles | plotgram 目标 |
+| yFiles | tautcore 目标 |
 |--------|----------------|
 | `TreeLayout` 核 + `defaultSubtreePlacer` + 节点级 `subtreePlacers` | `layout: tree` + `placer` + 节点 `subtree_placer` |
 | `RadialTreeLayout`（**独立算法**） | 本核 `placer: radial`（不新注册名；必保内核只有 `tree`） |
 | `TreeReductionStage` | Compose 内生成林；非树边 Straight 或 `DeferToRouter` |
-| `OrientationStage` | 已有 `plotgram_algo::orientation` wrap |
+| `OrientationStage` | 已有 `tautcore_algo::orientation` wrap |
 | `ITreeLayoutPortAssigner` | M1：边侧由 connector 方向决定；沿边分布后置 |
 | `fromSketchMode` + `IFromSketchSubtreePlacer` | 后置 |
 | `allowMultiParent` + `MultiParentDescriptor` | 后置 |
 | `ComponentLayout` / `SelfLoopRouter` / `ParallelEdgeRouter` | 自环/平行边进 extra；分量 = 森林根 |
 | Integrated edge labeling | Demand 预留；完整联合求解后置 |
 
-yFiles 默认 `defaultSubtreePlacer = SingleLayerSubtreePlacer`。plotgram 默认 `placer: single-layer`，与之对齐。
+yFiles 默认 `defaultSubtreePlacer = SingleLayerSubtreePlacer`。tautcore 默认 `placer: single-layer`，与之对齐。
 
 ---
 
@@ -30,7 +30,7 @@ yFiles 默认 `defaultSubtreePlacer = SingleLayerSubtreePlacer`。plotgram 默�
 
 描述假定 canonical 朝向：孩子在根**下方**。
 
-| yFiles 类 | 行为 | plotgram | 何时做 |
+| yFiles 类 | 行为 | tautcore | 何时做 |
 |-----------|------|----------|--------|
 | **SingleLayerSubtreePlacer** | 子水平一排；`rootAlignment` 定父相对子的位置；边 orthogonal / polyline / straight / orthogonal-at-root | `single-layer` | **M1**（组织图默认） |
 | **SingleSplitSubtreePlacer** | 孩子切成 primary/secondary 两套，对侧放置，委托两个 placer；文档点名 mind map | 泛化 `single-split` 后置 | 见下行复合 |
@@ -54,7 +54,7 @@ yFiles 默认 `defaultSubtreePlacer = SingleLayerSubtreePlacer`。plotgram 默�
 
 ## 3. `SingleLayerSubtreePlacer` 参数（默认 placer）
 
-| yFiles | 默认直觉 | plotgram | 备注 |
+| yFiles | 默认直觉 | tautcore | 备注 |
 |--------|----------|----------|------|
 | `rootAlignment` | center / center-of-ports | `root_alignment` | M1：`center`；M3：`leading` / `trailing` / on-bus |
 | `edgeRoutingStyle` | orthogonal | `routing_style` | M0 已有 orthogonal / straight；M3：`polyline` / `orthogonal-at-root` |
@@ -70,7 +70,7 @@ yFiles 紧凑提示（只对正交）：`minimumFirstSegmentLength ≥ verticalD
 
 ## 4. TreeLayout 核参数
 
-| yFiles | plotgram | 状态 |
+| yFiles | tautcore | 状态 |
 |--------|----------|------|
 | `defaultSubtreePlacer` | `placer` | 目标 |
 | `layoutData.subtreePlacers` | 节点 `subtree_placer` | M2 |
@@ -91,7 +91,7 @@ yFiles 紧凑提示（只对正交）：`minimumFirstSegmentLength ≥ verticalD
 
 ## 5. RadialTreeLayout（M5 已落地）
 
-独立算法，但 plotgram 收成 `placer: radial`（balloon 为圆盘变体）。复用核级 `layer_gap` / `node_gap`，不另开一大组键。交错子 / 链拉直 / `allowOverlaps` 仍后置，避免污染分层 placer：
+独立算法，但 tautcore 收成 `placer: radial`（balloon 为圆盘变体）。复用核级 `layer_gap` / `node_gap`，不另开一大组键。交错子 / 链拉直 / `allowOverlaps` 仍后置，避免污染分层 placer：
 
 | yFiles | 含义 | 备注 |
 |--------|------|------|
@@ -113,7 +113,7 @@ yFiles 紧凑提示（只对正交）：`minimumFirstSegmentLength ≥ verticalD
 
 `compact` 不是「把 gap 改小」：yFiles 对每个局部根试若干 aspect 配置 + 记忆化有界搜索。preset `compact` 只缩 gap，**不得**冒充 `placer: compact`。
 
-mindmap 不是 `left-right` + 整图 LTR。yFiles 导图示例是 `SingleSplitSubtreePlacer` 配一对旋转的 `LevelAlignedSubtreePlacer`（见 [API 示例](https://docs.yfiles.com/yfiles-html/api/SingleSplitSubtreePlacer.html)）。plotgram 把这一组合收成原子 `single-split-layered`。
+mindmap 不是 `left-right` + 整图 LTR。yFiles 导图示例是 `SingleSplitSubtreePlacer` 配一对旋转的 `LevelAlignedSubtreePlacer`（见 [API 示例](https://docs.yfiles.com/yfiles-html/api/SingleSplitSubtreePlacer.html)）。tautcore 把这一组合收成原子 `single-split-layered`。
 
 ---
 

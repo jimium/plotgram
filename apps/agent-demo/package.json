@@ -1,9 +1,9 @@
 {
-  "name": "plotgram-agent-demo",
+  "name": "tautcore-agent-demo",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Plotgram Agent Demo — 对话即画图的 AI Agent 演示页面",
+  "description": "Tautcore Agent Demo — 对话即画图的 AI Agent 演示页面",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

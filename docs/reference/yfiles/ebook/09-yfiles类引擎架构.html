@@ -428,14 +428,14 @@ impl LayoutAlgorithm for RemoveSelfLoopsStage {
           <table>
             <thead><tr><th>本篇概念</th><th>建议归属</th></tr></thead>
             <tbody>
-              <tr><td>Domain Model（DSL AST、图种、主题）</td><td><code>plotgram-model</code> + <code>plotgram-parse</code></td></tr>
-              <tr><td><strong>Layout Graph（纯几何）</strong></td><td><code>plotgram-engine-api</code>（类型）+ <code>plotgram-engine</code>（算法）</td></tr>
-              <tr><td>LayoutData（约束、权重）</td><td><code>plotgram-engine-api</code></td></tr>
-              <tr><td>Stage 链 / 装饰器</td><td><code>plotgram-compile</code></td></tr>
-              <tr><td>Profile → 参数展开</td><td><code>plotgram-compile</code>（读 model，产出 engine 参数）</td></tr>
-              <tr><td>文本测量 / content sizing</td><td><code>plotgram-content</code>（measure 相，见 06 篇 §5）</td></tr>
-              <tr><td>VPSC / 公共求解器</td><td><code>plotgram-engine::solver</code></td></tr>
-              <tr><td>渲染</td><td><code>plotgram-render</code></td></tr>
+              <tr><td>Domain Model（DSL AST、图种、主题）</td><td><code>tautcore-model</code> + <code>tautcore-parse</code></td></tr>
+              <tr><td><strong>Layout Graph（纯几何）</strong></td><td><code>tautcore-engine-api</code>（类型）+ <code>tautcore-engine</code>（算法）</td></tr>
+              <tr><td>LayoutData（约束、权重）</td><td><code>tautcore-engine-api</code></td></tr>
+              <tr><td>Stage 链 / 装饰器</td><td><code>tautcore-compile</code></td></tr>
+              <tr><td>Profile → 参数展开</td><td><code>tautcore-compile</code>（读 model，产出 engine 参数）</td></tr>
+              <tr><td>文本测量 / content sizing</td><td><code>tautcore-content</code>（measure 相，见 06 篇 §5）</td></tr>
+              <tr><td>VPSC / 公共求解器</td><td><code>tautcore-engine::solver</code></td></tr>
+              <tr><td>渲染</td><td><code>tautcore-render</code></td></tr>
             </tbody>
           </table>
         </div>
@@ -449,7 +449,7 @@ impl LayoutAlgorithm for RemoveSelfLoopsStage {
 
         <div class="callout good">
           <div class="ct-title"><span class="icon">✓</span>一句话收敛</div>
-          <p>yFiles 类引擎架构的价值不在某个算法多巧，而在<strong>三层分离 + Stage 装饰器 + 类型化写权 + 确定性约束</strong>这四件"非功能性"工程纪律。把它们在 crate 划分与类型系统里提前固化，是 plotgram 区别于"在路由阶段加特判"的工程分水岭。</p>
+          <p>yFiles 类引擎架构的价值不在某个算法多巧，而在<strong>三层分离 + Stage 装饰器 + 类型化写权 + 确定性约束</strong>这四件"非功能性"工程纪律。把它们在 crate 划分与类型系统里提前固化，是 tautcore 区别于"在路由阶段加特判"的工程分水岭。</p>
         </div>
 
       </div>

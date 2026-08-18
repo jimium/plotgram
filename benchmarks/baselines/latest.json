@@ -25,7 +25,7 @@
         "edge_count": 37,
         "node_count": 26
       },
-      "path": "hierarchical/group/demo.k8s-multi-namespace-overview.pgm",
+      "path": "hierarchical/group/demo.k8s-multi-namespace-overview.taut",
       "quality": {
         "aspect_ratio": 2.4196755994358257,
         "canvas_area": 778447.968,
@@ -51,7 +51,7 @@
         "edge_count": 35,
         "node_count": 21
       },
-      "path": "hierarchical/group/demo.k8s-multi-cluster-federation.pgm",
+      "path": "hierarchical/group/demo.k8s-multi-cluster-federation.taut",
       "quality": {
         "aspect_ratio": 1.5283145275035266,
         "canvas_area": 491682.992,
@@ -77,7 +77,7 @@
         "edge_count": 30,
         "node_count": 23
       },
-      "path": "hierarchical/group/demo.k8s-platform-stack.pgm",
+      "path": "hierarchical/group/demo.k8s-platform-stack.taut",
       "quality": {
         "aspect_ratio": 1.62664141593626,
         "canvas_area": 400664.0494660849,
@@ -103,7 +103,7 @@
         "edge_count": 26,
         "node_count": 19
       },
-      "path": "hierarchical/group/demo.k8s-tenant-isolation.pgm",
+      "path": "hierarchical/group/demo.k8s-tenant-isolation.taut",
       "quality": {
         "aspect_ratio": 2.072939754180939,
         "canvas_area": 510593.43999999994,
@@ -129,7 +129,7 @@
         "edge_count": 30,
         "node_count": 19
       },
-      "path": "hierarchical/group/demo.k8s-blue-green-release-topology.pgm",
+      "path": "hierarchical/group/demo.k8s-blue-green-release-topology.taut",
       "quality": {
         "aspect_ratio": 1.3588839523683611,
         "canvas_area": 369921.94890806614,
@@ -155,7 +155,7 @@
         "edge_count": 24,
         "node_count": 17
       },
-      "path": "hierarchical/group/demo.hybrid-cloud-dr-topology.pgm",
+      "path": "hierarchical/group/demo.hybrid-cloud-dr-topology.taut",
       "quality": {
         "aspect_ratio": 1.562471480840861,
         "canvas_area": 502671.8249347614,
@@ -181,7 +181,7 @@
         "edge_count": 20,
         "node_count": 16
       },
-      "path": "hierarchical/group/demo.data-lineage-platform.pgm",
+      "path": "hierarchical/group/demo.data-lineage-platform.taut",
       "quality": {
         "aspect_ratio": 1.2778356296058953,
         "canvas_area": 318641.616,
@@ -207,7 +207,7 @@
         "edge_count": 17,
         "node_count": 16
       },
-      "path": "hierarchical/group/demo.ai-agent-docops-pipeline.pgm",
+      "path": "hierarchical/group/demo.ai-agent-docops-pipeline.taut",
       "quality": {
         "aspect_ratio": 1.1901186733442948,
         "canvas_area": 422378.88645797,
@@ -233,7 +233,7 @@
         "edge_count": 17,
         "node_count": 16
       },
-      "path": "hierarchical/group/demo.payment-clearing-platform.pgm",
+      "path": "hierarchical/group/demo.payment-clearing-platform.taut",
       "quality": {
         "aspect_ratio": 1.059630414435144,
         "canvas_area": 340899.8888695504,
@@ -259,7 +259,7 @@
         "edge_count": 18,
         "node_count": 16
       },
-      "path": "hierarchical/group/demo.supply-chain-control-tower.pgm",
+      "path": "hierarchical/group/demo.supply-chain-control-tower.taut",
       "quality": {
         "aspect_ratio": 2.5825783998797776,
         "canvas_area": 381500.42610356555,
@@ -285,7 +285,7 @@
         "edge_count": 11,
         "node_count": 9
       },
-      "path": "hierarchical/group/demo.mcp-server-cluster-architecture.pgm",
+      "path": "hierarchical/group/demo.mcp-server-cluster-architecture.taut",
       "quality": {
         "aspect_ratio": 1.746380165289256,
         "canvas_area": 159804.69999999998,
@@ -311,7 +311,7 @@
         "edge_count": 29,
         "node_count": 20
       },
-      "path": "hierarchical/group/demo.plotgram-core-mod-deps.pgm",
+      "path": "hierarchical/group/demo.tautcore-core-mod-deps.taut",
       "quality": {
         "aspect_ratio": 2.1501571240961974,
         "canvas_area": 901466.8127593565,
@@ -337,7 +337,7 @@
         "edge_count": 10,
         "node_count": 9
       },
-      "path": "hierarchical/flat/demo.flat-realtime-recommendation.pgm",
+      "path": "hierarchical/flat/demo.flat-realtime-recommendation.taut",
       "quality": {
         "aspect_ratio": 1.522616097658464,
         "canvas_area": 109034.17332545918,
@@ -363,7 +363,7 @@
         "edge_count": 15,
         "node_count": 13
       },
-      "path": "hierarchical/flat/demo.aml-case-investigation.pgm",
+      "path": "hierarchical/flat/demo.aml-case-investigation.taut",
       "quality": {
         "aspect_ratio": 4.1878491616228635,
         "canvas_area": 166407.86549483615,
@@ -389,7 +389,7 @@
         "edge_count": 24,
         "node_count": 19
       },
-      "path": "hierarchical/flat/demo.k8s-incident-response.pgm",
+      "path": "hierarchical/flat/demo.k8s-incident-response.taut",
       "quality": {
         "aspect_ratio": 2.0953656457179584,
         "canvas_area": 332586.8405946955,
@@ -415,7 +415,7 @@
         "edge_count": 18,
         "node_count": 16
       },
-      "path": "hierarchical/flat/demo.change-approval-workflow.pgm",
+      "path": "hierarchical/flat/demo.change-approval-workflow.taut",
       "quality": {
         "aspect_ratio": 2.937938963146778,
         "canvas_area": 279206.7841740994,
@@ -441,7 +441,7 @@
         "edge_count": 15,
         "node_count": 13
       },
-      "path": "hierarchical/flat/demo.pr-architecture-review.pgm",
+      "path": "hierarchical/flat/demo.pr-architecture-review.taut",
       "quality": {
         "aspect_ratio": 1.6156480625982492,
         "canvas_area": 239537.56944914203,
@@ -467,7 +467,7 @@
         "edge_count": 29,
         "node_count": 23
       },
-      "path": "hierarchical/group/demo.ci-cd-security-pipeline.pgm",
+      "path": "hierarchical/group/demo.ci-cd-security-pipeline.taut",
       "quality": {
         "aspect_ratio": 4.768996916614691,
         "canvas_area": 421624.09310747223,
@@ -493,7 +493,7 @@
         "edge_count": 24,
         "node_count": 21
       },
-      "path": "hierarchical/group/demo.e-commerce-order-fulfillment.pgm",
+      "path": "hierarchical/group/demo.e-commerce-order-fulfillment.taut",
       "quality": {
         "aspect_ratio": 4.01435280902048,
         "canvas_area": 245433.02666025667,
@@ -519,7 +519,7 @@
         "edge_count": 27,
         "node_count": 23
       },
-      "path": "hierarchical/group/demo.customer-refund-process.pgm",
+      "path": "hierarchical/group/demo.customer-refund-process.taut",
       "quality": {
         "aspect_ratio": 1.615987393247305,
         "canvas_area": 447937.0588067593,
@@ -545,7 +545,7 @@
         "edge_count": 3,
         "node_count": 4
       },
-      "path": "hierarchical/group/mech.constrain-cross-group.pgm",
+      "path": "hierarchical/group/mech.constrain-cross-group.taut",
       "quality": {
         "aspect_ratio": 2.5448671931083986,
         "canvas_area": 31604.38400000001,
@@ -571,7 +571,7 @@
         "edge_count": 4,
         "node_count": 5
       },
-      "path": "hierarchical/flat/mech.constrain-flat-chain.pgm",
+      "path": "hierarchical/flat/mech.constrain-flat-chain.taut",
       "quality": {
         "aspect_ratio": 1.6783743100852988,
         "canvas_area": 42666.144,
@@ -597,7 +597,7 @@
         "edge_count": 4,
         "node_count": 4
       },
-      "path": "hierarchical/flat/mech.constrain-sink.pgm",
+      "path": "hierarchical/flat/mech.constrain-sink.taut",
       "quality": {
         "aspect_ratio": 1.446323529411765,
         "canvas_area": 26751.2,
@@ -623,7 +623,7 @@
         "edge_count": 8,
         "node_count": 5
       },
-      "path": "hierarchical/flat/product.user-auth.pgm",
+      "path": "hierarchical/flat/product.user-auth.taut",
       "quality": {
         "aspect_ratio": 1.2094368616107747,
         "canvas_area": 59209.17600000001,
@@ -649,7 +649,7 @@
         "edge_count": 16,
         "node_count": 8
       },
-      "path": "hierarchical/flat/product.typical-microservice-architecture.pgm",
+      "path": "hierarchical/flat/product.typical-microservice-architecture.taut",
       "quality": {
         "aspect_ratio": 1.5757847533632288,
         "canvas_area": 112841.56800000003,
@@ -675,7 +675,7 @@
         "edge_count": 4,
         "node_count": 3
       },
-      "path": "hierarchical/flat/product.three-tier.pgm",
+      "path": "hierarchical/flat/product.three-tier.taut",
       "quality": {
         "aspect_ratio": 1.9880735799474432,
         "canvas_area": 19461.498,
@@ -701,7 +701,7 @@
         "edge_count": 7,
         "node_count": 7
       },
-      "path": "hierarchical/flat/product.flat-rest-api.pgm",
+      "path": "hierarchical/flat/product.flat-rest-api.taut",
       "quality": {
         "aspect_ratio": 1.5386363636363636,
         "canvas_area": 74470.0,
@@ -727,7 +727,7 @@
         "edge_count": 8,
         "node_count": 7
       },
-      "path": "hierarchical/group/product.microservices.pgm",
+      "path": "hierarchical/group/product.microservices.taut",
       "quality": {
         "aspect_ratio": 1.735775460018655,
         "canvas_area": 96561.084,
@@ -753,7 +753,7 @@
         "edge_count": 9,
         "node_count": 7
       },
-      "path": "hierarchical/group/product.cdn-cache.pgm",
+      "path": "hierarchical/group/product.cdn-cache.taut",
       "quality": {
         "aspect_ratio": 1.7129127630507393,
         "canvas_area": 105647.62193592195,
@@ -779,7 +779,7 @@
         "edge_count": 14,
         "node_count": 12
       },
-      "path": "hierarchical/group/product.cloud-native.pgm",
+      "path": "hierarchical/group/product.cloud-native.taut",
       "quality": {
         "aspect_ratio": 1.9909167842031028,
         "canvas_area": 250199.00999999998,
@@ -805,7 +805,7 @@
         "edge_count": 19,
         "node_count": 18
       },
-      "path": "hierarchical/group/product.ecommerce-platform.pgm",
+      "path": "hierarchical/group/product.ecommerce-platform.taut",
       "quality": {
         "aspect_ratio": 1.03490832157969,
         "canvas_area": 332946.39999999997,
@@ -831,7 +831,7 @@
         "edge_count": 7,
         "node_count": 7
       },
-      "path": "hierarchical/group/product.message-queue-pipeline.pgm",
+      "path": "hierarchical/group/product.message-queue-pipeline.taut",
       "quality": {
         "aspect_ratio": 1.0719322990126938,
         "canvas_area": 86214.40000000001,
@@ -857,7 +857,7 @@
         "edge_count": 6,
         "node_count": 7
       },
-      "path": "hierarchical/group/product.monitoring-stack.pgm",
+      "path": "hierarchical/group/product.monitoring-stack.taut",
       "quality": {
         "aspect_ratio": 1.2037376586741888,
         "canvas_area": 96815.368,
@@ -883,7 +883,7 @@
         "edge_count": 5,
         "node_count": 6
       },
-      "path": "hierarchical/group/product.narrow-corridor.pgm",
+      "path": "hierarchical/group/product.narrow-corridor.taut",
       "quality": {
         "aspect_ratio": 1.174295108085728,
         "canvas_area": 38526.337790634156,
@@ -909,7 +909,7 @@
         "edge_count": 2,
         "node_count": 3
       },
-      "path": "hierarchical/flat/product.linear-chain.pgm",
+      "path": "hierarchical/flat/product.linear-chain.taut",
       "quality": {
         "aspect_ratio": 4.298724954462659,
         "canvas_area": 12956.400000000001,
@@ -935,7 +935,7 @@
         "edge_count": 11,
         "node_count": 10
       },
-      "path": "hierarchical/flat/product.refund-process.pgm",
+      "path": "hierarchical/flat/product.refund-process.taut",
       "quality": {
         "aspect_ratio": 1.649757009658779,
         "canvas_area": 139831.55619245613,
@@ -961,7 +961,7 @@
         "edge_count": 7,
         "node_count": 8
       },
-      "path": "hierarchical/group/product.swimlane-order-process.pgm",
+      "path": "hierarchical/group/product.swimlane-order-process.taut",
       "quality": {
         "aspect_ratio": 4.998840686981181,
         "canvas_area": 64358.09023437499,
@@ -987,7 +987,7 @@
         "edge_count": 11,
         "node_count": 10
       },
-      "path": "hierarchical/flat/product.password-reset.pgm",
+      "path": "hierarchical/flat/product.password-reset.taut",
       "quality": {
         "aspect_ratio": 1.2163121355275046,
         "canvas_area": 189661.91593570873,
@@ -1013,7 +1013,7 @@
         "edge_count": 11,
         "node_count": 10
       },
-      "path": "hierarchical/flat/product.leave-approval-process.pgm",
+      "path": "hierarchical/flat/product.leave-approval-process.taut",
       "quality": {
         "aspect_ratio": 1.0782196470898078,
         "canvas_area": 155449.18,
@@ -1039,7 +1039,7 @@
         "edge_count": 8,
         "node_count": 7
       },
-      "path": "hierarchical/flat/product.self-loop-retry.pgm",
+      "path": "hierarchical/flat/product.self-loop-retry.taut",
       "quality": {
         "aspect_ratio": 1.7118595033663127,
         "canvas_area": 66934.37736839849,
@@ -1065,7 +1065,7 @@
         "edge_count": 7,
         "node_count": 6
       },
-      "path": "hierarchical/flat/product.symmetric-fanout.pgm",
+      "path": "hierarchical/flat/product.symmetric-fanout.taut",
       "quality": {
         "aspect_ratio": 1.0762331838565022,
         "canvas_area": 77068.8,
@@ -1091,7 +1091,7 @@
         "edge_count": 2,
         "node_count": 3
       },
-      "path": "hierarchical/flat/smoke.client-api-db.pgm",
+      "path": "hierarchical/flat/smoke.client-api-db.taut",
       "quality": {
         "aspect_ratio": 2.0489583333333337,
         "canvas_area": 18883.2,
@@ -1117,7 +1117,7 @@
         "edge_count": 4,
         "node_count": 4
       },
-      "path": "hierarchical/flat/smoke.decision-loop.pgm",
+      "path": "hierarchical/flat/smoke.decision-loop.taut",
       "quality": {
         "aspect_ratio": 4.859675462103053,
         "canvas_area": 36461.38203708767,
@@ -1143,7 +1143,7 @@
         "edge_count": 4,
         "node_count": 5
       },
-      "path": "hierarchical/flat/smoke.fan-out-four.pgm",
+      "path": "hierarchical/flat/smoke.fan-out-four.taut",
       "quality": {
         "aspect_ratio": 3.052464228934817,
         "canvas_area": 48307.200000000004,
@@ -1169,7 +1169,7 @@
         "edge_count": 4,
         "node_count": 4
       },
-      "path": "hierarchical/flat/smoke.flat-gateway-fanout.pgm",
+      "path": "hierarchical/flat/smoke.flat-gateway-fanout.taut",
       "quality": {
         "aspect_ratio": 1.2223465075814068,
         "canvas_area": 31652.964000000007,
@@ -1195,7 +1195,7 @@
         "edge_count": 13,
         "node_count": 11
       },
-      "path": "hierarchical/group/stress.layout-stress-nested.pgm",
+      "path": "hierarchical/group/stress.layout-stress-nested.taut",
       "quality": {
         "aspect_ratio": 1.373786865165363,
         "canvas_area": 247580.06399999995,
@@ -1221,7 +1221,7 @@
         "edge_count": 20,
         "node_count": 11
       },
-      "path": "hierarchical/flat/stress.layout-stress-flat-mesh.pgm",
+      "path": "hierarchical/flat/stress.layout-stress-flat-mesh.taut",
       "quality": {
         "aspect_ratio": 1.191194925130933,
         "canvas_area": 193661.075222129,
@@ -1247,7 +1247,7 @@
         "edge_count": 18,
         "node_count": 11
       },
-      "path": "hierarchical/flat/stress.layout-stress-dag.pgm",
+      "path": "hierarchical/flat/stress.layout-stress-dag.taut",
       "quality": {
         "aspect_ratio": 3.572356582621724,
         "canvas_area": 134434.78804334503,
@@ -1273,7 +1273,7 @@
         "edge_count": 31,
         "node_count": 23
       },
-      "path": "hierarchical/flat/stress.layout-stress-yfiles-pipeline.pgm",
+      "path": "hierarchical/flat/stress.layout-stress-yfiles-pipeline.taut",
       "quality": {
         "aspect_ratio": 1.5077994807174233,
         "canvas_area": 256671.00629047712,

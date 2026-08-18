@@ -175,12 +175,12 @@ ADR-001 的封闭集：`flowchart | sequence | architecture | state | er | mindm
 
 ### 检验 2：反向审计（grep 测试）
 ```
-在 plotgram-engine 里 grep：diagram_type | profile | DiagramType
+在 tautcore-engine 里 grep：diagram_type | profile | DiagramType
                             "flowchart" | "sequence" | "er" | "mindmap"
 期望结果：0 命中
 ```
 可以做成 CI 检查（一个几行的脚本 + `#[deny]`/`grep` gate）。**这是 ADR-001 唯一的可执行守卫。**
-建议同时禁止引擎依赖 `plotgram-model::profile`（crate 依赖层面的硬约束，比 grep 更强）。
+建议同时禁止引擎依赖 `tautcore-model::profile`（crate 依赖层面的硬约束，比 grep 更强）。
 
 ### 检验 3：参数正交性审计
 对参数表两两检查：

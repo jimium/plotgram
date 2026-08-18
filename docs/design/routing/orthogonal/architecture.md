@@ -3,7 +3,7 @@
 > 状态：**现行目标架构 v1**（驱动重建；非当前能力声明）
 > 日期：2026-08-02
 > 引擎注册名：`orthogonal`
-> 代码落点：`crates/plotgram-router/`（`core` + `orthogonal` + `verify` + `score`）
+> 代码落点：`crates/tautcore-router/`（`core` + `orthogonal` + `verify` + `score`）
 > 约束入口：[写权纪律](../../layout/write-authority.md) · [AGENTS.md](../../../../AGENTS.md) §1 · [ADR-006](../../adr/006-engine-io-and-crates.md)
 > 证据：[03 正交边路由](../../../reference/yfiles/03-正交边路由.md) · libavoid / Wybrow et al.
 > 姊妹页：[README](README.md) · [scope](scope.md)
@@ -98,7 +98,7 @@ BoundaryCrossing =
 ### 3.2 过渡：现有 `RouteInput`
 
 ```text
-RouteInput<'a>   # plotgram-engine-api 现行
+RouteInput<'a>   # tautcore-engine-api 现行
   graph, nodes, edges, options
 ```
 
@@ -172,7 +172,7 @@ port stub 出针（展开端子）
 | 路径搜索 | **A\***，状态 `(vertex, Dir4)`；代价 = 长 + λ·弯 | Dijkstra 批量距离场 | 带交叉惩罚的非马尔可夫主搜（默认关） |
 | 边序 | **EdgeId 稳定序**；可选两轮（第二轮共享段惩罚） | — | HashMap 序 |
 | Track 定序 | 区间着色 + **垂向偏好空间序**；平局用色 id | 单边场景跳过 | 事后贪心挪交叉 |
-| Nudging | **VPSC 最小位移**（`nudge.rs` + `plotgram_algo::vpsc`）；L3 用 `interval_color` | 均匀 track 间距（已替换） | 发现重叠就「挪一点」 |
+| Nudging | **VPSC 最小位移**（`nudge.rs` + `tautcore_algo::vpsc`）；L3 用 `interval_color` | 均匀 track 间距（已替换） | 发现重叠就「挪一点」 |
 | 组穿越 | permission 列表驱动的可走 gate；**首期硬禁违约**（见 [group-crossing](phases/group-crossing.md)） | 无组场景跳过 | silent 穿组；`gate_region: None` 整边穿 |
 | Bus | — | — | Steiner / BusRouter（后置） |
 
@@ -193,13 +193,13 @@ cost = Σ segLen
 
 `bend_penalty` 典型为节点间距量级的 1–4 倍。交叉惩罚默认 0（进主搜会破坏可采纳启发）；交叉优先靠 L3 消。
 
-### 5.3 与 `route/core`、`plotgram-algo`
+### 5.3 与 `route/core`、`tautcore-algo`
 
 | 零件 | 位置 |
 |------|------|
 | `port_anchor` / `orthogonal_elbow` / 矩形并集 | `route/core`（无策略） |
 | 折线规范化、共线消点 | `route/core` 或 algo |
-| VPSC nudging | `plotgram-algo` |
+| VPSC nudging | `tautcore-algo` |
 | OVG 构造 / A* / track | `route/orthogonal`（本核策略） |
 
 Hier Builtin Ink 可调 `core`，**不得**调用本 Router 的 OVG 策略模块倒灌。
@@ -271,7 +271,7 @@ M0 已落地：主路径为 reduced lines OVG + A* 搜索（避障、确定性�
 ## 8. 模块边界（目标）
 
 ```text
-crates/plotgram-router/src/
+crates/tautcore-router/src/
   lib.rs          # crate 入口
   core/           # 无策略：anchor、elbow、rect、polyline normalize
   orthogonal/
@@ -283,17 +283,17 @@ crates/plotgram-router/src/
   verify.rs       # 正交性、碰撞、端口附着、组穿越自检
   score.rs        # 质量度量（弯折 / 长度 / 交叉 / 共线）
 
-crates/plotgram-router/tests/
+crates/tautcore-router/tests/
   fixtures.rs     # 夹具场景 + 集成测试
 ```
 
 依赖纪律（ADR-006）：
 
 ```text
-plotgram-router → engine-api, model, algo
-plotgram-router ↛ engine 门面 / layout 实现
-engine → plotgram-router（消费 core 原语 + 注册 OrthogonalEdgeRouter）
-layout Builtin Ink → plotgram_router::core（可）；↛ orthogonal 策略
+tautcore-router → engine-api, model, algo
+tautcore-router ↛ engine 门面 / layout 实现
+engine → tautcore-router（消费 core 原语 + 注册 OrthogonalEdgeRouter）
+layout Builtin Ink → tautcore_router::core（可）；↛ orthogonal 策略
 ```
 
 ---

@@ -3,7 +3,7 @@
   "note": "role-aware baseline: product-gate hard; stress/demo quality soft",
   "samples": [
     {
-      "file": "showcase/architecture/product.three-tier.pgm",
+      "file": "showcase/architecture/product.three-tier.taut",
       "diagram_type": "Architecture",
       "nodes": 3,
       "edges": 4,
@@ -100,7 +100,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/architecture/product.typical-microservice-architecture.pgm",
+      "file": "showcase/architecture/product.typical-microservice-architecture.taut",
       "diagram_type": "Architecture",
       "nodes": 8,
       "edges": 16,
@@ -197,7 +197,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/architecture/product.flat-rest-api.pgm",
+      "file": "showcase/architecture/product.flat-rest-api.taut",
       "diagram_type": "Architecture",
       "nodes": 7,
       "edges": 7,
@@ -294,7 +294,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/architecture/product.microservices.pgm",
+      "file": "showcase/architecture/product.microservices.taut",
       "diagram_type": "Architecture",
       "nodes": 7,
       "edges": 8,
@@ -391,7 +391,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/architecture/product.cdn-cache.pgm",
+      "file": "showcase/architecture/product.cdn-cache.taut",
       "diagram_type": "Architecture",
       "nodes": 7,
       "edges": 9,
@@ -488,7 +488,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/architecture/product.cloud-native.pgm",
+      "file": "showcase/architecture/product.cloud-native.taut",
       "diagram_type": "Architecture",
       "nodes": 12,
       "edges": 14,
@@ -585,7 +585,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/architecture/product.ecommerce-platform.pgm",
+      "file": "showcase/architecture/product.ecommerce-platform.taut",
       "diagram_type": "Architecture",
       "nodes": 18,
       "edges": 19,
@@ -682,7 +682,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/architecture/product.message-queue-pipeline.pgm",
+      "file": "showcase/architecture/product.message-queue-pipeline.taut",
       "diagram_type": "Architecture",
       "nodes": 7,
       "edges": 7,
@@ -779,7 +779,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/architecture/product.monitoring-stack.pgm",
+      "file": "showcase/architecture/product.monitoring-stack.taut",
       "diagram_type": "Architecture",
       "nodes": 7,
       "edges": 6,
@@ -876,7 +876,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/architecture/product.narrow-corridor.pgm",
+      "file": "showcase/architecture/product.narrow-corridor.taut",
       "diagram_type": "Architecture",
       "nodes": 6,
       "edges": 5,
@@ -973,7 +973,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/flowchart/product.linear-chain.pgm",
+      "file": "showcase/flowchart/product.linear-chain.taut",
       "diagram_type": "Flowchart",
       "nodes": 3,
       "edges": 2,
@@ -1070,7 +1070,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/flowchart/product.user-auth.pgm",
+      "file": "showcase/flowchart/product.user-auth.taut",
       "diagram_type": "Flowchart",
       "nodes": 5,
       "edges": 8,
@@ -1167,7 +1167,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/flowchart/product.refund-process.pgm",
+      "file": "showcase/flowchart/product.refund-process.taut",
       "diagram_type": "Flowchart",
       "nodes": 10,
       "edges": 11,
@@ -1264,7 +1264,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/flowchart/product.swimlane-order-process.pgm",
+      "file": "showcase/flowchart/product.swimlane-order-process.taut",
       "diagram_type": "Flowchart",
       "nodes": 8,
       "edges": 7,
@@ -1361,7 +1361,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/flowchart/product.password-reset.pgm",
+      "file": "showcase/flowchart/product.password-reset.taut",
       "diagram_type": "Flowchart",
       "nodes": 10,
       "edges": 11,
@@ -1458,7 +1458,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/flowchart/product.leave-approval-process.pgm",
+      "file": "showcase/flowchart/product.leave-approval-process.taut",
       "diagram_type": "Flowchart",
       "nodes": 10,
       "edges": 11,
@@ -1555,7 +1555,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/flowchart/product.self-loop-retry.pgm",
+      "file": "showcase/flowchart/product.self-loop-retry.taut",
       "diagram_type": "Flowchart",
       "nodes": 7,
       "edges": 8,
@@ -1652,7 +1652,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/flowchart/product.symmetric-fanout.pgm",
+      "file": "showcase/flowchart/product.symmetric-fanout.taut",
       "diagram_type": "Flowchart",
       "nodes": 6,
       "edges": 7,
@@ -1749,7 +1749,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/sequence/product.oauth-login.pgm",
+      "file": "showcase/sequence/product.oauth-login.taut",
       "diagram_type": "Sequence",
       "nodes": 4,
       "edges": 8,
@@ -1835,7 +1835,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/sequence/product.payment-gateway.pgm",
+      "file": "showcase/sequence/product.payment-gateway.taut",
       "diagram_type": "Sequence",
       "nodes": 5,
       "edges": 11,
@@ -1921,7 +1921,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/sequence/product.sms-verification.pgm",
+      "file": "showcase/sequence/product.sms-verification.taut",
       "diagram_type": "Sequence",
       "nodes": 5,
       "edges": 11,
@@ -2007,7 +2007,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/sequence/product.jwt-refresh-token.pgm",
+      "file": "showcase/sequence/product.jwt-refresh-token.taut",
       "diagram_type": "Sequence",
       "nodes": 5,
       "edges": 10,
@@ -2093,7 +2093,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/state/product.order-lifecycle.pgm",
+      "file": "showcase/state/product.order-lifecycle.taut",
       "diagram_type": "State",
       "nodes": 8,
       "edges": 8,
@@ -2190,7 +2190,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/state/product.user-session.pgm",
+      "file": "showcase/state/product.user-session.taut",
       "diagram_type": "State",
       "nodes": 7,
       "edges": 9,
@@ -2287,7 +2287,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/state/product.payment-flow.pgm",
+      "file": "showcase/state/product.payment-flow.taut",
       "diagram_type": "State",
       "nodes": 10,
       "edges": 12,
@@ -2384,7 +2384,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/state/product.delivery-tracking.pgm",
+      "file": "showcase/state/product.delivery-tracking.taut",
       "diagram_type": "State",
       "nodes": 7,
       "edges": 7,
@@ -2481,7 +2481,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/er/product.blog-schema.pgm",
+      "file": "showcase/er/product.blog-schema.taut",
       "diagram_type": "Er",
       "nodes": 5,
       "edges": 5,
@@ -2567,7 +2567,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/er/product.saas-schema.pgm",
+      "file": "showcase/er/product.saas-schema.taut",
       "diagram_type": "Er",
       "nodes": 9,
       "edges": 10,
@@ -2653,7 +2653,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/er/product.crm-schema.pgm",
+      "file": "showcase/er/product.crm-schema.taut",
       "diagram_type": "Er",
       "nodes": 5,
       "edges": 5,
@@ -2739,7 +2739,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/mindmap/product.tech-stack.pgm",
+      "file": "showcase/mindmap/product.tech-stack.taut",
       "diagram_type": "Mindmap",
       "nodes": 10,
       "edges": 9,
@@ -2825,7 +2825,7 @@
       "role": "product"
     },
     {
-      "file": "showcase/architecture/stress.layout-stress-nested.pgm",
+      "file": "showcase/architecture/stress.layout-stress-nested.taut",
       "diagram_type": "Architecture",
       "nodes": 11,
       "edges": 13,
@@ -2922,7 +2922,7 @@
       "role": "stress"
     },
     {
-      "file": "showcase/architecture/stress.layout-stress-flat-mesh.pgm",
+      "file": "showcase/architecture/stress.layout-stress-flat-mesh.taut",
       "diagram_type": "Architecture",
       "nodes": 11,
       "edges": 20,
@@ -3019,7 +3019,7 @@
       "role": "stress"
     },
     {
-      "file": "showcase/er/stress.layout-stress-dense.pgm",
+      "file": "showcase/er/stress.layout-stress-dense.taut",
       "diagram_type": "Er",
       "nodes": 7,
       "edges": 16,
@@ -3105,7 +3105,7 @@
       "role": "stress"
     },
     {
-      "file": "showcase/flowchart/stress.layout-stress-dag.pgm",
+      "file": "showcase/flowchart/stress.layout-stress-dag.taut",
       "diagram_type": "Flowchart",
       "nodes": 11,
       "edges": 18,
@@ -3202,7 +3202,7 @@
       "role": "stress"
     },
     {
-      "file": "showcase/sequence/stress.layout-stress-lifelines.pgm",
+      "file": "showcase/sequence/stress.layout-stress-lifelines.taut",
       "diagram_type": "Sequence",
       "nodes": 5,
       "edges": 14,
@@ -3288,7 +3288,7 @@
       "role": "stress"
     },
     {
-      "file": "showcase/state/stress.layout-stress-transitions.pgm",
+      "file": "showcase/state/stress.layout-stress-transitions.taut",
       "diagram_type": "State",
       "nodes": 9,
       "edges": 14,
@@ -3385,7 +3385,7 @@
       "role": "stress"
     },
     {
-      "file": "showcase/mindmap/stress.layout-stress-deep.pgm",
+      "file": "showcase/mindmap/stress.layout-stress-deep.taut",
       "diagram_type": "Mindmap",
       "nodes": 63,
       "edges": 62,

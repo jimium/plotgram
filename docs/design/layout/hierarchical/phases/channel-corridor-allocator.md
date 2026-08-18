@@ -393,7 +393,7 @@ equal                          → tip 半区（≥0.5 East）
 每步结束：
 
 ```text
-HIER_EVAL_WRITE_BASELINE=1 cargo test -p plotgram-compile --test hier_eval
+HIER_EVAL_WRITE_BASELINE=1 cargo test -p tautcore-compile --test hier_eval
 ```
 
 仅当 bends / reversed_count **有意**改善或持平时更新；交叉 / bbox 作观测 delta。
@@ -460,8 +460,8 @@ HIER_EVAL_WRITE_BASELINE=1 cargo test -p plotgram-compile --test hier_eval
 
 ## 11. 参考
 
-- Showcase 根因样本：`apps/showcase/hierarchical/flat/product.refund-process.pgm`（Cross k=0 + y=0）  
-- 代价现状：`crates/plotgram-layout/src/layout/hierarchical/channel/search.rs`  
+- Showcase 根因样本：`apps/showcase/hierarchical/flat/product.refund-process.taut`（Cross k=0 + y=0）  
+- 代价现状：`crates/tautcore-layout/src/layout/hierarchical/channel/search.rs`  
 - 路由序现状：`.../channel/route_all.rs`  
 - 外沿坐标：`.../metric/track.rs`（本方案主路径不改公式；④ 只扩 Demand）  
 - yFiles 层间路由理念：`docs/reference/yFiles-layouts-and-routing.md` · `notes/from-yfiles-reference.md`

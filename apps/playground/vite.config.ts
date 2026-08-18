@@ -5,30 +5,30 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url));
-const wasmDir = resolve(rootDir, 'plotgram-wasm');
+const wasmDir = resolve(rootDir, 'tautcore-wasm');
 const showcaseDir = resolve(rootDir, '../showcase');
 const cdnBase = process.env.VITE_CDN_BASE || '';
 
 /**
- * 开发/预览时从 `playground/plotgram-wasm/` 提供 `/plotgram-wasm/*`。
+ * 开发/预览时从 `playground/tautcore-wasm/` 提供 `/tautcore-wasm/*`。
  *
- * 若存在 `public/plotgram-wasm/` 旧副本，Vite 会优先于源码目录提供静态文件，
- * 导致浏览器一直加载过期 wasm（与 plotgram-wasm/ 内新构建产物 md5 不一致）。
+ * 若存在 `public/tautcore-wasm/` 旧副本，Vite 会优先于源码目录提供静态文件，
+ * 导致浏览器一直加载过期 wasm（与 tautcore-wasm/ 内新构建产物 md5 不一致）。
  */
-function servePlotgramWasm(): Plugin {
+function serveTautcoreWasm(): Plugin {
   return {
-    name: 'serve-plotgram-wasm',
+    name: 'serve-tautcore-wasm',
     configureServer(server) {
       // post hook：插入中间件栈最前，压过 public/ 里的同名路径
       return () => {
         server.middlewares.use((req, res, next) => {
           const urlPath = req.url?.split('?')[0] ?? '';
-          if (!urlPath.startsWith('/plotgram-wasm/')) {
+          if (!urlPath.startsWith('/tautcore-wasm/')) {
             next();
             return;
           }
 
-          const rel = decodeURIComponent(urlPath.slice('/plotgram-wasm/'.length));
+          const rel = decodeURIComponent(urlPath.slice('/tautcore-wasm/'.length));
           if (!rel || rel.includes('..')) {
             next();
             return;
@@ -79,7 +79,7 @@ function serveShowcase(): Plugin {
             return;
           }
 
-          if (file.endsWith('.pgm')) {
+          if (file.endsWith('.taut')) {
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
           }
           createReadStream(file).pipe(res);
@@ -90,13 +90,13 @@ function serveShowcase(): Plugin {
 }
 
 function rejectStalePublicWasm(): Plugin {
-  const stale = resolve(rootDir, 'public/plotgram-wasm');
+  const stale = resolve(rootDir, 'public/tautcore-wasm');
   return {
     name: 'reject-stale-public-wasm',
     buildStart() {
       if (existsSync(stale)) {
         throw new Error(
-          '检测到 public/plotgram-wasm/ 过期副本，请删除后重试（会覆盖 plotgram-wasm/ 构建产物）',
+          '检测到 public/tautcore-wasm/ 过期副本，请删除后重试（会覆盖 tautcore-wasm/ 构建产物）',
         );
       }
     },
@@ -106,14 +106,14 @@ function rejectStalePublicWasm(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || '/editor/',
-  plugins: [react(), rejectStalePublicWasm(), servePlotgramWasm(), serveShowcase()],
+  plugins: [react(), rejectStalePublicWasm(), serveTautcoreWasm(), serveShowcase()],
   resolve: {
     alias: {
-      '../../plotgram-wasm/plotgram_wasm.js': resolve(rootDir, 'plotgram-wasm/plotgram_wasm.js'),
+      '../../tautcore-wasm/tautcore_wasm.js': resolve(rootDir, 'tautcore-wasm/tautcore_wasm.js'),
     },
   },
   optimizeDeps: {
-    exclude: ['plotgram-wasm'],
+    exclude: ['tautcore-wasm'],
   },
   server: {
     port: 3000,

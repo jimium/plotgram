@@ -1,0 +1,15 @@
+[package]
+name = "tautcore-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Tautcore command-line interface (thin I/O over tautcore-compile)"
+
+[[bin]]
+name = "tautcore"
+path = "src/main.rs"
+
+[dependencies]
+tautcore-compile = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+serde_json = { workspace = true }

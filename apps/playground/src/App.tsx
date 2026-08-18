@@ -31,11 +31,11 @@ import {
 } from './lib/exportImage';
 import { buildShareUrl, readStateFromUrl } from './lib/share';
 import {
-  clearPgmQuery,
-  fetchShowcasePgm,
-  filenameFromPgmPath,
-  readPgmQuery,
-} from './lib/loadPgm';
+  clearTautQuery,
+  fetchShowcaseTaut,
+  filenameFromTautPath,
+  readTautQuery,
+} from './lib/loadTaut';
 import {
   applyLayoutOptions,
   detectDiagramType,
@@ -107,20 +107,20 @@ function App() {
   const layoutCatalog = useLayoutCatalog(wasm, ready);
 
   // ─── 持久化状态 ──────────────────────────────────────────
-  const [code, setCode] = useLocalStorage('plotgram.code', STARTER_SOURCE);
+  const [code, setCode] = useLocalStorage('tautcore.code', STARTER_SOURCE);
   const [layoutOptionsStored, setLayoutOptions] = useLocalStorage<LayoutOptions>(
-    'plotgram.layout',
+    'tautcore.layout',
     EMPTY_LAYOUT_OPTIONS,
   );
   const [appearanceOptionsStored, setAppearanceOptions] = useLocalStorage<AppearanceOptions>(
-    'plotgram.appearance',
+    'tautcore.appearance',
     DEFAULT_APPEARANCE_OPTIONS,
   );
-  const [theme, setTheme] = useLocalStorage<Theme>('plotgram.theme', 'light');
-  const [editorWidth, setEditorWidth] = useLocalStorage('plotgram.editorWidth', 380);
-  const [inspectorWidth, setInspectorWidth] = useLocalStorage('plotgram.inspectorWidth', 300);
+  const [theme, setTheme] = useLocalStorage<Theme>('tautcore.theme', 'light');
+  const [editorWidth, setEditorWidth] = useLocalStorage('tautcore.editorWidth', 380);
+  const [inspectorWidth, setInspectorWidth] = useLocalStorage('tautcore.inspectorWidth', 300);
   const [rasterExportScale, setRasterExportScale] = useLocalStorage<RasterExportScale>(
-    'plotgram.rasterScale',
+    'tautcore.rasterScale',
     2,
   );
   const [previewBackgroundStored, setPreviewBackground] = useLocalStorage<PreviewBackground>(
@@ -129,7 +129,7 @@ function App() {
   );
 
   // ─── 会话状态 ────────────────────────────────────────────
-  const [pgmLoading, setPgmLoading] = useState(false);
+  const [tautLoading, setTautLoading] = useState(false);
   const [svg, setSvg] = useState('');
   const [ascii, setAscii] = useState('');
   const [sceneJson, setSceneJson] = useState('');
@@ -146,7 +146,7 @@ function App() {
   const [activePreviewTab, setActivePreviewTab] = useState<PreviewTab>('graph');
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('problems');
   const [bottomPanelExpanded, setBottomPanelExpanded] = useState(false);
-  const [filename, setFilename] = useState('未命名.pgm');
+  const [filename, setFilename] = useState('未命名.taut');
   const [dirty, setDirty] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [renderLog, setRenderLog] = useState<string[]>([]);
@@ -301,7 +301,7 @@ function App() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
-  // ─── 首次加载：分享链接 / ?pgm= 样例路径 ─────────────────
+  // ─── 首次加载：分享链接 / ?taut= 样例路径 ─────────────────
   useEffect(() => {
     const shared = readStateFromUrl();
     if (shared) {
@@ -314,28 +314,28 @@ function App() {
       return;
     }
 
-    const pgmPath = readPgmQuery();
-    if (!pgmPath) return;
+    const tautPath = readTautQuery();
+    if (!tautPath) return;
 
     let cancelled = false;
-    setPgmLoading(true);
+    setTautLoading(true);
     void (async () => {
       try {
-        const source = await fetchShowcasePgm(pgmPath);
+        const source = await fetchShowcaseTaut(tautPath);
         if (cancelled) return;
         setCode(source);
-        setFilename(filenameFromPgmPath(pgmPath));
+        setFilename(filenameFromTautPath(tautPath));
         setDirty(false);
         setAppearanceOptions(DEFAULT_APPEARANCE_OPTIONS);
         setLayoutOptions(AUTO_LAYOUT_OPTIONS);
-        clearPgmQuery();
-        showToast(`已载入 ${pgmPath}`, 'success');
+        clearTautQuery();
+        showToast(`已载入 ${tautPath}`, 'success');
       } catch {
         if (!cancelled) {
-          showToast(`无法载入样例：${pgmPath}`, 'error');
+          showToast(`无法载入样例：${tautPath}`, 'error');
         }
       } finally {
-        if (!cancelled) setPgmLoading(false);
+        if (!cancelled) setTautLoading(false);
       }
     })();
 
@@ -585,7 +585,7 @@ function App() {
     setAppearanceOptions((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleLoadSource = useCallback((source: string, name = '未命名.pgm') => {
+  const handleLoadSource = useCallback((source: string, name = '未命名.taut') => {
     setCode(source);
     setFilename(name);
     setDirty(false);
@@ -640,13 +640,13 @@ function App() {
     },
     downloadPng: () => {
       if (!svg) return;
-      downloadPng(svg, `${filename.replace(/\.pgm$/, '') || 'diagram'}.png`, rasterExportScale)
+      downloadPng(svg, `${filename.replace(/\.taut$/, '') || 'diagram'}.png`, rasterExportScale)
         .then(() => showToast(`PNG 已导出（${rasterExportScale}x）`, 'success'))
         .catch(() => showToast('PNG 导出失败', 'error'));
     },
     downloadWebp: () => {
       if (!svg) return;
-      downloadWebp(svg, `${filename.replace(/\.pgm$/, '') || 'diagram'}.webp`, rasterExportScale)
+      downloadWebp(svg, `${filename.replace(/\.taut$/, '') || 'diagram'}.webp`, rasterExportScale)
         .then(() => showToast(`WebP 已导出（${rasterExportScale}x）`, 'success'))
         .catch(() => showToast('WebP 导出失败（浏览器可能不支持）', 'error'));
     },
@@ -672,7 +672,7 @@ function App() {
 
   // ─── 文本/数据页签内导出（ASCII / Scene JSON / AST） ─────────────────
   const baseExportName = useCallback(
-    () => filename.replace(/\.pgm$/, '') || 'diagram',
+    () => filename.replace(/\.taut$/, '') || 'diagram',
     [filename],
   );
   const handleCopyAscii = useCallback(() => {
@@ -700,7 +700,7 @@ function App() {
   // ─── 文件操作 ────────────────────────────────────────────
   const handleNewFile = useCallback(() => {
     setCode('');
-    setFilename('未命名.pgm');
+    setFilename('未命名.taut');
     setDirty(false);
     fileHandleRef.current = null;
     setFitSignal((s) => s + 1);
@@ -713,8 +713,8 @@ function App() {
       try {
         const [handle] = await (window as unknown as { showOpenFilePicker: (opts?: unknown) => Promise<FileSystemFileHandle[]> }).showOpenFilePicker({
           types: [{
-            description: 'Plotgram 文件',
-            accept: { 'text/plain': ['.pgm'] },
+            description: 'Tautcore 文件',
+            accept: { 'text/plain': ['.taut'] },
           }],
           multiple: false,
         });
@@ -735,7 +735,7 @@ function App() {
     // 回退到 input[type=file]
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.pgm,.txt';
+    input.accept = '.taut,.txt';
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
@@ -771,8 +771,8 @@ function App() {
         const handle = await (window as unknown as { showSaveFilePicker: (opts?: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker({
           suggestedName: filename,
           types: [{
-            description: 'Plotgram 文件',
-            accept: { 'text/plain': ['.pgm'] },
+            description: 'Tautcore 文件',
+            accept: { 'text/plain': ['.taut'] },
           }],
         });
         const writable = await handle.createWritable();
@@ -976,7 +976,7 @@ function App() {
           </div>
 
           {activePreviewTab === 'graph' && (
-            pgmLoading ? (
+            tautLoading ? (
               <div className="empty-state empty-state-loading">
                 <p>正在载入样例…</p>
               </div>

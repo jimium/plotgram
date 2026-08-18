@@ -2,7 +2,7 @@
 
 > 状态：accepted  
 > 日期：2026-07-28（修订 2026-07-30）  
-> 关联：dsl-spec §1.2 / §4、`plotgram-model::profile`
+> 关联：dsl-spec §1.2 / §4、`tautcore-model::profile`
 
 ## 背景
 
@@ -24,8 +24,8 @@ DSL 若写成 `diagram flowchart { … }`，位置上的 type 仍像语法一等
 
 ## 含义
 
-- `plotgram-engine` 禁止 `use` profile / `DiagramType` 做分支  
-- `plotgram-model::profile` 仅供 DSL / 编排层展开  
+- `tautcore-engine` 禁止 `use` profile / `DiagramType` 做分支  
+- `tautcore-model::profile` 仅供 DSL / 编排层展开  
 - language-spec / 旧 `diagram <type>` 示例一律迁到 `profile:`  
 - 算法表按 layout / router 名组织，不按图种列平行管线
 

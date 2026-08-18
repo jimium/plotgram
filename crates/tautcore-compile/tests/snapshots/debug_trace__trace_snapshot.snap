@@ -1,0 +1,1284 @@
+---
+source: crates/tautcore-compile/tests/debug_trace.rs
+expression: trace_json(FIXTURE)
+---
+{
+  "common": {
+    "edges": [
+      {
+        "edge_id": "e0",
+        "path": [
+          {
+            "x": 66.0,
+            "y": 30.900000000000002
+          },
+          {
+            "x": 65.99999999937913,
+            "y": 70.9
+          }
+        ],
+        "source": "a",
+        "target": "b"
+      },
+      {
+        "edge_id": "e1",
+        "path": [
+          {
+            "x": 52.0,
+            "y": 101.80000000000001
+          },
+          {
+            "x": 52.0,
+            "y": 173.8
+          }
+        ],
+        "source": "b",
+        "target": "c"
+      },
+      {
+        "edge_id": "e2",
+        "path": [
+          {
+            "x": 44.0,
+            "y": 204.70000000000002
+          },
+          {
+            "x": 44.0,
+            "y": 240.70000000000005
+          },
+          {
+            "x": 66.0,
+            "y": 240.70000000000005
+          },
+          {
+            "x": 66.0,
+            "y": 276.70000000000005
+          }
+        ],
+        "source": "c",
+        "target": "d"
+      },
+      {
+        "edge_id": "e3",
+        "path": [
+          {
+            "x": 50.0,
+            "y": 30.900000000000002
+          },
+          {
+            "x": 50.0,
+            "y": 50.900000000000006
+          },
+          {
+            "x": 0.0,
+            "y": 50.900000000000006
+          },
+          {
+            "x": 0.0,
+            "y": 256.70000000000005
+          },
+          {
+            "x": 50.0,
+            "y": 256.70000000000005
+          },
+          {
+            "x": 50.0,
+            "y": 276.70000000000005
+          }
+        ],
+        "source": "a",
+        "target": "d"
+      },
+      {
+        "edge_id": "e4",
+        "path": [
+          {
+            "x": 80.0,
+            "y": 292.15000000000003
+          },
+          {
+            "x": 120.0,
+            "y": 292.15000000000003
+          },
+          {
+            "x": 120.0,
+            "y": 15.450000000000001
+          },
+          {
+            "x": 80.0,
+            "y": 15.450000000000001
+          }
+        ],
+        "source": "d",
+        "target": "a"
+      },
+      {
+        "edge_id": "e5",
+        "path": [
+          {
+            "x": 80.0,
+            "y": 80.17
+          },
+          {
+            "x": 104.0,
+            "y": 80.17
+          },
+          {
+            "x": 104.0,
+            "y": 92.53
+          },
+          {
+            "x": 80.0,
+            "y": 92.53
+          }
+        ],
+        "source": "b",
+        "target": "b"
+      }
+    ],
+    "groups": [
+      {
+        "frame": null,
+        "frame_source": "none",
+        "group_id": "outer"
+      },
+      {
+        "frame": null,
+        "frame_source": "none",
+        "group_id": "inner",
+        "parent": "outer"
+      }
+    ],
+    "nodes": [
+      {
+        "center": {
+          "x": 60.0,
+          "y": 292.15000000000003
+        },
+        "frame": {
+          "height": 30.899999999999977,
+          "width": 40.0,
+          "x": 40.0,
+          "y": 276.70000000000005
+        },
+        "id": "d"
+      },
+      {
+        "center": {
+          "x": 44.0,
+          "y": 189.25
+        },
+        "frame": {
+          "height": 30.900000000000006,
+          "width": 40.0,
+          "x": 24.0,
+          "y": 173.8
+        },
+        "id": "c"
+      },
+      {
+        "center": {
+          "x": 60.0,
+          "y": 15.450000000000001
+        },
+        "frame": {
+          "height": 30.900000000000002,
+          "width": 40.0,
+          "x": 40.0,
+          "y": 0.0
+        },
+        "id": "a"
+      },
+      {
+        "center": {
+          "x": 60.0,
+          "y": 86.35000000000001
+        },
+        "frame": {
+          "height": 30.900000000000006,
+          "width": 40.0,
+          "x": 40.0,
+          "y": 70.9
+        },
+        "id": "b"
+      }
+    ]
+  },
+  "extension": {
+    "channels": {
+      "route_order": [
+        "e4",
+        "e3",
+        "e0",
+        "e1",
+        "e2"
+      ],
+      "routed_edges": 5,
+      "routes": [
+        {
+          "edge_id": "e0",
+          "track_ids": [
+            3
+          ]
+        },
+        {
+          "edge_id": "e1",
+          "track_ids": [
+            7
+          ]
+        },
+        {
+          "edge_id": "e2",
+          "track_ids": [
+            9
+          ]
+        },
+        {
+          "edge_id": "e3",
+          "track_ids": [
+            3,
+            2,
+            1,
+            12,
+            9
+          ]
+        },
+        {
+          "edge_id": "e4",
+          "track_ids": [
+            25
+          ]
+        }
+      ],
+      "status": "d1.3-gate",
+      "substrate_tracks": 26
+    },
+    "edge_plans": [
+      {
+        "dummy_chain": [],
+        "edge_id": "e0",
+        "original": {
+          "source": "a",
+          "target": "b"
+        },
+        "reversed": false,
+        "segments": [
+          {
+            "from": {
+              "id": "a",
+              "type": "real"
+            },
+            "ordinal": 0,
+            "to": {
+              "id": "b",
+              "type": "real"
+            }
+          }
+        ],
+        "working": {
+          "source": "a",
+          "target": "b"
+        }
+      },
+      {
+        "dummy_chain": [],
+        "edge_id": "e1",
+        "original": {
+          "source": "b",
+          "target": "c"
+        },
+        "reversed": false,
+        "segments": [
+          {
+            "from": {
+              "id": "b",
+              "type": "real"
+            },
+            "ordinal": 0,
+            "to": {
+              "id": "c",
+              "type": "real"
+            }
+          }
+        ],
+        "working": {
+          "source": "b",
+          "target": "c"
+        }
+      },
+      {
+        "dummy_chain": [],
+        "edge_id": "e2",
+        "original": {
+          "source": "c",
+          "target": "d"
+        },
+        "reversed": false,
+        "segments": [
+          {
+            "from": {
+              "id": "c",
+              "type": "real"
+            },
+            "ordinal": 0,
+            "to": {
+              "id": "d",
+              "type": "real"
+            }
+          }
+        ],
+        "working": {
+          "source": "c",
+          "target": "d"
+        }
+      },
+      {
+        "dummy_chain": [
+          {
+            "kind": "long-edge",
+            "ordinal": 0,
+            "owner_edge": "e3",
+            "type": "virtual"
+          },
+          {
+            "kind": "long-edge",
+            "ordinal": 1,
+            "owner_edge": "e3",
+            "type": "virtual"
+          }
+        ],
+        "edge_id": "e3",
+        "original": {
+          "source": "a",
+          "target": "d"
+        },
+        "reversed": false,
+        "segments": [
+          {
+            "from": {
+              "id": "a",
+              "type": "real"
+            },
+            "ordinal": 0,
+            "to": {
+              "kind": "long-edge",
+              "ordinal": 0,
+              "owner_edge": "e3",
+              "type": "virtual"
+            }
+          },
+          {
+            "from": {
+              "kind": "long-edge",
+              "ordinal": 0,
+              "owner_edge": "e3",
+              "type": "virtual"
+            },
+            "ordinal": 1,
+            "to": {
+              "kind": "long-edge",
+              "ordinal": 1,
+              "owner_edge": "e3",
+              "type": "virtual"
+            }
+          },
+          {
+            "from": {
+              "kind": "long-edge",
+              "ordinal": 1,
+              "owner_edge": "e3",
+              "type": "virtual"
+            },
+            "ordinal": 2,
+            "to": {
+              "id": "d",
+              "type": "real"
+            }
+          }
+        ],
+        "working": {
+          "source": "a",
+          "target": "d"
+        }
+      },
+      {
+        "dummy_chain": [
+          {
+            "kind": "long-edge",
+            "ordinal": 1,
+            "owner_edge": "e4",
+            "type": "virtual"
+          },
+          {
+            "kind": "long-edge",
+            "ordinal": 0,
+            "owner_edge": "e4",
+            "type": "virtual"
+          }
+        ],
+        "edge_id": "e4",
+        "original": {
+          "source": "d",
+          "target": "a"
+        },
+        "reversed": true,
+        "segments": [
+          {
+            "from": {
+              "id": "a",
+              "type": "real"
+            },
+            "ordinal": 0,
+            "to": {
+              "kind": "long-edge",
+              "ordinal": 0,
+              "owner_edge": "e4",
+              "type": "virtual"
+            }
+          },
+          {
+            "from": {
+              "kind": "long-edge",
+              "ordinal": 0,
+              "owner_edge": "e4",
+              "type": "virtual"
+            },
+            "ordinal": 1,
+            "to": {
+              "kind": "long-edge",
+              "ordinal": 1,
+              "owner_edge": "e4",
+              "type": "virtual"
+            }
+          },
+          {
+            "from": {
+              "kind": "long-edge",
+              "ordinal": 1,
+              "owner_edge": "e4",
+              "type": "virtual"
+            },
+            "ordinal": 2,
+            "to": {
+              "id": "d",
+              "type": "real"
+            }
+          }
+        ],
+        "working": {
+          "source": "a",
+          "target": "d"
+        }
+      },
+      {
+        "dummy_chain": [],
+        "edge_id": "e5",
+        "note": "self-loop",
+        "original": {
+          "source": "b",
+          "target": "b"
+        },
+        "reversed": false,
+        "segments": [],
+        "working": {
+          "source": "b",
+          "target": "b"
+        }
+      }
+    ],
+    "elems": [
+      {
+        "center": {
+          "x": 60.0,
+          "y": 292.15000000000003
+        },
+        "frame": {
+          "height": 30.899999999999977,
+          "width": 40.0,
+          "x": 40.0,
+          "y": 276.70000000000005
+        },
+        "group_path": [],
+        "key": {
+          "id": "d",
+          "type": "real"
+        },
+        "kind_tags": [
+          "real"
+        ],
+        "order": 0,
+        "rank": 3
+      },
+      {
+        "center": {
+          "x": 44.0,
+          "y": 189.25
+        },
+        "frame": {
+          "height": 30.900000000000006,
+          "width": 40.0,
+          "x": 24.0,
+          "y": 173.8
+        },
+        "group_path": [
+          "outer"
+        ],
+        "key": {
+          "id": "c",
+          "type": "real"
+        },
+        "kind_tags": [
+          "real"
+        ],
+        "order": 3,
+        "rank": 2
+      },
+      {
+        "center": {
+          "x": 60.0,
+          "y": 15.450000000000001
+        },
+        "frame": {
+          "height": 30.900000000000002,
+          "width": 40.0,
+          "x": 40.0,
+          "y": 0.0
+        },
+        "group_path": [
+          "outer",
+          "inner"
+        ],
+        "key": {
+          "id": "a",
+          "type": "real"
+        },
+        "kind_tags": [
+          "real"
+        ],
+        "order": 4,
+        "rank": 0
+      },
+      {
+        "center": {
+          "x": 60.0,
+          "y": 86.35000000000001
+        },
+        "frame": {
+          "height": 30.900000000000006,
+          "width": 40.0,
+          "x": 40.0,
+          "y": 70.9
+        },
+        "group_path": [
+          "outer",
+          "inner"
+        ],
+        "key": {
+          "id": "b",
+          "type": "real"
+        },
+        "kind_tags": [
+          "real"
+        ],
+        "order": 4,
+        "rank": 1
+      },
+      {
+        "center": {
+          "x": -32.00000000000001,
+          "y": 70.9
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": -32.00000000000001,
+          "y": 70.9
+        },
+        "group_path": [],
+        "key": {
+          "kind": "long-edge",
+          "ordinal": 0,
+          "owner_edge": "e3",
+          "type": "virtual"
+        },
+        "kind_tags": [
+          "virtual",
+          "long-edge-dummy"
+        ],
+        "order": 0,
+        "rank": 1
+      },
+      {
+        "center": {
+          "x": -32.00000000000001,
+          "y": 173.8
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": -32.00000000000001,
+          "y": 173.8
+        },
+        "group_path": [],
+        "key": {
+          "kind": "long-edge",
+          "ordinal": 1,
+          "owner_edge": "e3",
+          "type": "virtual"
+        },
+        "kind_tags": [
+          "virtual",
+          "long-edge-dummy"
+        ],
+        "order": 0,
+        "rank": 2
+      },
+      {
+        "center": {
+          "x": -8.0,
+          "y": 70.9
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": -8.0,
+          "y": 70.9
+        },
+        "group_path": [],
+        "key": {
+          "kind": "long-edge",
+          "ordinal": 0,
+          "owner_edge": "e4",
+          "type": "virtual"
+        },
+        "kind_tags": [
+          "virtual",
+          "long-edge-dummy"
+        ],
+        "order": 1,
+        "rank": 1
+      },
+      {
+        "center": {
+          "x": -8.0,
+          "y": 173.8
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": -8.0,
+          "y": 173.8
+        },
+        "group_path": [],
+        "key": {
+          "kind": "long-edge",
+          "ordinal": 1,
+          "owner_edge": "e4",
+          "type": "virtual"
+        },
+        "kind_tags": [
+          "virtual",
+          "long-edge-dummy"
+        ],
+        "order": 1,
+        "rank": 2
+      },
+      {
+        "center": {
+          "x": 8.0,
+          "y": 0.0
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": 8.0,
+          "y": 0.0
+        },
+        "group_path": [
+          "outer"
+        ],
+        "key": {
+          "group": "outer",
+          "rank": 0,
+          "side": "left",
+          "type": "group-boundary"
+        },
+        "kind_tags": [
+          "group-boundary"
+        ],
+        "order": 2,
+        "rank": 0
+      },
+      {
+        "center": {
+          "x": 96.0,
+          "y": 0.0
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": 96.0,
+          "y": 0.0
+        },
+        "group_path": [
+          "outer"
+        ],
+        "key": {
+          "group": "outer",
+          "rank": 0,
+          "side": "right",
+          "type": "group-boundary"
+        },
+        "kind_tags": [
+          "group-boundary"
+        ],
+        "order": 6,
+        "rank": 0
+      },
+      {
+        "center": {
+          "x": 24.0,
+          "y": 0.0
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": 24.0,
+          "y": 0.0
+        },
+        "group_path": [
+          "outer",
+          "inner"
+        ],
+        "key": {
+          "group": "inner",
+          "rank": 0,
+          "side": "left",
+          "type": "group-boundary"
+        },
+        "kind_tags": [
+          "group-boundary"
+        ],
+        "order": 3,
+        "rank": 0
+      },
+      {
+        "center": {
+          "x": 96.0,
+          "y": 0.0
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": 96.0,
+          "y": 0.0
+        },
+        "group_path": [
+          "outer",
+          "inner"
+        ],
+        "key": {
+          "group": "inner",
+          "rank": 0,
+          "side": "right",
+          "type": "group-boundary"
+        },
+        "kind_tags": [
+          "group-boundary"
+        ],
+        "order": 5,
+        "rank": 0
+      },
+      {
+        "center": {
+          "x": 8.0,
+          "y": 70.9
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": 8.0,
+          "y": 70.9
+        },
+        "group_path": [
+          "outer"
+        ],
+        "key": {
+          "group": "outer",
+          "rank": 1,
+          "side": "left",
+          "type": "group-boundary"
+        },
+        "kind_tags": [
+          "group-boundary"
+        ],
+        "order": 2,
+        "rank": 1
+      },
+      {
+        "center": {
+          "x": 96.0,
+          "y": 70.9
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": 96.0,
+          "y": 70.9
+        },
+        "group_path": [
+          "outer"
+        ],
+        "key": {
+          "group": "outer",
+          "rank": 1,
+          "side": "right",
+          "type": "group-boundary"
+        },
+        "kind_tags": [
+          "group-boundary"
+        ],
+        "order": 6,
+        "rank": 1
+      },
+      {
+        "center": {
+          "x": 24.0,
+          "y": 70.9
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": 24.0,
+          "y": 70.9
+        },
+        "group_path": [
+          "outer",
+          "inner"
+        ],
+        "key": {
+          "group": "inner",
+          "rank": 1,
+          "side": "left",
+          "type": "group-boundary"
+        },
+        "kind_tags": [
+          "group-boundary"
+        ],
+        "order": 3,
+        "rank": 1
+      },
+      {
+        "center": {
+          "x": 96.0,
+          "y": 70.9
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": 96.0,
+          "y": 70.9
+        },
+        "group_path": [
+          "outer",
+          "inner"
+        ],
+        "key": {
+          "group": "inner",
+          "rank": 1,
+          "side": "right",
+          "type": "group-boundary"
+        },
+        "kind_tags": [
+          "group-boundary"
+        ],
+        "order": 5,
+        "rank": 1
+      },
+      {
+        "center": {
+          "x": 8.0,
+          "y": 173.8
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": 8.0,
+          "y": 173.8
+        },
+        "group_path": [
+          "outer"
+        ],
+        "key": {
+          "group": "outer",
+          "rank": 2,
+          "side": "left",
+          "type": "group-boundary"
+        },
+        "kind_tags": [
+          "group-boundary"
+        ],
+        "order": 2,
+        "rank": 2
+      },
+      {
+        "center": {
+          "x": 96.0,
+          "y": 173.8
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": 96.0,
+          "y": 173.8
+        },
+        "group_path": [
+          "outer"
+        ],
+        "key": {
+          "group": "outer",
+          "rank": 2,
+          "side": "right",
+          "type": "group-boundary"
+        },
+        "kind_tags": [
+          "group-boundary"
+        ],
+        "order": 4,
+        "rank": 2
+      },
+      {
+        "center": {
+          "x": -75.90355452342826,
+          "y": 0.0
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": -75.90355452342826,
+          "y": 0.0
+        },
+        "group_path": [],
+        "key": {
+          "kind": "order-pad",
+          "ordinal": 0,
+          "owner_edge": "pad:0",
+          "type": "virtual"
+        },
+        "kind_tags": [
+          "order-pad"
+        ],
+        "order": 0,
+        "rank": 0
+      },
+      {
+        "center": {
+          "x": -75.90355452342826,
+          "y": 0.0
+        },
+        "frame": {
+          "height": 0.0,
+          "width": 0.0,
+          "x": -75.90355452342826,
+          "y": 0.0
+        },
+        "group_path": [],
+        "key": {
+          "kind": "order-pad",
+          "ordinal": 1,
+          "owner_edge": "pad:0",
+          "type": "virtual"
+        },
+        "kind_tags": [
+          "order-pad"
+        ],
+        "order": 1,
+        "rank": 0
+      }
+    ],
+    "kind": "hierarchical",
+    "layers": [
+      {
+        "elem_keys": [
+          {
+            "kind": "order-pad",
+            "ordinal": 0,
+            "owner_edge": "pad:0",
+            "type": "virtual"
+          },
+          {
+            "kind": "order-pad",
+            "ordinal": 1,
+            "owner_edge": "pad:0",
+            "type": "virtual"
+          },
+          {
+            "group": "outer",
+            "rank": 0,
+            "side": "left",
+            "type": "group-boundary"
+          },
+          {
+            "group": "inner",
+            "rank": 0,
+            "side": "left",
+            "type": "group-boundary"
+          },
+          {
+            "id": "a",
+            "type": "real"
+          },
+          {
+            "group": "inner",
+            "rank": 0,
+            "side": "right",
+            "type": "group-boundary"
+          },
+          {
+            "group": "outer",
+            "rank": 0,
+            "side": "right",
+            "type": "group-boundary"
+          }
+        ],
+        "main_band": {
+          "end": 30.900000000000002,
+          "start": 0.0
+        },
+        "rank": 0
+      },
+      {
+        "elem_keys": [
+          {
+            "kind": "long-edge",
+            "ordinal": 0,
+            "owner_edge": "e3",
+            "type": "virtual"
+          },
+          {
+            "kind": "long-edge",
+            "ordinal": 0,
+            "owner_edge": "e4",
+            "type": "virtual"
+          },
+          {
+            "group": "outer",
+            "rank": 1,
+            "side": "left",
+            "type": "group-boundary"
+          },
+          {
+            "group": "inner",
+            "rank": 1,
+            "side": "left",
+            "type": "group-boundary"
+          },
+          {
+            "id": "b",
+            "type": "real"
+          },
+          {
+            "group": "inner",
+            "rank": 1,
+            "side": "right",
+            "type": "group-boundary"
+          },
+          {
+            "group": "outer",
+            "rank": 1,
+            "side": "right",
+            "type": "group-boundary"
+          }
+        ],
+        "main_band": {
+          "end": 101.80000000000001,
+          "start": 70.9
+        },
+        "rank": 1
+      },
+      {
+        "elem_keys": [
+          {
+            "kind": "long-edge",
+            "ordinal": 1,
+            "owner_edge": "e3",
+            "type": "virtual"
+          },
+          {
+            "kind": "long-edge",
+            "ordinal": 1,
+            "owner_edge": "e4",
+            "type": "virtual"
+          },
+          {
+            "group": "outer",
+            "rank": 2,
+            "side": "left",
+            "type": "group-boundary"
+          },
+          {
+            "id": "c",
+            "type": "real"
+          },
+          {
+            "group": "outer",
+            "rank": 2,
+            "side": "right",
+            "type": "group-boundary"
+          }
+        ],
+        "main_band": {
+          "end": 204.70000000000002,
+          "start": 173.8
+        },
+        "rank": 2
+      },
+      {
+        "elem_keys": [
+          {
+            "id": "d",
+            "type": "real"
+          }
+        ],
+        "main_band": {
+          "end": 307.6,
+          "start": 276.70000000000005
+        },
+        "rank": 3
+      }
+    ],
+    "metrics": {
+      "layer_gap": 40.0,
+      "node_gap": 24.0
+    },
+    "ports": [
+      {
+        "constraint": "free",
+        "edge_id": "e0",
+        "end": "source",
+        "node": "a",
+        "point": {
+          "x": 66.0,
+          "y": 30.900000000000002
+        },
+        "side": "S",
+        "slot": null
+      },
+      {
+        "constraint": "free",
+        "edge_id": "e0",
+        "end": "target",
+        "node": "b",
+        "point": {
+          "x": 65.99999999937913,
+          "y": 70.9
+        },
+        "side": "N",
+        "slot": null
+      },
+      {
+        "constraint": "free",
+        "edge_id": "e1",
+        "end": "source",
+        "node": "b",
+        "point": {
+          "x": 52.0,
+          "y": 101.80000000000001
+        },
+        "side": "S",
+        "slot": null
+      },
+      {
+        "constraint": "free",
+        "edge_id": "e1",
+        "end": "target",
+        "node": "c",
+        "point": {
+          "x": 52.0,
+          "y": 173.8
+        },
+        "side": "N",
+        "slot": null
+      },
+      {
+        "constraint": "free",
+        "edge_id": "e2",
+        "end": "source",
+        "node": "c",
+        "point": {
+          "x": 44.0,
+          "y": 204.70000000000002
+        },
+        "side": "S",
+        "slot": null
+      },
+      {
+        "constraint": "free",
+        "edge_id": "e2",
+        "end": "target",
+        "node": "d",
+        "point": {
+          "x": 66.0,
+          "y": 276.70000000000005
+        },
+        "side": "N",
+        "slot": null
+      },
+      {
+        "constraint": "free",
+        "edge_id": "e3",
+        "end": "source",
+        "node": "a",
+        "point": {
+          "x": 50.0,
+          "y": 30.900000000000002
+        },
+        "side": "S",
+        "slot": null
+      },
+      {
+        "constraint": "free",
+        "edge_id": "e3",
+        "end": "target",
+        "node": "d",
+        "point": {
+          "x": 50.0,
+          "y": 276.70000000000005
+        },
+        "side": "N",
+        "slot": null
+      },
+      {
+        "constraint": "free",
+        "edge_id": "e4",
+        "end": "source",
+        "node": "d",
+        "point": {
+          "x": 80.0,
+          "y": 292.15000000000003
+        },
+        "side": "E",
+        "slot": 0
+      },
+      {
+        "constraint": "free",
+        "edge_id": "e4",
+        "end": "target",
+        "node": "a",
+        "point": {
+          "x": 80.0,
+          "y": 15.450000000000001
+        },
+        "side": "E",
+        "slot": 0
+      }
+    ]
+  },
+  "layout": "hierarchical",
+  "notes": [
+    "hierarchical: D1.3 Channel (RouteOrder + Gate/ScopeMask + bounded rip-up)"
+  ],
+  "orientation": "top-to-bottom",
+  "schema_version": 1,
+  "space": "physical"
+}

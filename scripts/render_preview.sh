@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# 运行 plotgram-render 的 preview example，生成汇总 HTML 并在浏览器打开。
+# 运行 tautcore-render 的 preview example，生成汇总 HTML 并在浏览器打开。
 # 用法: scripts/render_preview.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 OUT_DIR="target/render-preview"
 
-cargo run -p plotgram-render --example preview
-cargo run -p plotgram-render --example preview_ascii
+cargo run -p tautcore-render --example preview
+cargo run -p tautcore-render --example preview_ascii
 
 python3 - "$OUT_DIR" <<'PY'
 import html
@@ -64,7 +64,7 @@ page = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>plotgram-render preview</title>
+<title>tautcore-render preview</title>
 <style>
   body {{ margin: 0; padding: 24px; background: #e8e8ec; color: #1a1a2e;
          font-family: 'Inter', 'Noto Sans CJK SC', -apple-system, sans-serif; }}
@@ -86,7 +86,7 @@ page = f"""<!DOCTYPE html>
 </style>
 </head>
 <body>
-<h1>plotgram-render preview <small style="font-weight:400;color:#666">({len(cards)} cards)</small></h1>
+<h1>tautcore-render preview <small style="font-weight:400;color:#666">({len(cards)} cards)</small></h1>
 <div class="grid">{"".join(cards)}
 </div>
 </body>

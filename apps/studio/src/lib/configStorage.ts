@@ -8,7 +8,7 @@ import type { LLMConfig, LLMProvider } from './llm';
 
 export type { LLMConfig, LLMProvider };
 
-const STORAGE_KEY = 'plotgram-studio.llm-config';
+const STORAGE_KEY = 'tautcore-studio.llm-config';
 
 const DEFAULT_CONFIG: LLMConfig = {
   provider: 'openai',

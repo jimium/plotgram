@@ -68,11 +68,11 @@ const ROUTING_PIPELINE = [
 ];
 
 const COMPARISON = [
-  { label: '语法变体与隐式规则', legacy: '多种箭头风格、隐式写法多', legacyMark: 'cross' as const, plotgram: '固定语法——3 种箭头、显式结构', plotgramMark: 'check' as const },
-  { label: '自动布局', legacy: '需要手动调坐标/hint', legacyMark: 'partial' as const, plotgram: '语义优先，引擎全自动布局', plotgramMark: 'check' as const },
-  { label: '错误反馈', legacy: '静默失败或模糊文本错误', legacyMark: 'cross' as const, plotgram: '结构化 JSON 诊断含修复建议', plotgramMark: 'check' as const },
-  { label: '可编程性', legacy: '文本是唯一产物', legacyMark: 'cross' as const, plotgram: 'AST 导出、语义 Diff & Patch', plotgramMark: 'check' as const },
-  { label: '多端交付', legacy: '通常只有 CLI/Web', legacyMark: 'partial' as const, plotgram: 'CLI / HTTP API / WASM 同源核心', plotgramMark: 'check' as const },
+  { label: '语法变体与隐式规则', legacy: '多种箭头风格、隐式写法多', legacyMark: 'cross' as const, tautcore: '固定语法——3 种箭头、显式结构', tautcoreMark: 'check' as const },
+  { label: '自动布局', legacy: '需要手动调坐标/hint', legacyMark: 'partial' as const, tautcore: '语义优先，引擎全自动布局', tautcoreMark: 'check' as const },
+  { label: '错误反馈', legacy: '静默失败或模糊文本错误', legacyMark: 'cross' as const, tautcore: '结构化 JSON 诊断含修复建议', tautcoreMark: 'check' as const },
+  { label: '可编程性', legacy: '文本是唯一产物', legacyMark: 'cross' as const, tautcore: 'AST 导出、语义 Diff & Patch', tautcoreMark: 'check' as const },
+  { label: '多端交付', legacy: '通常只有 CLI/Web', legacyMark: 'partial' as const, tautcore: 'CLI / HTTP API / WASM 同源核心', tautcoreMark: 'check' as const },
 ];
 
 function Mark({ type }: { type: 'check' | 'cross' | 'partial' }) {
@@ -93,7 +93,7 @@ export default function Home() {
             一图胜千言，被 AI 放大
           </h1>
           <p className="hero-subtitle">
-            Plotgram 是为 AI 生成而设计的图表 DSL——Agent 理解语义、操作 AST，
+            Tautcore 是为 AI 生成而设计的图表 DSL——Agent 理解语义、操作 AST，
             按你的需求生成和修改图表，改一行不用重画整张。80+ 真实示例，对话即可出图。
           </p>
           <div className="hero-actions">
@@ -123,7 +123,7 @@ export default function Home() {
           <div className="judges-card">
             <div className="judges-header">
               <span className="judges-badge">项目概览</span>
-              <h2>为什么 Plotgram 值得关注</h2>
+              <h2>为什么 Tautcore 值得关注</h2>
               <p>30 秒理解项目核心价值与差异化优势</p>
             </div>
             <div className="judges-grid">
@@ -175,7 +175,7 @@ export default function Home() {
                   <div className="judges-compare-row">
                     <span className="judges-compare-label">语法设计</span>
                     <span className="judges-compare-bad">Mermaid 多种箭头变体、隐式规则</span>
-                    <span className="judges-compare-good">Plotgram 3 种箭头、显式声明</span>
+                    <span className="judges-compare-good">Tautcore 3 种箭头、显式声明</span>
                   </div>
                   <div className="judges-compare-row">
                     <span className="judges-compare-label">错误反馈</span>
@@ -321,9 +321,9 @@ export default function Home() {
       <section className="comparison" id="comparison">
         <div className="container">
           <div className="section-header">
-            <div className="section-label">Why Plotgram</div>
+            <div className="section-label">Why Tautcore</div>
             <h2>为 AI 生成而设计，从一开始</h2>
-            <p>传统工具为人类手写优化，Plotgram 为 Agent 生成优化——语境不同，设计不同</p>
+            <p>传统工具为人类手写优化，Tautcore 为 Agent 生成优化——语境不同，设计不同</p>
           </div>
           <div className="comparison-table">
             <div className="comparison-row header">
@@ -339,7 +339,7 @@ export default function Home() {
                   fontWeight: 700,
                 }}
               >
-                Plotgram
+                Tautcore
               </div>
             </div>
             {COMPARISON.map((row) => (
@@ -349,9 +349,9 @@ export default function Home() {
                   <Mark type={row.legacyMark} />
                   {row.legacy}
                 </div>
-                <div className="comparison-cell plotgram" data-label="Plotgram">
-                  <Mark type={row.plotgramMark} />
-                  {row.plotgram}
+                <div className="comparison-cell tautcore" data-label="Tautcore">
+                  <Mark type={row.tautcoreMark} />
+                  {row.tautcore}
                 </div>
               </div>
             ))}

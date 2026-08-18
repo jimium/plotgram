@@ -1,19 +1,19 @@
-# Plotgram
+# Tautcore
 
 **Turn anything into a diagram — a diagram description language and rendering engine built for AI agents.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
 
-Plotgram is **not** a drop-in replacement for Mermaid. It is a diagram language designed from the ground up for **machine generation**: LLMs write the source, the engine handles layout, and humans read the result.
+Tautcore is **not** a drop-in replacement for Mermaid. It is a diagram language designed from the ground up for **machine generation**: LLMs write the source, the engine handles layout, and humans read the result.
 
 ---
 
-## Why Plotgram?
+## Why Tautcore?
 
 Traditional diagram tools (Mermaid, PlantUML, Graphviz) were built for humans typing by hand. AI agents need something different:
 
-| Challenge | Legacy tools | Plotgram |
+| Challenge | Legacy tools | Tautcore |
 |-----------|--------------|---------|
 | Syntax variants | Many arrow styles, implicit rules | Fixed grammar — 3 arrow types, explicit structure |
 | Layout | Agent must express coordinates or hints | Semantic-first — engine infers layout automatically |
@@ -35,7 +35,7 @@ Traditional diagram tools (Mermaid, PlantUML, Graphviz) were built for humans ty
 
 ## Quick Example
 
-```plotgram
+```tautcore
 diagram flowchart {
     layout: left-to-right
     title: "Linear Flow"
@@ -52,7 +52,7 @@ diagram flowchart {
 Render it:
 
 ```bash
-cargo run -p plotgram-cli -- render apps/showcase/flowchart/product.linear-chain.pgm -f svg -o output.svg
+cargo run -p tautcore-cli -- render apps/showcase/flowchart/product.linear-chain.taut -f svg -o output.svg
 ```
 
 ---
@@ -67,16 +67,16 @@ cargo run -p plotgram-cli -- render apps/showcase/flowchart/product.linear-chain
 ### Build
 
 ```bash
-git clone https://github.com/your-org/plotgram.git
-cd plotgram
+git clone https://github.com/your-org/tautcore.git
+cd tautcore
 cargo build --release
 ```
 
 ### Install CLI
 
 ```bash
-cargo install --path crates/plotgram-cli
-plotgram --help
+cargo install --path crates/tautcore-cli
+tautcore --help
 ```
 
 ---
@@ -87,25 +87,25 @@ plotgram --help
 
 | Command | Description |
 |---------|-------------|
-| `plotgram render <file>` | Parse and render a `.pgm` file (`-f svg\|ascii\|png\|webp\|json`) |
-| `plotgram validate <file>` | Check syntax and semantics |
-| `plotgram export <file>` | Export the AST as JSON |
-| `plotgram diff -o old.pgm -n new.pgm` | Semantic diff between two files |
-| `plotgram patch <file> <patch.json>` | Apply an AST-level patch |
+| `tautcore render <file>` | Parse and render a `.taut` file (`-f svg\|ascii\|png\|webp\|json`) |
+| `tautcore validate <file>` | Check syntax and semantics |
+| `tautcore export <file>` | Export the AST as JSON |
+| `tautcore diff -o old.taut -n new.taut` | Semantic diff between two files |
+| `tautcore patch <file> <patch.json>` | Apply an AST-level patch |
 
 ```bash
 # Render to stdout (default format: SVG)
-plotgram render examples/my-diagram.pgm
+tautcore render examples/my-diagram.taut
 
 # Validate and print diagnostics
-plotgram validate examples/my-diagram.pgm
+tautcore validate examples/my-diagram.taut
 ```
 
 ### HTTP Server
 
 ```bash
-cargo run -p plotgram-server
-# Listens on 0.0.0.0:6080 (override with PLOTGRAM_SERVER_ADDR)
+cargo run -p tautcore-server
+# Listens on 0.0.0.0:6080 (override with TAUTCORE_SERVER_ADDR)
 ```
 
 | Endpoint | Method | Description |
@@ -147,15 +147,15 @@ Browse [apps/showcase/](apps/showcase/) for examples. Files use complexity prefi
 ## Project Structure
 
 ```
-plotgram/
+tautcore/
 ├── crates/
-│   ├── plotgram-core/     # Parser, AST, validation, layout, rendering
-│   ├── plotgram-cli/      # Command-line tool
-│   ├── plotgram-server/   # HTTP API service
-│   ├── plotgram-wasm/     # WASM bindings for the browser
-│   └── plotgram-eval/     # Evaluation metrics
+│   ├── tautcore-core/     # Parser, AST, validation, layout, rendering
+│   ├── tautcore-cli/      # Command-line tool
+│   ├── tautcore-server/   # HTTP API service
+│   ├── tautcore-wasm/     # WASM bindings for the browser
+│   └── tautcore-eval/     # Evaluation metrics
 ├── apps/
-│   ├── showcase/          # Example diagrams by type (.pgm)
+│   ├── showcase/          # Example diagrams by type (.taut)
 │   ├── playground/        # React + WASM live editor
 │   ├── website/           # Landing page
 │   └── editors/           # IDE extensions (VSCode)
@@ -184,8 +184,8 @@ plotgram/
 
 | Extension | Description |
 |-----------|-------------|
-| `.plotgram` | Full extension |
-| `.pgm` | Short extension (recommended) |
+| `.tautcore` | Full extension |
+| `.taut` | Short extension (recommended) |
 
 ---
 

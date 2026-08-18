@@ -110,7 +110,7 @@ function highlight(code: string): React.ReactNode[] {
   });
 }
 
-export default function CodeBlock({ code, language = 'plotgram', title }: CodeBlockProps) {
+export default function CodeBlock({ code, language = 'tautcore', title }: CodeBlockProps) {
   return (
     <div className="code-block">
       {title && (

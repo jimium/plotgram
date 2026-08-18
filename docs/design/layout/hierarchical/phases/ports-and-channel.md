@@ -180,7 +180,7 @@ Defer 模式可跳过 Hier Channel 搜索，但不能跳过端口、组框与 bo
 
 ## 10. Shape port policy
 
-内建表：`plotgram_model::policy_for(NodeShape)` → `ShapePortPolicy { allowed, preference, capacity_per_side }`。无 DSL。
+内建表：`tautcore_model::policy_for(NodeShape)` → `ShapePortPolicy { allowed, preference, capacity_per_side }`。无 DSL。
 
 | 规则 | 说明 |
 |------|------|

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# plotgram-eval 一键评估看板
+# tautcore-eval 一键评估看板
 #
 # 生成纯 HTML 文件，双击即可打开，无需 web 服务器。
 #
@@ -31,7 +31,7 @@ mkdir -p "$OUTPUT_DIR"
 
 if [ "$ONLY_DASHBOARD" = false ]; then
   echo "▶ 运行算法基准测试（showcase 目录）..."
-  cargo run -p plotgram-eval --bin bench -- --showcase "$PROJECT_DIR/showcase" --output "$JSON_PATH"
+  cargo run -p tautcore-eval --bin bench -- --showcase "$PROJECT_DIR/showcase" --output "$JSON_PATH"
   echo ""
 fi
 

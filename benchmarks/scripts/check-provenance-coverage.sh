@@ -10,7 +10,7 @@ source "$(dirname "$0")/gate-switch.sh"
 gate_skip_unless_enabled "check-provenance-coverage.sh"
 
 out="$(
-  cargo test -p plotgram-core --lib layout::atlas::provenance_check -- --nocapture 2>&1
+  cargo test -p tautcore-core --lib layout::atlas::provenance_check -- --nocapture 2>&1
 )" || {
   echo "$out" | tail -60
   echo "FAIL: provenance_check tests failed"

@@ -148,7 +148,7 @@
         </ul>
 
         <div class="callout info">
-          <div class="ct-title"><span class="icon">ℹ</span>plotgram 建议</div>
+          <div class="ct-title"><span class="icon">ℹ</span>tautcore 建议</div>
           <p>Hier 主路径用<strong>通道图</strong>；自由布局/用户拖动后的重路由用 <strong>OVG</strong>。两者共用同一个"搜索 + track 分配 + nudging"下游。</p>
         </div>
 
@@ -406,7 +406,7 @@ fn route(g:&amp;Graph, s:Point, t:Point) -&gt; Path {
         </div>
 
         <!-- ============ §8 ============ -->
-        <h2 id="sec-9"><span class="h2-num">8</span>plotgram 落地建议</h2>
+        <h2 id="sec-9"><span class="h2-num">8</span>tautcore 落地建议</h2>
 
         <ol>
           <li><strong>两条路由后端，一套下游</strong>：<code>ChannelRouter</code>（分层，走廊图）+ <code>FreeRouter</code>（OVG）；共享 <code>TrackAssign → Nudge → Decorate</code>。</li>

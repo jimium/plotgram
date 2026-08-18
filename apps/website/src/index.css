@@ -1085,7 +1085,7 @@ a {
   color: var(--text-muted);
 }
 
-.comparison-cell.plotgram {
+.comparison-cell.tautcore {
   color: var(--text-primary);
   font-weight: 500;
 }

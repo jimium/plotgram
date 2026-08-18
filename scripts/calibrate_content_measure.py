@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Calibrate / verify plotgram-content width heuristics against real fonts.
+"""Calibrate / verify tautcore-content width heuristics against real fonts.
 
 Eval-only side channel (ADR-005 §3): the Rust main path never opens font
 files; this script measures true advance widths with Pillow and the fonts the
 theme *assumes*, so the heuristic em-factor table in
-`crates/plotgram-content/src/measure.rs` can be data-driven instead of
+`crates/tautcore-content/src/measure.rs` can be data-driven instead of
 guessed. Char classes here MUST mirror `char_class()` in measure.rs.
 
 Subcommands:
@@ -22,7 +22,7 @@ Subcommands:
 Typical loop:
   python3 scripts/calibrate_content_measure.py calibrate
   python3 scripts/calibrate_content_measure.py gen-cases > /tmp/cases.json
-  cargo run -p plotgram-content --example dump_estimates -- /tmp/cases.json > /tmp/estimates.json
+  cargo run -p tautcore-content --example dump_estimates -- /tmp/cases.json > /tmp/estimates.json
   python3 scripts/calibrate_content_measure.py compare --estimates /tmp/estimates.json
 """
 import argparse

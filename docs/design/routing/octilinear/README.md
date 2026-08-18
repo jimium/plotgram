@@ -2,7 +2,7 @@
 
 > 状态：MVP 已落地
 > 注册名：`octilinear`
-> 代码：`crates/plotgram-router/src/octilinear.rs`
+> 代码：`crates/tautcore-router/src/octilinear.rs`
 > 约束：[写权纪律](../../layout/write-authority.md) · [routing README](../README.md) · [ADR-006](../../adr/006-engine-io-and-crates.md)
 
 段方向限于 **水平 / 竖直 / 45° 对角**（八方向）的避障折线路由。独立于布局核，可手写 `RouteScene` 夹具开发。

@@ -25,7 +25,7 @@ code_diagram_type() {
 }
 
 # 1) kernel：除文档外不得出现 DiagramType
-kernel_code="$(code_diagram_type crates/plotgram-core/src/layout/kernel | rg -v 'mod\.rs:' || true)"
+kernel_code="$(code_diagram_type crates/tautcore-core/src/layout/kernel | rg -v 'mod\.rs:' || true)"
 # 单测内 DiagramType：bounds/edge_gutter 的 #[cfg(test)] 块（生产路径已无）
 kernel_code="$(echo "$kernel_code" | rg -v 'kernel/(common/edge_gutter|group/bounds)\.rs:' || true)"
 if [[ -n "${kernel_code}" ]]; then
@@ -35,20 +35,20 @@ if [[ -n "${kernel_code}" ]]; then
 fi
 
 # 2) R1：OVG 目录必须已物理删除
-if [[ -d crates/plotgram-core/src/layout/routing/edge_routing_orthogonal ]]; then
+if [[ -d crates/tautcore-core/src/layout/routing/edge_routing_orthogonal ]]; then
   echo "FAIL: edge_routing_orthogonal still present (R1 remove OVG)"
   fail=1
 fi
-if rg -n 'OrthogonalRecipe|edge_routing_orthogonal::' crates/plotgram-core/src -g '*.rs' \
+if rg -n 'OrthogonalRecipe|edge_routing_orthogonal::' crates/tautcore-core/src -g '*.rs' \
   | rg -v '^\S+:\s*//' | rg -v '^\S+:\s*//!' | rg -q .; then
   echo "FAIL: OrthogonalRecipe / edge_routing_orthogonal references remain"
-  rg -n 'OrthogonalRecipe|edge_routing_orthogonal::' crates/plotgram-core/src -g '*.rs' || true
+  rg -n 'OrthogonalRecipe|edge_routing_orthogonal::' crates/tautcore-core/src -g '*.rs' || true
   fail=1
 fi
 
 # 3) algo == "architecture" 仅允许 frame_spec
 algo_arch_bad="$(
-  rg -n 'algo == "architecture"' crates/plotgram-core/src/layout -g '*.rs' \
+  rg -n 'algo == "architecture"' crates/tautcore-core/src/layout -g '*.rs' \
     | rg -v 'recipes/frame_spec/' \
     | rg -v '^\S+:\s*//' \
     || true
@@ -61,7 +61,7 @@ fi
 
 # 4) G5：生产路径禁止内联 `CoordinateProblem {`（须经 ::build；kernel 测试辅助白名单）
 cp_bad="$(
-  rg -n 'CoordinateProblem\s*\{' crates/plotgram-core/src/layout -g '*.rs' \
+  rg -n 'CoordinateProblem\s*\{' crates/tautcore-core/src/layout -g '*.rs' \
     | rg -v 'pub struct CoordinateProblem' \
     | rg -v 'impl CoordinateProblem' \
     | rg -v 'kernel/coordinate/(auditor|analysis|optimizer|group_ir)\.rs:' \
@@ -80,12 +80,12 @@ if [[ -n "${cp_bad}" ]]; then
 fi
 
 # 5b) G-pre：architecture 默认 Fit+None；resolve_group_frame_spec 不调 DSL
-spec_fn="$(rg -A8 '^pub fn resolve_group_frame_spec' crates/plotgram-core/src/layout/recipes/frame_spec/spec.rs | head -9)"
+spec_fn="$(rg -A8 '^pub fn resolve_group_frame_spec' crates/tautcore-core/src/layout/recipes/frame_spec/spec.rs | head -9)"
 if echo "$spec_fn" | rg -q 'resolve_from_group_frame_config\('; then
   echo "FAIL: resolve_group_frame_spec still calls resolve_from_group_frame_config"
   fail=1
 fi
-arch_fn="$(rg -A15 '^fn resolve_architecture' crates/plotgram-core/src/layout/recipes/frame_spec/spec.rs | head -16)"
+arch_fn="$(rg -A15 '^fn resolve_architecture' crates/tautcore-core/src/layout/recipes/frame_spec/spec.rs | head -16)"
 if ! echo "$arch_fn" | rg -q 'TrackSizing::Fit'; then
   echo "FAIL: resolve_architecture must default TrackSizing::Fit"
   fail=1
@@ -100,12 +100,12 @@ if echo "$arch_fn" | rg -q 'TrackSizing::Equal|BorderAlign::SharedLines'; then
 fi
 
 # 5c) G-pre：parse_group_sizing 恒 Fit；无 subnet id 启发式
-gs_fn="$(rg -A5 '^pub fn parse_group_sizing' crates/plotgram-core/src/layout/recipes/architecture/group_sizing.rs | head -6)"
+gs_fn="$(rg -A5 '^pub fn parse_group_sizing' crates/tautcore-core/src/layout/recipes/architecture/group_sizing.rs | head -6)"
 if ! echo "$gs_fn" | rg -q 'GroupSizingPolicy::Fit'; then
   echo "FAIL: parse_group_sizing must return Fit"
   fail=1
 fi
-if rg -n 'fn architecture_subnet_layout_hint' crates/plotgram-core/src/layout/recipes/architecture/group_layout_hint.rs \
+if rg -n 'fn architecture_subnet_layout_hint' crates/tautcore-core/src/layout/recipes/architecture/group_layout_hint.rs \
   | rg -v '^\S+:\s*//' | rg -q .; then
   echo "FAIL: architecture_subnet_layout_hint must be removed (G-pre)"
   fail=1
@@ -113,7 +113,7 @@ fi
 
 mut_sigs="$(
   rg -n 'pub(\([^)]*\))?\s+fn\s+\w+[^{]*&mut\s*\[EdgeLayout\]' \
-    crates/plotgram-core/src/layout -g '*.rs' \
+    crates/tautcore-core/src/layout -g '*.rs' \
     || true
 )"
 mut_count="$(echo "$mut_sigs" | sed '/^$/d' | wc -l | tr -d ' ')"

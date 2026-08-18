@@ -11,7 +11,7 @@ TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 
 # stdout=TSV；stderr 含 perf 噪声 + summary 行
-cargo run -q -p plotgram-eval --bin atlas_repair_baseline -- "$SET" >"$TMP" 2>/tmp/m70-stderr.txt || {
+cargo run -q -p tautcore-eval --bin atlas_repair_baseline -- "$SET" >"$TMP" 2>/tmp/m70-stderr.txt || {
   echo "FAIL: atlas_repair_baseline"
   cat /tmp/m70-stderr.txt >&2
   exit 1
@@ -61,7 +61,7 @@ DATE="$(date +%Y-%m-%d)"
   echo '```bash'
   echo "./benchmarks/scripts/report-ink-repair-baseline.sh"
   echo "# 或"
-  echo "cargo run -q -p plotgram-eval --bin atlas_repair_baseline -- ${SET}"
+  echo "cargo run -q -p tautcore-eval --bin atlas_repair_baseline -- ${SET}"
   echo '```'
 } >"$OUT"
 

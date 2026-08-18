@@ -5,7 +5,7 @@ export interface SelectOption {
   label: string;
 }
 
-/** WASM `layout_catalog()` 返回的结构（与 plotgram-core 对齐） */
+/** WASM `layout_catalog()` 返回的结构（与 tautcore-core 对齐） */
 export interface AlgorithmOptionInfo {
   key: string;
   kind: 'non_negative_number' | 'positive_number' | 'number';

@@ -24,14 +24,14 @@
 |---|------|------|
 | P1 | 画廊页失效 | `index.html` manifest 指向 `architecture/` 等已删目录，0 条指向 `hierarchical/` |
 | P2 | 渲染产物陈旧 | `hierarchical/*.svg`（69 个）为 v1 渲染，与新 DSL 无关 |
-| P3 | 脚本与 CLI 不匹配 | `render-all.sh` 调 `plotgram render -f` / `plotgram validate`；现行 CLI 只有 `plotgram <input> [-o] [--theme]` |
+| P3 | 脚本与 CLI 不匹配 | `render-all.sh` 调 `tautcore render -f` / `tautcore validate`；现行 CLI 只有 `tautcore <input> [-o] [--theme]` |
 | P4 | 门禁悬空 | `benchmarks/` 依赖 v1 `gate-baseline` 二进制；`sets/*.txt` 路径指向旧目录 |
 | P5 | 多布局资产闲置 | `_backup/{tree,sequence,circular,state}/` 共 ~63 个旧 DSL；夹具未定义毕业路径 |
 
 ## 3. 总体架构
 
 ```
-showcase/{layout}/*.pgm              样例源（layout = 引擎注册名；文件名即角色）
+showcase/{layout}/*.taut              样例源（layout = 引擎注册名；文件名即角色）
         │                              一期仅 hierarchical/；tree/… 毕业后同级出现
         ▼  showcase/render.sh（薄壳编排）
         │     └─ scripts/*.py          发现样例 / 增量判定 / 写 manifest.json
@@ -40,20 +40,20 @@ showcase/_out/manifest.json          画廊与门禁共同数据源（gitignore�
         │
         ├── index.html               进仓库的静态画廊（手写；运行时 fetch manifest）
         │
-        ▼  plotgram measure（布局无关起步指标 + 可选 layout 扩展字段）
+        ▼  tautcore measure（布局无关起步指标 + 可选 layout 扩展字段）
 benchmarks/baselines/latest.json     门禁基线（进仓库；按 path 含 layout）
         │
         ▼  benchmarks/compare.sh（角色分轨棘轮；sets 路径带 layout 前缀）
 CI gate（smoke + product 硬门禁；新 layout 自带 smoke 后再进 CI）
 ```
 
-单一事实源原则：`.pgm` 文件是唯一进仓库的样例资产；SVG 与 `manifest.json` 全部由脚本派生、gitignore。`index.html` **进仓库且不由脚本生成**（只读 manifest）。基线只提交**指标 JSON**，不提交 SVG。
+单一事实源原则：`.taut` 文件是唯一进仓库的样例资产；SVG 与 `manifest.json` 全部由脚本派生、gitignore。`index.html` **进仓库且不由脚本生成**（只读 manifest）。基线只提交**指标 JSON**，不提交 SVG。
 
 ## 4. 目录与命名（多布局约定）
 
 ```
 showcase/
-├── hierarchical/            # 一期：{facet}/{role}.{slug}.pgm
+├── hierarchical/            # 一期：{facet}/{role}.{slug}.taut
 │   ├── flat/ group/ partition/
 ├── tree/                    # 将来：tree 内核毕业后从 _backup 迁入 / 重写
 ├── sequence/                # 将来
@@ -65,7 +65,7 @@ showcase/
 │   └── state/               # 17（v1 按图种归档；毕业时拆入 hier/circular，见 §4.2）
 ├── _out/                    # SVG + manifest.json（gitignore；镜像源路径）
 ├── scripts/                 # 编排辅助（进仓库；见 §6.1）
-│   ├── discover.py          # 列出激活 layout 下的 .pgm（含 facet 子目录）
+│   ├── discover.py          # 列出激活 layout 下的 .taut（含 facet 子目录）
 │   ├── write_manifest.py    # 写 / 比对 _out/manifest.json（含 facet / changed）
 │   └── incremental.py       # mtime 增量判定
 ├── index.html               # 监视画廊（手写单文件；fetch _out/manifest.json）
@@ -103,16 +103,16 @@ showcase/
 
 P0–P3 只保证 `hierarchical/` 闭环；画廊 / 脚本的 layout 过滤与自动发现**一并落地**（空目录不出现即可），避免 tree 落地时再改夹具。
 
-## 5. CLI 前置能力（plotgram-cli 扩展）
+## 5. CLI 前置能力（tautcore-cli 扩展）
 
 现行薄壳 CLI 需要两个新子命令（参数解析在 CLI，逻辑在 crate）：
 
-### 5.1 `plotgram validate <file>`
+### 5.1 `tautcore validate <file>`
 
 - 只做 parse + 模型校验，不布局不渲染；失败输出结构化诊断（对齐 `error-model.md`），exit ≠ 0。
 - 用途：门禁第 0 轨、画廊状态标记。
 
-### 5.2 `plotgram measure <file> [--json]`
+### 5.2 `tautcore measure <file> [--json]`
 
 输出单样例指标 JSON。指标集最小起步，分三轨：
 
@@ -122,7 +122,7 @@ P0–P3 只保证 `hierarchical/` 闭环；画廊 / 脚本的 layout 过滤与�
 | 质量 | `edge_crossing_count`；`total_edge_length`；`canvas_area`；`aspect_ratio` | 按角色分轨 |
 | 观测 | `elapsed_ms`（release 计时）；`node_count` / `edge_count` | 只记录不门禁 |
 
-实现位置：指标计算放 `plotgram-engine`（或新 `plotgram-audit` 模块，实现时定），只依赖 `LayoutContract` 结果几何，**不得按图种 / layout 名分支**（AGENTS.md §1/§3）。布局专属正确性指标以**可选字段**挂上（缺省即跳过），`schema_version` 供 compare 校验。
+实现位置：指标计算放 `tautcore-engine`（或新 `tautcore-audit` 模块，实现时定），只依赖 `LayoutContract` 结果几何，**不得按图种 / layout 名分支**（AGENTS.md §1/§3）。布局专属正确性指标以**可选字段**挂上（缺省即跳过），`schema_version` 供 compare 校验。
 
 布局专属指标示例（内核落地时再加，非一期）：
 
@@ -148,8 +148,8 @@ P0–P3 只保证 `hierarchical/` 闭环；画廊 / 脚本的 layout 过滤与�
 
 | 层 | 文件 | 做什么 |
 |----|------|--------|
-| 入口 | `render.sh` | `cargo build`；解析 flag；循环调 `plotgram validate` / 渲染；`--serve` 时 `python3 -m http.server` |
-| 发现 | `scripts/discover.py` | 列出激活 layout 下 `.pgm`（尊重 `--layout`；跳过 `_backup` / `_out`） |
+| 入口 | `render.sh` | `cargo build`；解析 flag；循环调 `tautcore validate` / 渲染；`--serve` 时 `python3 -m http.server` |
+| 发现 | `scripts/discover.py` | 列出激活 layout 下 `.taut`（尊重 `--layout`；跳过 `_backup` / `_out`） |
 | 增量 | `scripts/incremental.py` | 比较源 / 二进制 / 产物 mtime 或内容 hash，输出「需要重渲」清单；`--force` 时全量 |
 | 清单 | `scripts/write_manifest.py` | 渲染前备份 `manifest.json` → `manifest.prev.json`；渲染后写新 manifest（含 `layout` / `changed` / status） |
 
@@ -162,11 +162,11 @@ P0–P3 只保证 `hierarchical/` 闭环；画廊 / 脚本的 layout 过滤与�
 
 ### 6.2 规则
 
-- 自动构建 `plotgram-cli`（默认 release，`--debug` 切换；遵守 AGENTS.md「验真」条，开发期可随时 `--debug`）。
-- **发现范围**：`showcase/` 下非 `_` 前缀目录中的 `*.pgm`；一期自然只有 `hierarchical/`。
-- **增量判定**：`.pgm` mtime/hash 或二进制 mtime 新于产物才重渲；`--force` 跳过判定。
+- 自动构建 `tautcore-cli`（默认 release，`--debug` 切换；遵守 AGENTS.md「验真」条，开发期可随时 `--debug`）。
+- **发现范围**：`showcase/` 下非 `_` 前缀目录中的 `*.taut`；一期自然只有 `hierarchical/`。
+- **增量判定**：`.taut` mtime/hash 或二进制 mtime 新于产物才重渲；`--force` 跳过判定。
 - 每个样例先 `validate` 再渲染；两者状态都进 manifest。
-- 输出 `_out/{path 去 .pgm}.svg`（镜像源树含 facet；透明背景）。
+- 输出 `_out/{path 去 .taut}.svg`（镜像源树含 facet；透明背景）。
 
 ### 6.3 manifest.json（画廊与门禁的共同数据源）
 
@@ -176,7 +176,7 @@ P0–P3 只保证 `hierarchical/` 闭环；画廊 / 脚本的 layout 过滤与�
   "binary_hash": "…",
   "samples": [
     {
-      "path": "hierarchical/group/product.cloud-native.pgm",
+      "path": "hierarchical/group/product.cloud-native.taut",
       "layout": "hierarchical",
       "facet": "group",
       "role": "product",
@@ -202,7 +202,7 @@ P0–P3 只保证 `hierarchical/` 闭环；画廊 / 脚本的 layout 过滤与�
 1. **状态徽章**：每卡片角标 ✅ / 解析错 / 渲染失败 / 🔄 有变化；顶部汇总条（总数 / 失败数 / 变化数；可按当前 layout 过滤子集汇总）。
 2. **过滤**：layout × 角色 × 状态 三维过滤 + 文件名搜索。一期 layout 只有 hierarchical，控件仍要有（多 layout 时零改动）。高频视图：「只看有变化」「只看失败」「只看当前在改的 layout」。
 3. **缩略图墙**：SVG 经 `IntersectionObserver` 懒加载；样例规模随 layout 毕业增长，首屏仍秒开。
-4. **灯箱详情**：点卡片放大，支持缩放 / 1:1；并排展示 DSL 源（fetch `.pgm`）与渲染结果。
+4. **灯箱详情**：点卡片放大，支持缩放 / 1:1；并排展示 DSL 源（fetch `.taut`）与渲染结果。
 5. **键盘导航**：`j/k` 在过滤结果内切换，`Esc` 关闭灯箱——抽检 20 张图不用碰鼠标。
 
 ### 7.2 不做
@@ -223,14 +223,14 @@ P0–P3 只保证 `hierarchical/` 闭环；画廊 / 脚本的 layout 过滤与�
 | `demo-observe-set.txt` | demo | 正确性硬；质量 WARN |
 | `mech-set.txt` | mech | 不进指标门禁；机制断言由 crate 内单元测试承担 |
 
-清单内每行是相对 `showcase/` 的路径，**必须含 layout 前缀**（及 facet，若有；如 `hierarchical/flat/smoke.decision-loop.pgm`）。新 layout 毕业时往同一角色清单追加行，或另建 `{layout}-smoke-set.txt` 再在 CI 合并——优先前者，避免清单爆炸。
+清单内每行是相对 `showcase/` 的路径，**必须含 layout 前缀**（及 facet，若有；如 `hierarchical/flat/smoke.decision-loop.taut`）。新 layout 毕业时往同一角色清单追加行，或另建 `{layout}-smoke-set.txt` 再在 CI 合并——优先前者，避免清单爆炸。
 
 `_backup/` 下样例一律不进任何门禁集。新 layout 未达 smoke 稳定前，其路径**不写入** CI 所用的 smoke/product 清单。
 
 ### 8.2 快照与比对（重写 v1 脚本，接口保持习惯）
 
 ```bash
-./benchmarks/snapshot.sh [--tag xxx] [--set path]   # plotgram measure 批量采集 → baselines/
+./benchmarks/snapshot.sh [--tag xxx] [--set path]   # tautcore measure 批量采集 → baselines/
 ./benchmarks/compare.sh baseline.json current.json  # 角色分轨棘轮，exit code 即门禁结论
 ```
 
@@ -246,8 +246,8 @@ P0–P3 只保证 `hierarchical/` 闭环；画廊 / 脚本的 layout 过滤与�
 
 ```
 gate job:
-  cargo build --release -p plotgram-cli
-  对 smoke-set + product-regression-set 逐个 plotgram measure → current.json
+  cargo build --release -p tautcore-cli
+  对 smoke-set + product-regression-set 逐个 tautcore measure → current.json
   compare.sh baselines/latest.json current.json   # 硬门禁，非零即红
 ```
 

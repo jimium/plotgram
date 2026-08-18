@@ -404,7 +404,7 @@ diagram_type
 
 示意（DSL，非冻结语法；**无** swimlane 关键字）：
 
-```plotgram
+```tautcore
 diagram architecture {
     // 不再写 group_frame: strips
     // scheme 默认已含：strong-group + equal sibling track + shared chrome
@@ -423,7 +423,7 @@ diagram flowchart {
 
 高级覆盖（仍不必叫 frame）：
 
-```plotgram
+```tautcore
 config {
     scheme: architecture-default
     group_sizing: equal      // 或 fit

@@ -232,127 +232,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
-name = "plotgram-algo"
-version = "0.1.0"
-dependencies = [
- "thiserror",
-]
-
-[[package]]
-name = "plotgram-cli"
-version = "0.1.0"
-dependencies = [
- "clap",
- "plotgram-compile",
- "serde_json",
-]
-
-[[package]]
-name = "plotgram-compile"
-version = "0.1.0"
-dependencies = [
- "insta",
- "plotgram-content",
- "plotgram-engine",
- "plotgram-engine-api",
- "plotgram-layout",
- "plotgram-model",
- "plotgram-parse",
- "plotgram-render",
- "plotgram-router",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "plotgram-content"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "plotgram-engine"
-version = "0.1.0"
-dependencies = [
- "plotgram-algo",
- "plotgram-engine-api",
- "plotgram-layout",
- "plotgram-model",
- "plotgram-router",
-]
-
-[[package]]
-name = "plotgram-engine-api"
-version = "0.1.0"
-dependencies = [
- "plotgram-model",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "plotgram-layout"
-version = "0.1.0"
-dependencies = [
- "insta",
- "plotgram-algo",
- "plotgram-engine-api",
- "plotgram-model",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "plotgram-model"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "plotgram-parse"
-version = "0.1.0"
-dependencies = [
- "plotgram-model",
- "thiserror",
-]
-
-[[package]]
-name = "plotgram-render"
-version = "0.1.0"
-dependencies = [
- "insta",
- "plotgram-model",
- "serde",
- "serde_json",
- "unicode-width",
-]
-
-[[package]]
-name = "plotgram-router"
-version = "0.1.0"
-dependencies = [
- "plotgram-algo",
- "plotgram-engine-api",
- "plotgram-model",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "plotgram-wasm"
-version = "0.1.0"
-dependencies = [
- "console_error_panic_hook",
- "plotgram-compile",
- "serde_json",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "proc-macro2"
 version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -459,6 +338,127 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "tautcore-algo"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
+name = "tautcore-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "serde_json",
+ "tautcore-compile",
+]
+
+[[package]]
+name = "tautcore-compile"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "serde",
+ "serde_json",
+ "tautcore-content",
+ "tautcore-engine",
+ "tautcore-engine-api",
+ "tautcore-layout",
+ "tautcore-model",
+ "tautcore-parse",
+ "tautcore-render",
+ "tautcore-router",
+ "thiserror",
+]
+
+[[package]]
+name = "tautcore-content"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "tautcore-engine"
+version = "0.1.0"
+dependencies = [
+ "tautcore-algo",
+ "tautcore-engine-api",
+ "tautcore-layout",
+ "tautcore-model",
+ "tautcore-router",
+]
+
+[[package]]
+name = "tautcore-engine-api"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tautcore-model",
+ "thiserror",
+]
+
+[[package]]
+name = "tautcore-layout"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "serde",
+ "serde_json",
+ "tautcore-algo",
+ "tautcore-engine-api",
+ "tautcore-model",
+]
+
+[[package]]
+name = "tautcore-model"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "tautcore-parse"
+version = "0.1.0"
+dependencies = [
+ "tautcore-model",
+ "thiserror",
+]
+
+[[package]]
+name = "tautcore-render"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "serde",
+ "serde_json",
+ "tautcore-model",
+ "unicode-width",
+]
+
+[[package]]
+name = "tautcore-router"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tautcore-algo",
+ "tautcore-engine-api",
+ "tautcore-model",
+]
+
+[[package]]
+name = "tautcore-wasm"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "serde_json",
+ "tautcore-compile",
+ "wasm-bindgen",
 ]
 
 [[package]]

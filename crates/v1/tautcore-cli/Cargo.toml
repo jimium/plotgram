@@ -1,0 +1,20 @@
+[package]
+name = "tautcore-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "CLI tool for Tautcore — Turn anything into a diagram"
+
+[[bin]]
+name = "tautcore"
+path = "src/main.rs"
+
+[dependencies]
+tautcore-core = { workspace = true, default-features = false }
+clap = { version = "4", features = ["derive"] }
+serde_json.workspace = true
+
+[features]
+default = []
+svg-debug = ["tautcore-core/svg-debug"]
