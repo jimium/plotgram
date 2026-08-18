@@ -16,12 +16,14 @@
 
 mod audit;
 mod error;
+mod explain;
 mod hier_metrics;
 mod measure_graph;
 mod options;
 
 pub use audit::{compute as compute_metrics, GeometryMetrics};
 pub use error::BuildError;
+pub use explain::explain;
 pub use hier_metrics::{
     compute as compute_hier_metrics, node_gap_from_source, CrossAxis, HierQualityMetrics,
     DEFAULT_NODE_GAP,
@@ -34,13 +36,30 @@ use plotgram_engine_api::{EdgeGeometryMode, LayoutInput};
 use plotgram_model::render::RenderInput;
 use plotgram_model::result::LayoutResult;
 use plotgram_parse::parse;
-use plotgram_render::render_svg;
+use plotgram_render::{render_drawio, render_svg};
 
 use crate::measure_graph::measure_node_sizes;
 
 /// Build `.pgm` source into an SVG string.
 pub fn build_svg(source: &str, options: &BuildOptions) -> Result<String, BuildError> {
     Ok(build_svg_with_layout(source, options)?.1)
+}
+
+/// Build `.pgm` source into a draw.io (mxGraphModel) XML string.
+pub fn build_drawio(source: &str, options: &BuildOptions) -> Result<String, BuildError> {
+    let parsed = parse(source)?;
+    let node_sizes = measure_node_sizes(&parsed.graph, options)?;
+
+    let meta = parsed.meta.clone();
+    let contract = parsed.into_contract(node_sizes);
+    let layout = run_layout(&contract)?;
+
+    let input = RenderInput {
+        graph: contract.graph,
+        layout,
+        meta,
+    };
+    Ok(render_drawio(&input))
 }
 
 /// Build source into (layout, SVG) in a single pipeline run. Exposed for the
@@ -120,6 +139,16 @@ pub fn validate(source: &str, options: &BuildOptions) -> Result<(), BuildError> 
     let node_sizes = measure_node_sizes(&parsed.graph, options)?;
     let _contract = parsed.into_contract(node_sizes);
     Ok(())
+}
+
+/// Build source into layout-facts text (ADR-007). The layout is solved once;
+/// facts are a pure derivation over (`Graph`, `LayoutResult`) — no render.
+pub fn build_explain(source: &str, options: &BuildOptions) -> Result<String, BuildError> {
+    let parsed = parse(source)?;
+    let node_sizes = measure_node_sizes(&parsed.graph, options)?;
+    let contract = parsed.into_contract(node_sizes);
+    let layout = run_layout(&contract)?;
+    Ok(explain(&contract.graph, &layout))
 }
 
 #[cfg(test)]

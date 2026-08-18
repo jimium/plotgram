@@ -143,8 +143,17 @@ fn count_edge_group_interior(layout: &LayoutResult) -> u32 {
 // yield d == 0 (collinear), failing the strict sign test.
 
 fn count_edge_crossings(edges: &[plotgram_model::result::EdgePlacement]) -> u32 {
+    edge_crossing_pairs(edges).len() as u32
+}
+
+/// Edge id pairs (index order, i < j) whose paths properly cross at least
+/// once. Consumed by the layout-facts channel (`explain`) to name the
+/// crossing participants, not just the count.
+pub(crate) fn edge_crossing_pairs(
+    edges: &[plotgram_model::result::EdgePlacement],
+) -> Vec<(&str, &str)> {
     let polylines: Vec<Vec<Point>> = edges.iter().map(|e| e.path.samples()).collect();
-    let mut count = 0u32;
+    let mut pairs = Vec::new();
     for i in 0..polylines.len() {
         let pi = &polylines[i];
         if pi.len() < 2 {
@@ -165,11 +174,11 @@ fn count_edge_crossings(edges: &[plotgram_model::result::EdgePlacement]) -> u32 
                 }
             }
             if crossed {
-                count += 1;
+                pairs.push((edges[i].id.as_str(), edges[j].id.as_str()));
             }
         }
     }
-    count
+    pairs
 }
 
 // ── total_edge_length ──────────────────────────────────────────

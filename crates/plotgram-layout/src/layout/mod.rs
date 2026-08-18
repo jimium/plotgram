@@ -2,6 +2,7 @@
 
 pub mod circular;
 pub mod hierarchical;
+pub mod organic;
 pub mod sequence;
 pub mod tree;
 
@@ -11,5 +12,6 @@ pub use hierarchical::{
     GroupPenetrationViolation, GroupPolicy, HierarchicalLayout, HierarchicalParams,
     HierarchicalPreset, LayoutDebugTrace, Orientation, RoutingStyle,
 };
+pub use organic::{OrganicLayout, OrganicParams, OrganicPreset};
 pub use sequence::{SequenceLayout, SequenceParams, SequencePreset};
 pub use tree::{PlacerId, TreeLayout, TreeParams, TreePreset};

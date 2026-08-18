@@ -5,21 +5,30 @@
 //!   render   <file> [-o]      .pgm → SVG (default: stdout)
 //!   measure  <file> [--json]  layout metrics (§5.2): correctness / quality / observation
 //!   debug-layout <file> [-o]  .pgm → LayoutDebugTrace JSON (debug-inspector.md T1)
+//!   explain  <file>           .pgm → layout facts (ADR-007): LLM-readable predicates
 
 use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
 
-use clap::{Parser, Subcommand};
-use plotgram_compile::{build_svg, build_svg_with_layout, compute_metrics, validate, BuildOptions};
+use clap::{Parser, Subcommand, ValueEnum};
+use plotgram_compile::{
+    build_drawio, build_svg, build_svg_with_layout, compute_metrics, validate, BuildOptions,
+};
 use serde_json::json;
 
 #[derive(Debug, Parser)]
-#[command(name = "plotgram", about = "Plotgram DSL → SVG")]
+#[command(name = "plotgram", about = "Plotgram DSL → SVG / draw.io")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum RenderFormat {
+    Svg,
+    Drawio,
 }
 
 #[derive(Debug, Subcommand)]
@@ -29,16 +38,19 @@ enum Command {
         /// Input `.pgm` file
         input: PathBuf,
     },
-    /// Render `.pgm` → SVG.
+    /// Render `.pgm` → SVG / draw.io.
     Render {
         /// Input `.pgm` file
         input: PathBuf,
-        /// Output SVG path (default: stdout)
+        /// Output path (default: stdout)
         #[arg(short, long)]
         output: Option<PathBuf>,
         /// Theme id override
         #[arg(long)]
         theme: Option<String>,
+        /// Output format
+        #[arg(long, value_enum, default_value_t = RenderFormat::Svg)]
+        format: RenderFormat,
     },
     /// Compute layout metrics (§5.2): correctness / quality / observation.
     Measure {
@@ -56,6 +68,11 @@ enum Command {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
+    /// Explain the solved layout as LLM-readable facts (ADR-007 layout facts).
+    Explain {
+        /// Input `.pgm` file
+        input: PathBuf,
+    },
 }
 
 fn main() -> ExitCode {
@@ -66,9 +83,28 @@ fn main() -> ExitCode {
             input,
             output,
             theme,
-        } => run_render(&input, output, theme),
+            format,
+        } => run_render(&input, output, theme, format),
         Command::Measure { input, json } => run_measure(&input, json),
         Command::DebugLayout { input, output } => run_debug_layout(&input, output),
+        Command::Explain { input } => run_explain(&input),
+    }
+}
+
+fn run_explain(input: &PathBuf) -> ExitCode {
+    let source = match read_source(input) {
+        Ok(s) => s,
+        Err(code) => return code,
+    };
+    match plotgram_compile::build_explain(&source, &BuildOptions::default()) {
+        Ok(text) => {
+            println!("{text}");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("explain {}: {e}", input.display());
+            ExitCode::FAILURE
+        }
     }
 }
 
@@ -120,7 +156,12 @@ fn run_validate(input: &PathBuf) -> ExitCode {
     }
 }
 
-fn run_render(input: &PathBuf, output: Option<PathBuf>, theme: Option<String>) -> ExitCode {
+fn run_render(
+    input: &PathBuf,
+    output: Option<PathBuf>,
+    theme: Option<String>,
+    format: RenderFormat,
+) -> ExitCode {
     let source = match read_source(input) {
         Ok(s) => s,
         Err(code) => return code,
@@ -129,20 +170,26 @@ fn run_render(input: &PathBuf, output: Option<PathBuf>, theme: Option<String>) -
         theme,
         ..BuildOptions::default()
     };
-    match build_svg_with_layout(&source, &options) {
-        Ok((layout, svg)) => {
+    let built = match format {
+        RenderFormat::Svg => build_svg_with_layout(&source, &options).map(|(layout, svg)| {
             // Layout diagnostics exit (roadmap phase C): warnings never
             // affect geometry or exit code — structured output to stderr.
             for w in &layout.diagnostics.warnings {
                 eprintln!("warning: {}: {}", input.display(), w.message);
             }
+            svg
+        }),
+        RenderFormat::Drawio => build_drawio(&source, &options),
+    };
+    match built {
+        Ok(text) => {
             if let Some(path) = output {
-                if let Err(e) = fs::write(&path, svg) {
+                if let Err(e) = fs::write(&path, text) {
                     eprintln!("write {}: {e}", path.display());
                     return ExitCode::FAILURE;
                 }
             } else {
-                print!("{svg}");
+                print!("{text}");
             }
             ExitCode::SUCCESS
         }

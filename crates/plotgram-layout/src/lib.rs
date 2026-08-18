@@ -12,7 +12,8 @@ mod params;
 pub use layout::{
     build_debug_trace, group_penetration_violations, verify_no_group_penetration, CircularLayout,
     CircularParams, GroupPenetrationViolation, HierarchicalLayout, LayoutDebugTrace,
-    SequenceLayout, SequenceParams, TreeLayout, TreeParams,
+    OrganicLayout, OrganicParams, OrganicPreset, SequenceLayout, SequenceParams, TreeLayout,
+    TreeParams,
 };
 
 /// Frame-pad contract constants (see `layout::hierarchical::group_frame`).

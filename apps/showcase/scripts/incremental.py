@@ -27,8 +27,14 @@ def svg_rel_for(pgm_rel: str) -> str:
     return f"_out/{stem}.svg"
 
 
-def needs_render(pgm_abs: Path, svg_abs: Path, binary_abs: Path) -> bool:
-    if not svg_abs.exists():
+def facts_rel_for(pgm_rel: str) -> str:
+    """Layout facts sidecar (ADR-007 explain): _out/{stem}.facts.txt"""
+    stem = pgm_rel[:-4] if pgm_rel.endswith(".pgm") else pgm_rel
+    return f"_out/{stem}.facts.txt"
+
+
+def needs_render(pgm_abs: Path, svg_abs: Path, binary_abs: Path, facts_abs: Path) -> bool:
+    if not svg_abs.exists() or not facts_abs.exists():
         return True
     svg_mtime = svg_abs.stat().st_mtime
     if pgm_abs.stat().st_mtime > svg_mtime:
@@ -65,7 +71,8 @@ def main() -> int:
         total += 1
         pgm_abs = showcase / pgm_rel
         svg_abs = showcase / svg_rel_for(pgm_rel)
-        if args.force or needs_render(pgm_abs, svg_abs, binary):
+        facts_abs = showcase / facts_rel_for(pgm_rel)
+        if args.force or needs_render(pgm_abs, svg_abs, binary, facts_abs):
             out_lines.append(pgm_rel)
             rendered += 1
 

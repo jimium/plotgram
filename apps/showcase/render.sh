@@ -169,6 +169,20 @@ render_one() {
 
   local hash
   hash="$(sha256_file "$svg_abs")"
+
+  # layout facts sidecar (ADR-007 explain). Best-effort: a failure never
+  # fails the sample — write a placeholder so incremental stays consistent.
+  local facts_rel="_out/${path%.pgm}.facts.txt"
+  local facts_abs="$SCRIPT_DIR/$facts_rel"
+  : > "$ERR_FILE"
+  set +e
+  "$BIN" explain "$pgm_abs" > "$facts_abs" 2>"$ERR_FILE"
+  local x_rc=$?
+  set -e
+  if [[ $x_rc -ne 0 ]]; then
+    echo "// explain failed: $(head -c 300 "$ERR_FILE" | tr '\n' ' ')" > "$facts_abs"
+  fi
+
   emit_result "$path" "ok" "$svg_rel" "-" "$(( ${v_ms:-0} + ${r_ms:-0} ))" "$hash"
   echo "  ✓ $path ($(( ${v_ms:-0} + ${r_ms:-0} ))ms)"
 }

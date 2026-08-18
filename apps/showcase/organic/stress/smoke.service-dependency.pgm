@@ -1,0 +1,19 @@
+// 力导向冒烟：连通主图 + 孤立节点（组件 shelf 装箱路径）
+diagram {
+    title: "服务依赖",
+    layout: organic
+
+    node gw "Gateway"
+    node auth "Auth"
+    node core "Core"
+    node cache "Cache"
+    node db "DB"
+    node audit "Audit"
+
+    gw -> auth
+    gw -> core
+    core -> cache
+    cache -> db
+    db -> core
+    core -> gw
+}

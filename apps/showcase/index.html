@@ -313,11 +313,23 @@
       padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.08);
       color: #9aa4b2; font-size: 11px; font-family: var(--mono);
     }
+    .lb-tabs { display: flex; gap: 4px; }
+    .lb-tab {
+      font: inherit; font-size: 11px; color: #9aa4b2;
+      background: transparent; border: 1px solid transparent; border-radius: 6px;
+      padding: 3px 9px; cursor: pointer;
+    }
+    .lb-tab:hover { color: #e8edf2; }
+    .lb-tab.active {
+      color: #e8edf2; background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.14);
+    }
     .lb-dsl-pane pre {
       margin: 0; padding: 14px 16px;
       font: 12.5px/1.55 var(--mono);
       color: #d7dee7; white-space: pre; tab-size: 2;
     }
+    .lb-dsl-pane pre.hide { display: none; }
     .lb-hint {
       position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
       background: rgba(12,16,22,0.72); color: #e8edf2; font-size: 11px;
@@ -409,14 +421,18 @@
     <div class="lb-body">
       <div class="lb-svg-pane" id="lb-svg-pane">
         <img id="lb-img" alt="" />
-        <div class="lb-hint" id="lb-hint">j/k 切换 · 拖拽平移 · 滚轮缩放 · Esc 关闭</div>
+        <div class="lb-hint" id="lb-hint">j/k 切换 · f 布局事实 · 拖拽平移 · 滚轮缩放 · Esc 关闭</div>
       </div>
       <div class="lb-dsl-pane">
         <div class="lb-dsl-bar">
-          <span>DSL</span>
+          <div class="lb-tabs">
+            <button id="lb-tab-dsl" class="lb-tab active" type="button">DSL</button>
+            <button id="lb-tab-facts" class="lb-tab" type="button">布局事实</button>
+          </div>
           <button class="linkish" id="lb-copy" type="button" style="color:#9ec8c3">复制路径</button>
         </div>
         <pre id="lb-dsl"></pre>
+        <pre id="lb-facts" class="hide"></pre>
       </div>
     </div>
   </div>
@@ -435,7 +451,7 @@
 
     const state = {
       manifest: null,
-      layout: new Set(),
+      layout: null,
       facet: new Set(),
       role: new Set(),
       status: new Set(),
@@ -443,6 +459,8 @@
       view: "grid",
       filtered: [],
       lbIndex: -1,
+      lbTab: "dsl",
+      lbFactsUrl: null,
       scale: 1, tx: 0, ty: 0, isFit: true,
       hintTimer: null,
     };
@@ -452,7 +470,7 @@
 
     function parseHash() {
       const h = location.hash.replace(/^#/, "");
-      state.layout.clear();
+      state.layout = null;
       state.facet.clear();
       state.role.clear();
       state.status.clear();
@@ -460,8 +478,9 @@
       state.view = "grid";
       if (h) {
         const params = new URLSearchParams(h);
+        const layoutV = params.get("layout");
+        if (layoutV) state.layout = layoutV.split(",")[0] || null;
         for (const [k, set] of [
-          ["layout", state.layout],
           ["facet", state.facet],
           ["role", state.role],
           ["status", state.status],
@@ -486,7 +505,7 @@
     function writeHash() {
       const params = new URLSearchParams();
       const put = (k, set) => { if (set.size) params.set(k, [...set].sort().join(",")); };
-      put("layout", state.layout);
+      if (state.layout) params.set("layout", state.layout);
       put("facet", state.facet);
       put("role", state.role);
       put("status", state.status);
@@ -533,7 +552,7 @@
 
     function layoutScopedSamples() {
       return state.manifest.samples.filter((s) =>
-        !state.layout.size || state.layout.has(s.layout)
+        !state.layout || s.layout === state.layout
       );
     }
 
@@ -548,7 +567,7 @@
         statuses.set(s.status, (statuses.get(s.status) || 0) + 1);
         if (s.changed) statuses.set("changed", (statuses.get("changed") || 0) + 1);
       }
-      renderChips("layout-chips", state.layout, sortKeys(layouts.keys(), [...layouts.keys()].sort()), layouts);
+      renderSingleChips("layout-chips", state.layout, sortKeys(layouts.keys(), [...layouts.keys()].sort()), layouts);
       renderChips("role-chips", state.role, sortKeys(roles.keys(), ROLE_ORDER), roles);
       renderChips("status-chips", state.status, STATUS_ORDER.filter((k) => statuses.has(k)), statuses, (k) =>
         k === "changed" ? "changed" : (STATUS_META[k]?.label || k)
@@ -576,6 +595,25 @@
       renderChips("facet-chips", state.facet, sortKeys(facets.keys(), FACET_ORDER), facets);
     }
 
+    function renderSingleChips(containerId, active, keys, counts, labelFn) {
+      const el = $(containerId);
+      el.innerHTML = "";
+      for (const k of keys) {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "chip" + (active === k ? " active" : "");
+        const label = labelFn ? labelFn(k) : k;
+        chip.innerHTML = `${label}<span class="n">${counts.get(k) || 0}</span>`;
+        chip.onclick = () => {
+          state.layout = active === k ? null : k;
+          rebuildFacetChips();
+          renderSingleChips(containerId, state.layout, keys, counts, labelFn);
+          renderAll();
+        };
+        el.appendChild(chip);
+      }
+    }
+
     function renderChips(containerId, activeSet, keys, counts, labelFn) {
       const el = $(containerId);
       el.innerHTML = "";
@@ -588,8 +626,7 @@
         chip.onclick = () => {
           if (activeSet.has(k)) activeSet.delete(k);
           else activeSet.add(k);
-          if (containerId === "layout-chips") rebuildFacetChips();
-          else renderChips(containerId, activeSet, keys, counts, labelFn);
+          renderChips(containerId, activeSet, keys, counts, labelFn);
           renderAll();
         };
         el.appendChild(chip);
@@ -597,7 +634,7 @@
     }
 
     function matchesFilters(s) {
-      if (state.layout.size && !state.layout.has(s.layout)) return false;
+      if (state.layout && s.layout !== state.layout) return false;
       if (state.facet.size && !state.facet.has(s.facet || "")) return false;
       if (state.role.size && !state.role.has(s.role)) return false;
       if (state.status.size) {
@@ -708,7 +745,7 @@
     }
 
     function clearAll() {
-      state.layout.clear(); state.facet.clear(); state.role.clear(); state.status.clear();
+      state.layout = null; state.facet.clear(); state.role.clear(); state.status.clear();
       state.search = "";
       $("search").value = "";
       buildFilters();
@@ -749,10 +786,48 @@
     const lb = $("lightbox");
     const lbImg = $("lb-img");
     const lbDsl = $("lb-dsl");
+    const lbFacts = $("lb-facts");
+    const lbTabDslBtn = $("lb-tab-dsl");
+    const lbTabFactsBtn = $("lb-tab-facts");
     const lbTitle = $("lb-title");
     const lbZoomPct = $("lb-zoom-pct");
     const lbSvgPane = $("lb-svg-pane");
     const lbHint = $("lb-hint");
+
+    function factsUrlFor(path) {
+      const stem = path.endsWith(".pgm") ? path.slice(0, -4) : path;
+      return `_out/${stem}.facts.txt`;
+    }
+
+    async function loadFacts(force) {
+      const s = state.filtered[state.lbIndex];
+      if (!s) return;
+      const url = factsUrlFor(s.path);
+      if (!force && state.lbFactsUrl === url) return;
+      state.lbFactsUrl = url;
+      lbFacts.textContent = "加载布局事实…";
+      try {
+        const r = await fetch(url, { cache: "no-cache" });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const text = await r.text();
+        if (state.lbFactsUrl === url) lbFacts.textContent = text;
+      } catch (e) {
+        if (state.lbFactsUrl === url) {
+          lbFacts.textContent = `// 无法加载 ${url}: ${e}\n// 请先运行 ./apps/showcase/render.sh 生成 facts sidecar`;
+        }
+      }
+    }
+
+    function setLbTab(tab) {
+      state.lbTab = tab;
+      lbTabDslBtn.classList.toggle("active", tab === "dsl");
+      lbTabFactsBtn.classList.toggle("active", tab === "facts");
+      lbDsl.classList.toggle("hide", tab !== "dsl");
+      lbFacts.classList.toggle("hide", tab !== "facts");
+      if (tab === "facts") loadFacts(false);
+    }
+    lbTabDslBtn.onclick = () => setLbTab("dsl");
+    lbTabFactsBtn.onclick = () => setLbTab("facts");
 
     async function openLightbox(path) {
       const idx = state.filtered.findIndex((s) => s.path === path);
@@ -772,6 +847,8 @@
       if (!s) return;
       lbTitle.textContent = s.path;
       lbDsl.textContent = "加载 DSL…";
+      lbFacts.textContent = "";
+      state.lbFactsUrl = null;
       lbImg.removeAttribute("src");
       lbImg.style.visibility = "hidden";
       state.scale = 1; state.tx = 0; state.ty = 0; state.isFit = true;
@@ -787,6 +864,7 @@
       } catch (e) {
         lbDsl.textContent = `// 无法加载 ${s.path}: ${e}`;
       }
+      if (state.lbTab === "facts") loadFacts(true);
       if (state.isFit) requestAnimationFrame(fitToView);
     }
 
@@ -938,6 +1016,7 @@
         else if (e.key === "+" || e.key === "=") { e.preventDefault(); zoomBy(1.2); }
         else if (e.key === "-") { e.preventDefault(); zoomBy(1 / 1.2); }
         else if (e.key === "0") { e.preventDefault(); fitToView(); }
+        else if (e.key === "f") { e.preventDefault(); setLbTab(state.lbTab === "facts" ? "dsl" : "facts"); }
         return;
       }
       if (e.key === "/" && document.activeElement !== $("search")) {

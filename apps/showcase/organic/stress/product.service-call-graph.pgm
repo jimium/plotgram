@@ -1,0 +1,32 @@
+// 力导向产品样例：微服务调用网（含双向依赖与环）
+diagram {
+    title: "微服务调用网",
+    layout: organic {
+        preferred_edge_length: 140,
+        minimum_node_distance: 40
+    }
+
+    node edge "Edge"
+    node web "Web"
+    node mobile "Mobile"
+    node gateway "Gateway"
+    node identity "Identity"
+    node order "Order"
+    node payment "Payment"
+    node inventory "Inventory"
+    node notify "Notify"
+    node search "Search"
+
+    edge -> gateway
+    web -> gateway
+    mobile -> gateway
+    gateway -> identity
+    gateway -> order
+    order -> payment
+    order -> inventory
+    order -> notify
+    payment -> notify
+    inventory -> order
+    search -> order
+    search -> inventory
+}

@@ -1086,6 +1086,48 @@ mod tests {
     }
 
     #[test]
+    fn tree_orthogonal_edges_keep_visible_final_drop_into_child() {
+        // min_first_segment == layer_gap in every preset; the elbow must not
+        // pin onto the child row's top edge, or the final segment degenerates
+        // and the arrowhead arrives sideways along the node tops.
+        for style in ["orthogonal", "orthogonal-at-root"] {
+            let graph = Graph {
+                nodes: vec![node("root"), node("l"), node("r")],
+                edges: vec![edge("e0", "root", "l"), edge("e1", "root", "r")],
+                groups: vec![],
+                partition: None,
+            };
+            let result = run(&LayoutContract {
+                layout: tree_options(&[("routing_style", AttrValue::Atom(style.into()))]),
+                edge_routing: None,
+                graph,
+                node_sizes: sizes(&["root", "l", "r"]),
+            })
+            .unwrap();
+            for e in &result.edges {
+                let pts = e.path.polyline_points().unwrap();
+                let last = pts.len() - 1;
+                assert!(
+                    pts[last].y > pts[last - 1].y + 8.0,
+                    "{style}: arrow should approach the child port downward, got {pts:?}"
+                );
+                for p in &pts[..last] {
+                    assert!(
+                        p.y < pts[last].y - 8.0,
+                        "{style}: elbow must stay clear of the child row's top edge, got {pts:?}"
+                    );
+                }
+                if style == "orthogonal" {
+                    assert!(
+                        (pts[last].x - pts[last - 1].x).abs() < 1e-6,
+                        "{style}: final segment should be vertical, got {pts:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn tree_assistant_sits_beside_bus_regulars_below() {
         let graph = Graph {
             nodes: vec![

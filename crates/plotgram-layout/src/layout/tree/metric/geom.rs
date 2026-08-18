@@ -36,6 +36,12 @@ pub fn opposite(side: Side) -> Side {
     }
 }
 
+/// Minimum visible drop between an elbow and the child port. Without it the
+/// elbow can pin onto the child row's top edge: the final segment degenerates
+/// to zero length (arrowhead orientation falls back to the horizontal run)
+/// and the horizontal run grazes node tops.
+const MIN_FINAL_SEGMENT: f64 = 16.0;
+
 pub fn orthogonal_route(start: Point, from_side: Side, end: Point, to_side: Side) -> TreeRoute {
     let vertical_from = matches!(from_side, Side::North | Side::South);
     let vertical_to = matches!(to_side, Side::North | Side::South);
@@ -124,7 +130,11 @@ pub fn parent_child_route(
             } else {
                 1.0
             };
-            let elbow_y = start.y + dir * min_first_segment;
+            let gap = (end.y - start.y) * dir;
+            let stem = min_first_segment
+                .min((gap - MIN_FINAL_SEGMENT).max(gap / 2.0))
+                .max(0.0);
+            let elbow_y = start.y + dir * stem;
             TreeRoute::Polyline {
                 points: vec![
                     start,
@@ -140,8 +150,12 @@ pub fn parent_child_route(
             let mut route = orthogonal_route(start, from_side, end, to_side);
             if let TreeRoute::OrthoThreeSeg { start, mid_y, end } = &mut route {
                 if matches!(from_side, Side::South) && *mid_y < start.y + min_first_segment {
-                    let cap = end.y - 1e-6;
-                    *mid_y = (start.y + min_first_segment).min(cap).max(start.y);
+                    // Honor the stem minimum when the seam has room, but keep
+                    // the elbow above `end.y - MIN_FINAL_SEGMENT` (or at the
+                    // natural midpoint on tight seams) so the final drop into
+                    // the child stays vertical and visible.
+                    let cap = (end.y - MIN_FINAL_SEGMENT).max(*mid_y);
+                    *mid_y = (start.y + min_first_segment).min(cap);
                 }
             }
             route

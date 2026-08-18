@@ -11,6 +11,7 @@
 
 pub mod ascii;
 pub mod decorations;
+pub mod drawio;
 pub mod edges;
 pub mod group;
 pub mod icons;
@@ -74,6 +75,11 @@ pub fn render_svg(input: &RenderInput) -> String {
     }
 
     svg.finish()
+}
+
+/// Render a complete diagram to draw.io (mxGraphModel) XML.
+pub fn render_drawio(input: &RenderInput) -> String {
+    drawio::render_drawio(input)
 }
 
 /// Internal SVG document builder.

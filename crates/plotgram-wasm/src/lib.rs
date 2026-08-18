@@ -5,7 +5,7 @@
 //! geometry is written back — the trace is a read-only projection
 //! (write-authority discipline).
 
-use plotgram_compile::{build_debug_trace, build_svg, BuildOptions};
+use plotgram_compile::{build_debug_trace, build_drawio, build_svg, BuildOptions};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
@@ -29,6 +29,12 @@ pub fn debug_trace(source: &str) -> Result<String, JsError> {
 #[wasm_bindgen(js_name = renderSvg)]
 pub fn render_svg(source: &str) -> Result<String, JsError> {
     build_svg(source, &BuildOptions::default()).map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// Render the source into draw.io (mxGraphModel) XML.
+#[wasm_bindgen(js_name = renderDrawio)]
+pub fn render_drawio(source: &str) -> Result<String, JsError> {
+    build_drawio(source, &BuildOptions::default()).map_err(|e| JsError::new(&e.to_string()))
 }
 
 #[wasm_bindgen]
